@@ -1,0 +1,11 @@
+[mcp_servers.wordpress-playground]
+command = "npx"
+args = ["-y", "@wp-playground/mcp"]
+
+[mcp_servers.playwright]
+command = "npx"
+args = ["-y", "@playwright/mcp@latest", "--browser", "chrome"]
+
+[mcp_servers.jotform]
+url = "https://mcp.jotform.com"
+auth = "oauth"
