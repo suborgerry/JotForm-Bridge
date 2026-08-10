@@ -1,0 +1,1490 @@
+# AGENTS.md — Jotform Bridge
+
+## Проект
+
+Разрабатываем standalone WordPress-плагин:
+
+**Jotform Bridge**
+
+Назначение плагина — использовать Jotform как headless backend для WordPress-форм.
+
+Jotform отвечает за:
+
+* структуру форм;
+* submissions;
+* email notifications;
+* integrations;
+* хранение данных.
+
+WordPress отвечает за:
+
+* frontend HTML;
+* custom templates;
+* UX;
+* отправку данных через собственный REST endpoint;
+* server-side validation;
+* mapping данных в Jotform.
+
+Основной сценарий — полностью кастомная HTML-разметка формы.
+
+В дальнейшем также поддерживается автоматическая генерация формы из Jotform schema.
+
+---
+
+# Минимальные системные требования
+
+Поддерживаем:
+
+* WordPress >= 6.4
+* PHP >= 8.0
+
+Plugin header должен содержать:
+
+```text
+Requires at least: 6.4
+Requires PHP: 8.0
+```
+
+Не использовать PHP features, появившиеся после PHP 8.0, если они делают PHP 8.0 несовместимым.
+
+Например, не делать обязательными:
+
+* enums;
+* readonly properties;
+* intersection types;
+* PHP 8.1+ syntax.
+
+Можно использовать возможности PHP 8.0:
+
+* typed properties;
+* union types;
+* constructor property promotion;
+* match;
+* nullsafe operator.
+
+---
+
+# Универсальность
+
+Плагин должен быть полностью standalone.
+
+Он НЕ должен зависеть от:
+
+* Sage;
+* Blade;
+* Acorn;
+* ACF;
+* Elementor;
+* WooCommerce;
+* Gutenberg;
+* jQuery;
+* React;
+* Vue;
+* Laravel;
+* конкретной WordPress-темы;
+* конкретного сайта;
+* Node.js в production;
+* frontend build system сайта.
+
+Sage и Blade в текущей версии вообще не поддерживаем и не учитываем.
+
+Custom templates версии 1 — обычные PHP templates.
+
+---
+
+# Composer
+
+Composer разрешен для разработки и PSR-4 autoloading.
+
+Однако конечный plugin package должен работать после обычной установки WordPress-плагина.
+
+Пользователь не должен выполнять:
+
+```bash
+composer install
+```
+
+после установки ZIP.
+
+Если используется Composer autoload, production package должен содержать необходимые runtime autoload files.
+
+Не добавлять сторонние Composer dependencies без реальной необходимости.
+
+Предпочитать WordPress Core API.
+
+---
+
+# Основная архитектурная идея
+
+Не привязывать frontend к Jotform Form ID или Question ID.
+
+Публичный код работает через локальную сущность:
+
+**Integration**
+
+Например:
+
+```text
+contact
+consultation
+career
+```
+
+Integration связывает:
+
+```text
+local slug
+    ↓
+Jotform Form
+    ↓
+rendering mode
+    ↓
+optional custom template
+```
+
+Theme code не должен содержать Jotform Form ID.
+
+---
+
+# Integration
+
+Integration должна иметь минимум следующие данные:
+
+```text
+Name
+Slug
+Jotform Form ID
+Rendering Mode
+Template Slug
+Active
+```
+
+Rendering modes:
+
+```text
+custom
+auto
+```
+
+Одна Jotform Form может использоваться несколькими integrations.
+
+Например:
+
+```text
+Jotform Form:
+Request Consultation
+
+Integrations:
+consultation
+consultation-popup
+consultation-footer
+```
+
+Это намеренное требование.
+
+---
+
+# Хранение данных
+
+Не создавать custom database tables без необходимости.
+
+Использовать WordPress options.
+
+Предпочтительно разделить:
+
+```text
+jotform_bridge_settings
+jotform_bridge_integrations
+```
+
+или аналогичные namespaced options.
+
+Все данные:
+
+* sanitize при сохранении;
+* validate перед использованием.
+
+---
+
+# Jotform API
+
+Создать отдельный:
+
+```text
+JotformClient
+```
+
+Он является единственным низкоуровневым слоем взаимодействия с Jotform REST API.
+
+Другие части приложения не должны самостоятельно строить произвольные HTTP-запросы к Jotform.
+
+Использовать:
+
+```php
+wp_remote_get()
+wp_remote_post()
+```
+
+или соответствующие функции WordPress HTTP API.
+
+Не использовать прямой cURL без объективной причины.
+
+JotformClient должен обрабатывать:
+
+* WP_Error;
+* timeout;
+* non-2xx response;
+* malformed response;
+* API error;
+* unavailable service.
+
+Не молчать при ошибках.
+
+---
+
+# Jotform API documentation
+
+Не угадывать формат Jotform REST API.
+
+Перед реализацией конкретного API interaction проверить актуальную официальную документацию Jotform.
+
+Особенно важно проверить:
+
+* authentication;
+* получение forms;
+* получение questions;
+* submission endpoint;
+* submission payload;
+* composite fields;
+* checkbox/radio/select formats.
+
+Jotform MCP НЕ является заменой REST API documentation.
+
+Production plugin использует Jotform REST API.
+
+---
+
+# API Key
+
+Jotform API key никогда не должен попадать на frontend.
+
+Приоритет источников:
+
+```text
+1. JOTFORM_API_KEY constant
+2. WordPress option
+```
+
+Например:
+
+```php
+define('JOTFORM_API_KEY', '...');
+```
+
+Если constant определена:
+
+* использовать ее;
+* не перезаписывать;
+* показать в Admin, что API key задается externally;
+* не показывать его значение.
+
+Сохраненный API key:
+
+* никогда не выводить полностью обратно;
+* не добавлять в frontend HTML;
+* не добавлять в JavaScript;
+* не возвращать через REST API;
+* не писать в debug logs.
+
+---
+
+# Jotform region
+
+Все API URL должны формироваться централизованно.
+
+Не hardcode API base URL в разных классах.
+
+Поддержать настройку региона/base URL через JotformClient configuration.
+
+Архитектура должна позволять поддерживать Standard/EU и другие Jotform environments.
+
+---
+
+# Schema
+
+Jotform question schema нельзя использовать непосредственно во frontend.
+
+Нужен слой:
+
+```text
+Jotform Questions
+       ↓
+FieldNormalizer
+       ↓
+Normalized Schema
+```
+
+Normalized Schema является внутренним контрактом приложения.
+
+---
+
+# Semantic fields
+
+Custom template не должен знать Jotform qid.
+
+Нельзя требовать:
+
+```html
+<input name="q7">
+```
+
+или:
+
+```html
+<input data-jotform-field="7">
+```
+
+Использовать semantic identifiers.
+
+Например:
+
+```html
+<input data-jotform-field="email">
+```
+
+Composite fields:
+
+```html
+<input data-jotform-field="name.first">
+<input data-jotform-field="name.last">
+```
+
+Address:
+
+```html
+<input data-jotform-field="address.street">
+<input data-jotform-field="address.city">
+<input data-jotform-field="address.state">
+<input data-jotform-field="address.zip">
+```
+
+Разработчик template не должен знать внутренние Jotform Question IDs.
+
+---
+
+# Semantic key generation
+
+Использовать наиболее стабильный machine-readable identifier, предоставляемый Jotform schema.
+
+Не полагаться только на visible label.
+
+Labels могут:
+
+* изменяться;
+* повторяться;
+* содержать пробелы;
+* содержать special characters.
+
+Raw Jotform qid должен сохраняться внутри normalized schema как authoritative mapping.
+
+Если semantic key collision невозможно разрешить однозначно:
+
+* не угадывать;
+* пометить schema как problematic;
+* показать понятную ошибку administrator.
+
+---
+
+# FieldNormalizer
+
+FieldNormalizer преобразует Jotform-specific data во внутренний формат.
+
+Концептуальный пример:
+
+```php
+[
+    'key'      => 'email',
+    'qid'      => '7',
+    'type'     => 'email',
+    'required' => true,
+]
+```
+
+Composite:
+
+```php
+[
+    'key'      => 'name',
+    'qid'      => '3',
+    'type'     => 'name',
+    'required' => true,
+    'children' => [
+        'first',
+        'last',
+    ],
+]
+```
+
+Поддерживаемые основные типы:
+
+* textbox;
+* textarea;
+* email;
+* phone;
+* full name;
+* address;
+* dropdown/select;
+* radio;
+* checkbox;
+* number;
+* date, если возможно без неправильных предположений.
+
+Unsupported fields:
+
+* не должны silently corrupt data;
+* должны отмечаться как unsupported;
+* должны быть видны administrator.
+
+---
+
+# Custom Templates
+
+Custom templates располагаются в активной WordPress theme.
+
+Базовый каталог:
+
+```text
+/forms/
+```
+
+Пример:
+
+```text
+wp-content/themes/example/
+└── forms/
+    ├── contact.php
+    └── consultation.php
+```
+
+Поддерживать:
+
+* active theme;
+* child theme;
+* parent theme.
+
+Child theme имеет приоритет при конфликте template slug.
+
+Предоставить filter:
+
+```text
+jotform_bridge_template_paths
+```
+
+чтобы разработчики могли добавлять дополнительные template directories.
+
+---
+
+# Template metadata
+
+Template обнаруживается по file header.
+
+Пример:
+
+```php
+<?php
+/*
+Jotform Template Name: Contact Form
+Jotform Template Slug: contact
+*/
+?>
+```
+
+Обязательные metadata:
+
+```text
+Jotform Template Name
+Jotform Template Slug
+```
+
+Jotform Form ID внутри template запрещен.
+
+Неправильно:
+
+```text
+Jotform Form ID: 123456789
+```
+
+Template идентифицирует только frontend template.
+
+Связь:
+
+```text
+Template
+↔
+Jotform Form
+```
+
+хранится в Integration configuration.
+
+---
+
+# TemplateScanner
+
+TemplateScanner должен:
+
+* сканировать только разрешенные directories;
+* находить PHP templates;
+* читать header без исполнения файла;
+* проверять metadata;
+* формировать registry;
+* отклонять duplicate slugs с понятной диагностикой;
+* учитывать child theme priority;
+* предотвращать directory traversal.
+
+Нельзя сканировать theme files на каждом frontend request.
+
+Registry должен кешироваться.
+
+Добавить возможность:
+
+```text
+Rescan Templates
+```
+
+---
+
+# TemplateRegistry
+
+Registry entry концептуально:
+
+```php
+[
+    'slug' => 'contact',
+    'name' => 'Contact Form',
+    'file' => '/trusted/path/forms/contact.php',
+]
+```
+
+Можно render только file, обнаруженный TemplateScanner и находящийся внутри разрешенного template path.
+
+Никогда не render произвольный path, полученный из:
+
+* $_GET;
+* $_POST;
+* REST request;
+* admin field.
+
+---
+
+# Template Validation
+
+TemplateValidator сравнивает:
+
+```text
+data-jotform-field
+```
+
+из custom template с Normalized Schema Jotform form.
+
+Static semantic identifiers в templates должны быть literal strings.
+
+Например:
+
+```html
+data-jotform-field="email"
+```
+
+TemplateValidator должен определять:
+
+* required fields present;
+* required fields missing;
+* optional fields missing;
+* unknown template fields;
+* unsupported schema fields.
+
+Статусы:
+
+```text
+Compatible
+Compatible with warnings
+Invalid
+```
+
+Пример diagnostics:
+
+```text
+Email       email        ✓
+First Name  name.first   ✓
+Last Name   name.last    ✓
+Company     company      Missing optional
+Phone       phone        Missing required
+```
+
+Required field missing:
+
+```text
+ERROR
+```
+
+Optional field missing:
+
+```text
+WARNING
+```
+
+---
+
+# Schema refresh
+
+Jotform form может измениться вне WordPress.
+
+Schema не считать вечной.
+
+Кешировать normalized schema и fingerprint/hash.
+
+Добавить:
+
+```text
+Refresh Schema
+```
+
+После refresh:
+
+1. получить current Jotform schema;
+2. normalize;
+3. обновить cache;
+4. пересчитать template compatibility.
+
+Не обращаться к Jotform API на каждом frontend page view.
+
+---
+
+# Rendering
+
+Поддерживаем два renderer:
+
+```text
+CustomTemplateRenderer
+AutoRenderer
+```
+
+Custom Template — основной сценарий.
+
+AutoRenderer реализуется после рабочего custom-template flow.
+
+Renderer должен использовать:
+
+```text
+Integration
++
+Normalized Schema
+```
+
+Не обращаться напрямую к Jotform API во время обычного rendering при наличии cached schema.
+
+---
+
+# PHP rendering API
+
+Предоставить public helper:
+
+```php
+jotform_form('contact')
+```
+
+Предпочтительно helper возвращает HTML.
+
+Использование:
+
+```php
+echo jotform_form('contact');
+```
+
+Также предоставить shortcode:
+
+```text
+[jotform_form id="contact"]
+```
+
+Shortcode и PHP helper используют один и тот же rendering service.
+
+Business logic не дублировать.
+
+---
+
+# Custom template context
+
+Custom PHP template может получить безопасный context, необходимый для rendering.
+
+Например:
+
+```text
+integration
+schema
+endpoint
+```
+
+Template не должен hardcode integration-specific Jotform ID.
+
+Form markup может использовать runtime integration slug.
+
+Например:
+
+```php
+<form
+    data-jotform-bridge
+    data-jotform-integration="<?php echo esc_attr($integration['slug']); ?>"
+>
+```
+
+---
+
+# Frontend JavaScript
+
+Использовать vanilla JavaScript.
+
+Не использовать jQuery.
+
+JS должен работать без build pipeline.
+
+Production plugin содержит готовый:
+
+```text
+assets/frontend.js
+```
+
+Основной form marker:
+
+```html
+<form
+    data-jotform-bridge
+    data-jotform-integration="contact"
+>
+```
+
+Field marker:
+
+```html
+data-jotform-field="email"
+```
+
+JS должен:
+
+* intercept submit;
+* собирать semantic fields;
+* правильно обрабатывать radio;
+* checkbox;
+* select;
+* multi-value fields;
+* composite fields;
+* блокировать repeated/double submit;
+* отправлять JSON;
+* показывать validation errors;
+* восстанавливать submit state после ошибки.
+
+Dispatch events:
+
+```text
+jotformbridge:before-submit
+jotformbridge:success
+jotformbridge:error
+```
+
+Не навязывать popup/animation/redirect.
+
+Theme должна иметь возможность построить собственный UX.
+
+---
+
+# REST API
+
+Namespace:
+
+```text
+jotform-bridge/v1
+```
+
+Submission route:
+
+```text
+POST /wp-json/jotform-bridge/v1/submit/{integration}
+```
+
+Например:
+
+```text
+POST /wp-json/jotform-bridge/v1/submit/contact
+```
+
+Использовать WordPress REST API:
+
+```php
+register_rest_route()
+WP_REST_Request
+WP_REST_Response
+WP_Error
+```
+
+Frontend отправляет semantic data.
+
+Концептуально:
+
+```json
+{
+    "fields": {
+        "name.first": "John",
+        "name.last": "Smith",
+        "email": "john@example.com"
+    }
+}
+```
+
+Frontend не должен отправлять authoritative:
+
+* Jotform Form ID;
+* API key;
+* qid.
+
+Backend самостоятельно определяет:
+
+```text
+integration
+→ configured Jotform form
+→ normalized schema
+→ Jotform qids
+```
+
+---
+
+# Submission Validation
+
+Все значения проверять server-side.
+
+Frontend validation — только UX.
+
+Backend проверяет:
+
+* integration exists;
+* integration active;
+* schema available;
+* allowed fields;
+* required fields;
+* field type;
+* allowed options;
+* request size.
+
+Примеры WordPress sanitization:
+
+```php
+sanitize_text_field()
+sanitize_textarea_field()
+sanitize_email()
+```
+
+Email дополнительно проверять на valid format.
+
+Select/radio values проверять по допустимым options, если schema их предоставляет.
+
+Checkbox/multi-value fields проверять по разрешенным options.
+
+Не доверять field type из frontend request.
+
+---
+
+# SubmissionMapper
+
+Создать отдельный SubmissionMapper.
+
+Он отвечает только за преобразование:
+
+```text
+semantic fields
+→
+Jotform submission payload
+```
+
+REST Controller не должен содержать mapping business logic.
+
+Особенно внимательно обрабатывать composite fields:
+
+```text
+name.first
+name.last
+address.city
+...
+```
+
+Перед реализацией mapper обязательно проверить актуальный формат Jotform REST API.
+
+Не угадывать payload.
+
+---
+
+# REST responses
+
+Success:
+
+```json
+{
+    "success": true,
+    "message": "Form submitted successfully."
+}
+```
+
+Validation failure:
+
+```text
+HTTP 422
+```
+
+```json
+{
+    "success": false,
+    "message": "Validation failed.",
+    "errors": {
+        "email": "Invalid email."
+    }
+}
+```
+
+Upstream/Jotform error:
+
+appropriate `5xx`.
+
+Не возвращать:
+
+* credentials;
+* API keys;
+* internal filesystem paths;
+* raw exception stack;
+* sensitive upstream details.
+
+---
+
+# Spam protection
+
+Публичный endpoint нельзя считать защищенным WordPress nonce.
+
+Не использовать nonce как единственную anti-spam protection anonymous form.
+
+В первой версии не обязательно реализовывать конкретный captcha provider.
+
+Но submission pipeline должен иметь extension point для будущего:
+
+* Cloudflare Turnstile;
+* reCAPTCHA;
+* custom anti-spam provider.
+
+Можно использовать interface или четкий WordPress hook/filter.
+
+---
+
+# AutoRenderer
+
+AutoRenderer строит semantic accessible HTML из Normalized Schema.
+
+Использовать:
+
+```html
+<label>
+<input>
+<textarea>
+<select>
+<fieldset>
+<legend>
+```
+
+Добавлять:
+
+* correct input types;
+* required;
+* accessible IDs;
+* error hooks;
+* predictable CSS classes.
+
+Базовые classes:
+
+```text
+.jfb-form
+.jfb-field
+.jfb-field--email
+.jfb-error
+.jfb-submit
+```
+
+Не создавать визуальный form builder.
+
+Не пытаться копировать дизайн Jotform.
+
+Не добавлять тяжелый frontend CSS framework.
+
+---
+
+# Caching
+
+Кешировать:
+
+* account forms list;
+* raw/relevant form schema;
+* normalized schema;
+* template registry.
+
+Использовать стандартные WordPress mechanisms:
+
+* transients;
+* options;
+* object cache where appropriate.
+
+Обеспечить explicit invalidation.
+
+Обычный page request не должен обращаться к Jotform API без необходимости.
+
+Страница без Jotform Bridge form не должна инициировать Jotform API calls.
+
+---
+
+# Debug logging
+
+Debug logging:
+
+```text
+disabled by default
+```
+
+Можно включить через plugin settings.
+
+Разрешено логировать:
+
+* API failure metadata;
+* HTTP status;
+* schema refresh failures;
+* template validation problems;
+* submission technical errors.
+
+Не логировать:
+
+* API key;
+* passwords;
+* полный sensitive submission content без необходимости.
+
+---
+
+# Admin UI
+
+Создать top-level admin menu:
+
+```text
+Jotform Bridge
+├── Integrations
+└── Settings
+```
+
+## Settings
+
+Минимально:
+
+```text
+API Key
+Region
+Connection Status
+Debug Logging
+```
+
+Actions:
+
+```text
+Save
+Test Connection
+Refresh Forms
+```
+
+## Integrations
+
+Integration UI:
+
+```text
+Name
+Slug
+Jotform Form
+Rendering Mode
+Template
+Active
+```
+
+Также показывать:
+
+```text
+Schema status
+Template compatibility
+```
+
+Actions:
+
+```text
+Refresh Schema
+Rescan Templates
+```
+
+Не создавать visual form builder.
+
+---
+
+# Developer diagnostics
+
+На странице Integration показывать normalized schema table.
+
+Пример columns:
+
+```text
+Label
+Semantic Key
+QID
+Type
+Required
+Template Status
+```
+
+Не заставлять разработчика открывать raw JSON.
+
+Raw response можно добавить только в debug/developer mode при необходимости.
+
+---
+
+# Security
+
+Всегда соблюдать:
+
+* capability checks в Admin;
+* admin nonces для mutating admin actions;
+* sanitization on input;
+* validation;
+* contextual escaping;
+* no arbitrary file include;
+* no path traversal;
+* no API keys on frontend;
+* no client-trusted Jotform IDs.
+
+Admin settings должны быть доступны только пользователю с подходящей capability, например:
+
+```text
+manage_options
+```
+
+Публичный submission endpoint валидирует всё самостоятельно.
+
+---
+
+# Escaping
+
+Использовать contextual escaping:
+
+```php
+esc_html()
+esc_attr()
+esc_url()
+```
+
+и другие WordPress APIs.
+
+Не пропускать user-editable admin values как raw HTML.
+
+Custom theme template является trusted developer-controlled PHP file и может формировать собственный HTML.
+
+---
+
+# Code architecture
+
+Предпочитаем современный OO PHP.
+
+Примерные ответственности:
+
+```text
+Api/
+    JotformClient
+
+Forms/
+    FieldNormalizer
+    FormSchema
+    FormRepository
+
+Integrations/
+    IntegrationRepository
+
+Templates/
+    TemplateScanner
+    TemplateRegistry
+    TemplateValidator
+
+Rendering/
+    CustomTemplateRenderer
+    AutoRenderer
+    FormRenderer
+
+Submission/
+    SubmissionValidator
+    SubmissionMapper
+
+Rest/
+    SubmissionController
+
+Admin/
+    SettingsPage
+    IntegrationsPage
+```
+
+Это ориентир, а не требование создавать бессмысленные empty classes.
+
+Не делать:
+
+* giant god class;
+* giant functions.php-style plugin file;
+* business logic внутри admin views;
+* arbitrary static globals;
+* direct `$_POST` внутри domain services.
+
+---
+
+# WordPress hooks
+
+Добавлять extension points только там, где есть реальная польза.
+
+Потенциальные hooks:
+
+```text
+jotform_bridge_template_paths
+jotform_bridge_normalized_schema
+jotform_bridge_submission_fields
+jotform_bridge_before_submit
+jotform_bridge_after_submit
+jotform_bridge_auto_field_html
+jotform_bridge_spam_check
+```
+
+Не добавлять hooks ради количества.
+
+---
+
+# MCP
+
+Для этого проекта настроены project-scoped MCP servers через:
+
+```text
+.codex/config.toml
+```
+
+Ожидаемые MCP:
+
+```text
+wordpress-playground
+playwright
+jotform
+```
+
+Используй их для verification, а не просто потому, что они доступны.
+
+---
+
+# WordPress Playground MCP
+
+Использовать для WordPress runtime verification:
+
+* plugin activation;
+* fatal errors;
+* hooks;
+* REST routes;
+* options;
+* transients;
+* PHP execution;
+* shortcode;
+* rendering;
+* lifecycle;
+* runtime smoke tests.
+
+Если изменение зависит от WordPress runtime, не ограничиваться чтением PHP-кода.
+
+По возможности реально проверить его через WordPress Playground.
+
+---
+
+# Playwright MCP
+
+Использовать для browser/UI verification:
+
+* wp-admin;
+* Settings;
+* Integrations;
+* selects;
+* buttons;
+* validation messages;
+* frontend form;
+* JS behavior;
+* REST submission;
+* success/error state;
+* double submit prevention.
+
+Если этап затрагивает UI или frontend behavior, выполнить smoke test через Playwright.
+
+---
+
+# Jotform MCP
+
+Использовать прежде всего как read/verification tool.
+
+Полезно для:
+
+* получения списка test forms;
+* проверки существования формы;
+* проверки submissions;
+* end-to-end verification.
+
+Не использовать Jotform MCP как замену официальной REST API documentation.
+
+По умолчанию НЕ:
+
+* удалять формы;
+* изменять production forms;
+* удалять submissions;
+* менять реальные production data.
+
+Для write-тестов использовать только явно test/development form.
+
+Если такой формы нет, не выполнять live write operation без явного разрешения.
+
+---
+
+# End-to-end verification
+
+Идеальный E2E flow:
+
+```text
+Playwright
+    ↓
+WordPress form
+    ↓
+WordPress REST API
+    ↓
+Jotform Bridge
+    ↓
+Jotform REST API
+    ↓
+Jotform
+    ↓
+Jotform MCP verification
+```
+
+Если live Jotform write нельзя безопасно выполнить:
+
+* проверить mapper unit/integration tests;
+* проверить REST validation;
+* использовать fixtures/mocks;
+* явно указать, что live upstream write не проверялся.
+
+---
+
+# MCP failure policy
+
+Если конкретный MCP недоступен:
+
+* не ломать implementation;
+* выполнить доступную альтернативную проверку;
+* в финальном отчете явно указать, что именно не было проверено.
+
+Никогда не утверждать, что E2E test прошел, если он не выполнялся.
+
+---
+
+# Tests
+
+Критичная domain logic должна быть testable отдельно от WordPress UI.
+
+Приоритет tests:
+
+1. FieldNormalizer
+2. semantic key generation
+3. collision detection
+4. TemplateScanner
+5. TemplateValidator
+6. SubmissionValidator
+7. SubmissionMapper
+
+Использовать fixtures с realistic Jotform API responses.
+
+Unit tests не должны требовать live Jotform API.
+
+---
+
+# Workflow для каждого этапа
+
+Перед изменением:
+
+1. Прочитать этот `AGENTS.md`.
+2. Изучить уже существующий код.
+3. Не переписывать работающую архитектуру без объективной необходимости.
+4. Определить минимальный scope текущего этапа.
+5. Реализовать его.
+6. Запустить доступные tests/lint.
+7. Выполнить соответствующий MCP verification.
+8. Исправить найденные проблемы.
+9. Только после этого считать этап завершенным.
+
+---
+
+# Запрет на преждевременную реализацию
+
+Если текущий prompt описывает конкретный этап:
+
+* не реализовывать будущие этапы полностью;
+* можно подготовить минимальный extension point;
+* нельзя добавлять большой код "на будущее".
+
+Цель — небольшие проверяемые increments.
+
+---
+
+# Отчет после каждого этапа
+
+После работы предоставить:
+
+```text
+Что реализовано
+Какие файлы изменены
+Какие архитектурные решения приняты
+Какие tests выполнены
+Какие MCP проверки выполнены
+Что не удалось проверить
+Что остается для следующего этапа
+```
+
+Не писать просто:
+
+```text
+Done
+Implementation complete
+```
+
+без verification details.
+
+---
+
+# Главные invariants проекта
+
+Эти правила нельзя нарушать без явного изменения требований:
+
+1. WordPress 6.4+.
+2. PHP 8.0+.
+3. Никакого Sage/Blade в текущей версии.
+4. Plugin standalone.
+5. Custom template не знает Jotform Form ID.
+6. Template не знает Jotform qid.
+7. Связь Form ↔ Template хранится в Integration.
+8. Frontend использует semantic `data-jotform-field`.
+9. Backend является authoritative source mapping.
+10. API key существует только server-side.
+11. Jotform REST API не вызывается на каждом page view.
+12. Все submissions валидируются server-side.
+13. Произвольный filesystem path никогда не renderится.
+14. Одна Jotform Form может иметь несколько integrations/templates.
+15. Custom Template — основной сценарий.
+16. AutoRenderer строится поверх уже готовой Normalized Schema.
+17. Перед использованием Jotform payload format проверяется официальная документация.
+18. MCP используется для реальной verification, когда это возможно.
