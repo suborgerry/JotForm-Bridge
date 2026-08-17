@@ -251,7 +251,23 @@ Jotform Form ID
 Rendering Mode
 Template Slug
 Active
+Success Action
+Redirect Page ID
+Redirect Delay
 ```
+
+Success actions:
+
+```text
+message
+redirect
+```
+
+`message` — поведение по умолчанию: показать success message в слоте template.
+
+`redirect` — после успешного submission выполнить redirect на выбранную страницу.
+
+Redirect target выбирается отдельно для каждой Integration.
 
 Rendering modes:
 
@@ -952,9 +968,13 @@ jotformbridge:success
 jotformbridge:error
 ```
 
-Не навязывать popup/animation/redirect.
+Не навязывать popup/animation.
 
-Theme должна иметь возможность построить собственный UX.
+Redirect выполняется только тогда, когда он явно настроен в Integration, и
+только по данным, пришедшим в success response. См. `Success redirect`.
+
+Theme должна иметь возможность построить собственный UX и отменить
+настроенный redirect через `preventDefault()` на `jotformbridge:success`.
 
 ---
 
@@ -1093,6 +1113,21 @@ Success:
 }
 ```
 
+Если Integration настроена на redirect, success response дополнительно содержит:
+
+```json
+{
+    "success": true,
+    "message": "Form submitted successfully.",
+    "redirect": {
+        "url": "https://example.com/thanks/",
+        "delay": 0
+    }
+}
+```
+
+Ключ `redirect` отсутствует, если redirect не настроен.
+
 Validation failure:
 
 ```text
@@ -1138,6 +1173,90 @@ appropriate `5xx`.
 * custom anti-spam provider.
 
 Можно использовать interface или четкий WordPress hook/filter.
+
+---
+
+# Success redirect
+
+Каждая Integration может быть настроена на redirect после успешного submission.
+
+Redirect настраивается отдельно для каждой Integration, а не глобально.
+
+Две integrations одной Jotform Form могут иметь разные redirect targets.
+
+## Конфигурация
+
+```text
+Success Action:   message | redirect
+Redirect Page ID: WordPress page ID
+Redirect Delay:   секунды, 0 по умолчанию
+```
+
+Выбор страницы в Admin UI — существующая WordPress page/post, выбираемая
+из списка (`wp_dropdown_pages()` или аналогичный контролируемый выбор).
+
+Не свободный текстовый URL input в первой версии.
+
+## Authority
+
+Redirect target определяет backend.
+
+Frontend никогда не передает redirect URL в submission request.
+
+Backend резолвит `Redirect Page ID` в URL непосредственно в момент ответа.
+
+Причины:
+
+* URL страницы может измениться после сохранения Integration;
+* frontend-provided URL — open redirect vector.
+
+## Валидация
+
+Redirect URL обязан быть внутренним для сайта.
+
+Проверять через `wp_validate_redirect()` или эквивалентную проверку host против
+`home_url()`.
+
+Если page отсутствует, в trash, или не published:
+
+* redirect не выполняется;
+* поведение деградирует до обычного success message;
+* admin получает предупреждение о невалидном redirect target на странице
+  Integration (аналогично Template compatibility).
+
+Success submission никогда не должен падать из-за сломанного redirect target.
+
+## Frontend поведение
+
+При наличии `redirect` в success response JS выполняет переход после dispatch
+`jotformbridge:success`.
+
+Порядок обязателен:
+
+1. success state формы;
+2. dispatch `jotformbridge:success`;
+3. redirect.
+
+Событие `jotformbridge:success` должно быть cancelable в части redirect: если
+theme вызывает `preventDefault()`, redirect не выполняется, и theme строит
+собственный UX.
+
+`detail` события содержит `redirect`, чтобы theme могла принять решение.
+
+Redirect выполняется через `window.location.assign()`.
+
+При `delay > 0` — после соответствующей задержки, чтобы success message успел
+быть прочитан.
+
+Форма остается в disabled state во время задержки: повторный submit после
+успешной отправки недопустим.
+
+## Ограничения
+
+* Redirect применяется только к успешному submission.
+* Validation errors и upstream errors никогда не вызывают redirect.
+* Не добавлять submission data в query string redirect URL.
+* Не передавать persistent identifiers через URL.
 
 ---
 
@@ -1271,13 +1390,20 @@ Jotform Form
 Rendering Mode
 Template
 Active
+Success Action
+Redirect Page
+Redirect Delay
 ```
+
+`Redirect Page` и `Redirect Delay` показываются только при
+`Success Action = redirect`.
 
 Также показывать:
 
 ```text
 Schema status
 Template compatibility
+Redirect target status
 ```
 
 Actions:
@@ -1764,3 +1890,5 @@ Implementation complete
 16. AutoRenderer строится поверх уже готовой Normalized Schema.
 17. Перед использованием Jotform payload format проверяется официальная документация.
 18. MCP используется для реальной verification, когда это возможно.
+19. Redirect target приходит из Integration, резолвится backend и обязан быть
+    внутренним URL; frontend никогда не диктует, куда выполняется redirect.

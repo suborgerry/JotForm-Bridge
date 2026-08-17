@@ -634,6 +634,11 @@ deleted* on the settings screen before deleting.
   values from the same IP, not idempotency keys, and two genuinely simultaneous
   requests can still both go through.
 * **One site, one Jotform account.** There is no per-integration API key.
+* **No built-in success redirect yet.** An integration cannot be pointed at a
+  thank-you page from the admin screen; send the visitor there yourself from the
+  `jotformbridge:success` event, as shown above. A per-integration redirect
+  target is specified in `AGENTS.md` (*Success redirect*) and scheduled as stage
+  7 in `prompts/7.md`.
 
 ---
 
