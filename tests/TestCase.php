@@ -45,6 +45,20 @@ abstract class TestCase extends PHPUnitTestCase
             static fn($value): string => preg_replace('/[^a-z0-9_\-]/', '', strtolower((string) $value)) ?? ''
         );
 
+        Functions\when('sanitize_textarea_field')->alias(
+            static fn($value): string => trim(strip_tags((string) $value))
+        );
+
+        Functions\when('sanitize_email')->alias(
+            static fn($value): string => trim((string) filter_var((string) $value, FILTER_SANITIZE_EMAIL))
+        );
+
+        Functions\when('is_email')->alias(
+            static fn($value) => filter_var((string) $value, FILTER_VALIDATE_EMAIL) !== false
+                ? (string) $value
+                : false
+        );
+
         Functions\when('esc_url_raw')->alias(
             static fn($value): string => (string) $value
         );

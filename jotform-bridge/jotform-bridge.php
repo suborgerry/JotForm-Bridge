@@ -84,6 +84,8 @@ require_once __DIR__ . '/src/Autoloader.php';
 
 Autoloader::register(__NAMESPACE__ . '\\', __DIR__ . '/src');
 
+require_once __DIR__ . '/src/api.php';
+
 register_deactivation_hook(__FILE__, [Plugin::class, 'onDeactivate']);
 
 add_action(

@@ -27,6 +27,15 @@ if (!defined('MINUTE_IN_SECONDS')) {
     define('MINUTE_IN_SECONDS', 60);
 }
 
+// Normally defined by the main plugin file, which is not loaded in unit tests.
+if (!defined('JOTFORM_BRIDGE_VERSION')) {
+    define('JOTFORM_BRIDGE_VERSION', '0.1.0');
+}
+
+if (!defined('JOTFORM_BRIDGE_URL')) {
+    define('JOTFORM_BRIDGE_URL', 'https://example.test/wp-content/plugins/jotform-bridge/');
+}
+
 if (!class_exists('WP_Error')) {
     /**
      * Minimal stand-in for the WordPress error object.

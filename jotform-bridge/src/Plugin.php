@@ -12,7 +12,12 @@ use JotformBridge\Forms\FormRepository;
 use JotformBridge\Forms\SchemaRepository;
 use JotformBridge\Integrations\CompatibilityChecker;
 use JotformBridge\Integrations\IntegrationRepository;
+use JotformBridge\Rendering\Assets;
+use JotformBridge\Rendering\CustomTemplateRenderer;
+use JotformBridge\Rendering\FormRenderer;
+use JotformBridge\Rest\SubmissionController;
 use JotformBridge\Settings\Settings;
+use JotformBridge\Submission\SubmissionPipeline;
 use JotformBridge\Support\Logger;
 use JotformBridge\Templates\TemplateRegistry;
 
@@ -42,6 +47,10 @@ final class Plugin
     private ?IntegrationRepository $integrations = null;
 
     private ?TemplateRegistry $templates = null;
+
+    private ?Assets $assets = null;
+
+    private ?FormRenderer $renderer = null;
 
     private ConnectionState $connection;
 
@@ -81,6 +90,14 @@ final class Plugin
                 );
             }
         );
+
+        // Rendering and submitting are front-end concerns, but the REST route
+        // must also exist for a logged-in editor previewing a page.
+        add_action('wp_enqueue_scripts', [$this->assets(), 'register']);
+
+        add_shortcode('jotform_form', [$this->renderer(), 'shortcode']);
+
+        (new SubmissionController($this->pipeline()))->register();
 
         if (is_admin()) {
             // Registration order decides the submenu order: Integrations first.
@@ -162,6 +179,46 @@ final class Plugin
         }
 
         return $this->templates;
+    }
+
+    public function assets(): Assets
+    {
+        if ($this->assets === null) {
+            $this->assets = new Assets();
+        }
+
+        return $this->assets;
+    }
+
+    /**
+     * The service behind both `jotform_form()` and the shortcode.
+     */
+    public function renderer(): FormRenderer
+    {
+        if ($this->renderer === null) {
+            $this->renderer = new FormRenderer(
+                $this->integrations(),
+                $this->schemas(),
+                new CustomTemplateRenderer($this->templates()),
+                $this->assets(),
+                $this->logger
+            );
+        }
+
+        return $this->renderer;
+    }
+
+    public function pipeline(): SubmissionPipeline
+    {
+        return new SubmissionPipeline(
+            $this->integrations(),
+            $this->schemas(),
+            $this->client(),
+            null,
+            null,
+            null,
+            $this->logger
+        );
     }
 
     public function compatibility(): CompatibilityChecker

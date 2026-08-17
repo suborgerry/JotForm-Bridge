@@ -171,6 +171,53 @@ final class JotformClient
     }
 
     /**
+     * POST /form/{formID}/submissions — creates one submission.
+     *
+     * The parameter names are built by SubmissionMapper; this method only knows
+     * how to put them on the wire. Jotform expects the submission parameters as
+     * `application/x-www-form-urlencoded` body fields, the same encoding the
+     * official client libraries use.
+     *
+     * @param array<string, string|array<int, string>> $params Already-mapped
+     *                                                         `submission[...]` parameters.
+     *
+     * @return ApiResponse Data is `['submission_id' => string]` on success.
+     */
+    public function createSubmission(string $formId, array $params): ApiResponse
+    {
+        $formId = trim($formId);
+
+        if ($formId === '' || !ctype_digit($formId)) {
+            return ApiResponse::failure(
+                self::ERROR_UNEXPECTED,
+                __('The Jotform form ID is missing or invalid.', 'jotform-bridge')
+            );
+        }
+
+        if ($params === []) {
+            return ApiResponse::failure(
+                self::ERROR_UNEXPECTED,
+                __('The submission contains no values to send.', 'jotform-bridge')
+            );
+        }
+
+        $response = $this->post('/form/' . $formId . '/submissions', $params);
+
+        if (!$response->isSuccess()) {
+            return $response;
+        }
+
+        $content = $response->data();
+
+        return ApiResponse::success(
+            [
+                'submission_id' => isset($content['submissionID']) ? (string) $content['submissionID'] : '',
+            ],
+            $response->status()
+        );
+    }
+
+    /**
      * Performs a GET request and unwraps the Jotform response envelope.
      *
      * @param array<string, scalar> $query
@@ -201,6 +248,67 @@ final class JotformClient
             ]
         );
 
+        return $this->unwrap($response, $path);
+    }
+
+    /**
+     * Performs a POST request and unwraps the Jotform response envelope.
+     *
+     * @param array<string, string|array<int, string>> $params
+     */
+    public function post(string $path, array $params): ApiResponse
+    {
+        if ($this->apiKey === '') {
+            return ApiResponse::failure(
+                self::ERROR_NO_API_KEY,
+                __('No Jotform API key is configured.', 'jotform-bridge')
+            );
+        }
+
+        $response = wp_remote_post(
+            $this->baseUrl . '/' . ltrim($path, '/'),
+            [
+                'timeout' => $this->timeout,
+                'headers' => [
+                    'APIKEY'       => $this->apiKey,
+                    'Accept'       => 'application/json',
+                    'Content-Type' => 'application/x-www-form-urlencoded',
+                ],
+                'body'    => self::encodeBody($params),
+            ]
+        );
+
+        return $this->unwrap($response, $path);
+    }
+
+    /**
+     * Encodes mapped parameters into a form-urlencoded body.
+     *
+     * A list value is repeated under the same name, which is how Jotform
+     * documents multi-value answers (`submission[31][]=A&submission[31][]=B`).
+     *
+     * @param array<string, string|array<int, string>> $params
+     */
+    public static function encodeBody(array $params): string
+    {
+        $pairs = [];
+
+        foreach ($params as $name => $value) {
+            foreach (is_array($value) ? $value : [$value] as $item) {
+                $pairs[] = rawurlencode((string) $name) . '=' . rawurlencode((string) $item);
+            }
+        }
+
+        return implode('&', $pairs);
+    }
+
+    /**
+     * Turns a wp_remote_* result into an ApiResponse.
+     *
+     * @param array<string, mixed>|\WP_Error $response
+     */
+    private function unwrap($response, string $path): ApiResponse
+    {
         if (is_wp_error($response)) {
             $this->log('Jotform request failed on transport level.', [
                 'path'  => $path,

@@ -1,0 +1,274 @@
+<?php
+
+declare(strict_types=1);
+
+namespace JotformBridge\Tests\Unit\Submission;
+
+use Brain\Monkey\Functions;
+use JotformBridge\Api\JotformClient;
+use JotformBridge\Forms\SchemaBuilder;
+use JotformBridge\Forms\SchemaRepository;
+use JotformBridge\Integrations\IntegrationRepository;
+use JotformBridge\Submission\SubmissionOutcome;
+use JotformBridge\Submission\SubmissionPipeline;
+use JotformBridge\Submission\ValidationResult;
+use JotformBridge\Tests\TestCase;
+
+/**
+ * The submission flow end to end, up to the upstream boundary.
+ *
+ * Everything below the Jotform HTTP call is real: integration lookup, cached
+ * schema, validation, mapping and response contract. Only the transport is
+ * mocked, so no test ever writes to a real form.
+ */
+final class SubmissionPipelineTest extends TestCase
+{
+    private const FORM_ID = '240000000000001';
+
+    /** @var array<string, mixed> */
+    private array $options = [];
+
+    /** @var array<string, mixed> */
+    private array $transients = [];
+
+    /** @var array<int, array<string, mixed>> Captured wp_remote_post() calls. */
+    private array $requests = [];
+
+    protected function setUp(): void
+    {
+        parent::setUp();
+
+        $this->options    = [];
+        $this->transients = [];
+        $this->requests   = [];
+
+        Functions\when('get_option')->alias(
+            fn(string $name, $default = false) => $this->options[$name] ?? $default
+        );
+        Functions\when('update_option')->alias(
+            function (string $name, $value): bool {
+                $this->options[$name] = $value;
+
+                return true;
+            }
+        );
+        Functions\when('get_transient')->alias(
+            fn(string $name) => $this->transients[$name] ?? false
+        );
+        Functions\when('set_transient')->alias(
+            function (string $name, $value): bool {
+                $this->transients[$name] = $value;
+
+                return true;
+            }
+        );
+
+        $this->storeIntegration(true);
+        $this->cacheSchema();
+    }
+
+    public function testAnUnknownIntegrationIsNotFound(): void
+    {
+        $outcome = $this->pipeline()->submit('nope', $this->valid());
+
+        $this->assertSame(404, $outcome->status());
+        $this->assertFalse($outcome->body()['success']);
+        $this->assertSame([], $this->requests);
+    }
+
+    public function testAnInactiveIntegrationIsRefused(): void
+    {
+        $this->storeIntegration(false);
+
+        $outcome = $this->pipeline()->submit('contact', $this->valid());
+
+        $this->assertSame(403, $outcome->status());
+        $this->assertSame([], $this->requests);
+    }
+
+    public function testAMissingRequiredFieldFailsValidation(): void
+    {
+        $fields = $this->valid();
+        unset($fields['email']);
+
+        $outcome = $this->pipeline()->submit('contact', $fields);
+
+        $this->assertSame(422, $outcome->status());
+        $this->assertSame('Validation failed.', $outcome->body()['message']);
+        $this->assertArrayHasKey('email', $outcome->errors());
+        $this->assertSame([], $this->requests);
+    }
+
+    public function testAnUnknownFieldFailsValidation(): void
+    {
+        $fields           = $this->valid();
+        $fields['nonsense'] = 'x';
+
+        $outcome = $this->pipeline()->submit('contact', $fields);
+
+        $this->assertSame(422, $outcome->status());
+        $this->assertArrayHasKey('nonsense', $outcome->errors());
+    }
+
+    public function testABodyWithoutFieldsFailsValidation(): void
+    {
+        $outcome = $this->pipeline()->submit('contact', null);
+
+        $this->assertSame(422, $outcome->status());
+        $this->assertArrayHasKey(ValidationResult::FORM_KEY, $outcome->errors());
+    }
+
+    public function testAnUnavailableSchemaIsASafeServerError(): void
+    {
+        $this->transients = [];
+
+        Functions\when('wp_remote_get')->justReturn(
+            $this->httpResponse(401, ['responseCode' => 401, 'message' => 'Invalid API key: abcd1234'])
+        );
+
+        $outcome = $this->pipeline()->submit('contact', $this->valid());
+
+        $this->assertSame(503, $outcome->status());
+        $this->assertStringNotContainsString('abcd1234', (string) $outcome->body()['message']);
+    }
+
+    public function testAnUpstreamFailureIsReportedWithoutUpstreamDetail(): void
+    {
+        $this->mockPost(403, ['responseCode' => 403, 'message' => 'Forbidden: apiKey abcd1234 has no write access']);
+
+        $outcome = $this->pipeline()->submit('contact', $this->valid());
+
+        $this->assertSame(502, $outcome->status());
+        $this->assertFalse($outcome->body()['success']);
+        $this->assertStringNotContainsString('abcd1234', (string) $outcome->body()['message']);
+        $this->assertArrayNotHasKey('errors', $outcome->body());
+    }
+
+    public function testASuccessfulSubmissionSendsTheMappedPayload(): void
+    {
+        $this->mockPost(200, ['responseCode' => 200, 'content' => ['submissionID' => '600000000000001']]);
+
+        $outcome = $this->pipeline()->submit('contact', $this->valid());
+
+        $this->assertSame(200, $outcome->status());
+        $this->assertTrue($outcome->body()['success']);
+        $this->assertSame('Form submitted successfully.', $outcome->body()['message']);
+
+        $this->assertCount(1, $this->requests);
+        $request = $this->requests[0];
+
+        $this->assertSame(
+            'https://api.jotform.com/form/' . self::FORM_ID . '/submissions',
+            $request['url']
+        );
+        $this->assertSame(
+            'application/x-www-form-urlencoded',
+            $request['args']['headers']['Content-Type']
+        );
+
+        parse_str($request['args']['body'], $sent);
+
+        $this->assertSame(
+            [
+                '3'  => ['first' => 'Jane', 'last' => 'Doe'],
+                '4'  => 'jane@example.com',
+                '8'  => 'Hello there.',
+                '10' => 'E-mail',
+                '11' => ['Pricing', 'Support'],
+            ],
+            $sent['submission']
+        );
+    }
+
+    public function testTheSpamExtensionPointCanRejectASubmission(): void
+    {
+        $this->mockPost(200, ['responseCode' => 200, 'content' => ['submissionID' => '1']]);
+
+        Functions\when('apply_filters')->alias(
+            static function (string $hook, $value) {
+                return $hook === 'jotform_bridge_spam_check' ? 'Please solve the challenge.' : $value;
+            }
+        );
+
+        $outcome = $this->pipeline()->submit('contact', $this->valid());
+
+        $this->assertSame(403, $outcome->status());
+        $this->assertSame('Please solve the challenge.', $outcome->body()['message']);
+        $this->assertSame([], $this->requests, 'A rejected submission must not reach Jotform.');
+    }
+
+    public function testTheOutcomeNeverLeaksTheApiKey(): void
+    {
+        $this->mockPost(500, ['responseCode' => 500, 'message' => 'boom']);
+
+        $outcome = $this->pipeline()->submit('contact', $this->valid());
+
+        $this->assertStringNotContainsString('test-api-key', json_encode($outcome->body()) ?: '');
+    }
+
+    private function pipeline(): SubmissionPipeline
+    {
+        $client = new JotformClient('test-api-key', 'https://api.jotform.com');
+
+        return new SubmissionPipeline(
+            new IntegrationRepository(),
+            new SchemaRepository($client),
+            $client
+        );
+    }
+
+    /**
+     * @param array<string, mixed> $body
+     */
+    private function mockPost(int $status, array $body): void
+    {
+        $response = $this->httpResponse($status, $body);
+
+        Functions\when('wp_remote_post')->alias(
+            function (string $url, array $args) use ($response) {
+                $this->requests[] = ['url' => $url, 'args' => $args];
+
+                return $response;
+            }
+        );
+    }
+
+    private function storeIntegration(bool $active): void
+    {
+        $this->options[IntegrationRepository::OPTION] = [
+            'contact' => [
+                'slug'     => 'contact',
+                'name'     => 'Contact',
+                'form_id'  => self::FORM_ID,
+                'mode'     => 'custom',
+                'template' => 'contact',
+                'active'   => $active,
+            ],
+        ];
+    }
+
+    private function cacheSchema(): void
+    {
+        $schema = (new SchemaBuilder())->build(
+            self::FORM_ID,
+            array_values($this->fixture('form-questions')['content'])
+        );
+
+        $this->transients[SchemaRepository::transientKey(self::FORM_ID)] = $schema->toArray();
+    }
+
+    /**
+     * @return array<string, mixed>
+     */
+    private function valid(): array
+    {
+        return [
+            'full_name.first'   => 'Jane',
+            'full_name.last'    => 'Doe',
+            'email'             => 'jane@example.com',
+            'message'           => 'Hello there.',
+            'preferred_contact' => 'E-mail',
+            'topics_of'         => ['Pricing', 'Support'],
+        ];
+    }
+}
