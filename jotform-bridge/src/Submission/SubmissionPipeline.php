@@ -26,6 +26,18 @@ if (!defined('ABSPATH')) {
  */
 final class SubmissionPipeline
 {
+    /**
+     * How long an identical, already accepted submission is refused, in seconds.
+     *
+     * This is not rate limiting: it only catches the same visitor sending the
+     * same values twice — a double click, a retried request, a bounced network —
+     * which would otherwise become two Jotform submissions. A failed submission
+     * is never fingerprinted, so retrying after an error works immediately.
+     */
+    public const DUPLICATE_WINDOW = 30;
+
+    public const DUPLICATE_TRANSIENT_PREFIX = 'jotform_bridge_sent_';
+
     private IntegrationRepository $integrations;
 
     private SchemaRepository $schemas;
@@ -121,6 +133,16 @@ final class SubmissionPipeline
             $values = $result->values();
         }
 
+        $window      = $this->duplicateWindow();
+        $fingerprint = $window > 0 ? $this->fingerprint($slug, $values, $context) : '';
+
+        if ($fingerprint !== '' && get_transient($fingerprint) !== false) {
+            return SubmissionOutcome::error(
+                429,
+                __('This form has already been submitted. Please wait a moment before sending it again.', 'jotform-bridge')
+            );
+        }
+
         $rejection = $this->spam->check($slug, $values, $context);
 
         if ($rejection !== '') {
@@ -158,6 +180,12 @@ final class SubmissionPipeline
             return SubmissionOutcome::error(502, $this->upstreamMessage());
         }
 
+        // Only an accepted submission is remembered, so an upstream failure can
+        // be retried straight away.
+        if ($fingerprint !== '') {
+            set_transient($fingerprint, 1, $window);
+        }
+
         /**
          * Fires after a submission was accepted by Jotform.
          *
@@ -173,6 +201,36 @@ final class SubmissionPipeline
         );
 
         return SubmissionOutcome::success(__('Form submitted successfully.', 'jotform-bridge'));
+    }
+
+    /**
+     * @return int Seconds; 0 disables the duplicate guard entirely.
+     */
+    private function duplicateWindow(): int
+    {
+        /**
+         * Filters how long an identical submission is refused after one was
+         * accepted. Return 0 to turn the guard off.
+         *
+         * @param int $seconds Duplicate window.
+         */
+        $window = (int) apply_filters('jotform_bridge_duplicate_window', self::DUPLICATE_WINDOW);
+
+        return max(0, $window);
+    }
+
+    /**
+     * Identifies "the same submission again": same integration, same visitor,
+     * same values. Only a hash is stored — never the values themselves.
+     *
+     * @param array<string, string|array<int, string>> $values
+     * @param array<string, mixed>                     $context
+     */
+    private function fingerprint(string $slug, array $values, array $context): string
+    {
+        $ip = isset($context['ip']) && is_scalar($context['ip']) ? (string) $context['ip'] : '';
+
+        return self::DUPLICATE_TRANSIENT_PREFIX . md5($slug . '|' . $ip . '|' . (string) wp_json_encode($values));
     }
 
     private function upstreamMessage(): string

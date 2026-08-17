@@ -31,6 +31,15 @@ final class SubmissionValidator
     /** Upper bound on how many values one multi-value field may carry. */
     public const MAX_VALUES = 100;
 
+    /**
+     * Longest field identifier that may appear in an error response.
+     *
+     * The frontend addresses error slots by this identifier, so it is echoed
+     * back — including for a field the schema does not know. Anything that is
+     * not a plausible identifier is reported without being repeated.
+     */
+    public const MAX_PATH_LENGTH = 128;
+
     public const MAX_TEXT_LENGTH     = 1000;
     public const MAX_TEXTAREA_LENGTH = 10000;
     public const MAX_EMAIL_LENGTH    = 254;
@@ -56,7 +65,18 @@ final class SubmissionValidator
             $path = (string) $rawPath;
 
             if (!isset($allowed[$path])) {
-                $errors[$path] = __('This field does not exist on the form.', 'jotform-bridge');
+                // An unknown identifier is a template/schema mismatch worth
+                // reporting per field — but only when it looks like one. A key
+                // that does not is reported once, at form level, so nothing
+                // arbitrary is echoed back into the response.
+                if (self::isPlausiblePath($path)) {
+                    $errors[$path] = __('This field does not exist on the form.', 'jotform-bridge');
+                } else {
+                    $errors[ValidationResult::FORM_KEY] = __(
+                        'The submission contains a field this form does not have.',
+                        'jotform-bridge'
+                    );
+                }
 
                 continue;
             }
@@ -80,7 +100,22 @@ final class SubmissionValidator
     }
 
     /**
+     * The shape a semantic identifier can have: what SemanticKey produces, plus
+     * the dot that joins a composite child to its parent.
+     */
+    private static function isPlausiblePath(string $path): bool
+    {
+        return $path !== ''
+            && strlen($path) <= self::MAX_PATH_LENGTH
+            && preg_match('/^[A-Za-z0-9_.-]+$/', $path) === 1;
+    }
+
+    /**
      * Request sanity, checked before anything is looked at field by field.
+     *
+     * Nested values are measured rather than skipped: a payload built out of
+     * arrays of arrays must not be able to pass the size check just because no
+     * single leaf is a string.
      *
      * @param array<string, mixed> $input
      */
@@ -94,10 +129,7 @@ final class SubmissionValidator
 
         foreach ($input as $path => $value) {
             $bytes += strlen((string) $path);
-
-            foreach (is_array($value) ? $value : [$value] as $item) {
-                $bytes += is_scalar($item) ? strlen((string) $item) : 0;
-            }
+            $bytes += self::measure($value);
 
             if ($bytes > self::MAX_PAYLOAD_BYTES) {
                 return __('The submission is too large.', 'jotform-bridge');
@@ -105,6 +137,36 @@ final class SubmissionValidator
         }
 
         return '';
+    }
+
+    /**
+     * Size of one submitted value, counting every leaf of a nested structure.
+     *
+     * @param mixed $value
+     */
+    private static function measure($value, int $depth = 0): int
+    {
+        if (is_scalar($value)) {
+            return strlen((string) $value);
+        }
+
+        if (!is_array($value) || $depth > 4) {
+            // Anything deeper is rejected by value() anyway; charging it the
+            // full budget stops a deep structure from being measured for free.
+            return self::MAX_PAYLOAD_BYTES + 1;
+        }
+
+        $bytes = 0;
+
+        foreach ($value as $item) {
+            $bytes += self::measure($item, $depth + 1);
+
+            if ($bytes > self::MAX_PAYLOAD_BYTES) {
+                return $bytes;
+            }
+        }
+
+        return $bytes;
     }
 
     /**

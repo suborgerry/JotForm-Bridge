@@ -236,10 +236,64 @@ final class FormSchema
     public static function fromArray(array $data): self
     {
         return new self(
-            isset($data['form_id']) ? (string) $data['form_id'] : '',
-            isset($data['fields']) && is_array($data['fields']) ? $data['fields'] : [],
-            isset($data['diagnostics']) && is_array($data['diagnostics']) ? $data['diagnostics'] : [],
-            isset($data['fingerprint']) ? (string) $data['fingerprint'] : ''
+            isset($data['form_id']) && is_scalar($data['form_id']) ? (string) $data['form_id'] : '',
+            self::readFields($data['fields'] ?? null),
+            isset($data['diagnostics']) && is_array($data['diagnostics'])
+                ? array_values(array_filter($data['diagnostics'], 'is_array'))
+                : [],
+            isset($data['fingerprint']) && is_scalar($data['fingerprint']) ? (string) $data['fingerprint'] : ''
         );
+    }
+
+    /**
+     * Field arrays come back out of a transient, so their shape is verified
+     * rather than assumed: an entry that is missing what every later layer reads
+     * is dropped instead of being allowed to fatal in the middle of a page.
+     *
+     * @param mixed $fields
+     *
+     * @return array<string, array<string, mixed>>
+     */
+    private static function readFields($fields): array
+    {
+        if (!is_array($fields)) {
+            return [];
+        }
+
+        $clean = [];
+
+        foreach ($fields as $key => $field) {
+            if (!is_array($field)) {
+                continue;
+            }
+
+            $expected = [
+                'key',
+                'qid',
+                'type',
+                'label',
+                'required',
+                'supported',
+                'multiple',
+                'allow_other',
+                'children',
+                'options',
+                'meta',
+            ];
+
+            foreach ($expected as $required) {
+                if (!array_key_exists($required, $field)) {
+                    continue 2;
+                }
+            }
+
+            if (!is_array($field['children']) || !is_array($field['options'])) {
+                continue;
+            }
+
+            $clean[(string) $key] = $field;
+        }
+
+        return $clean;
     }
 }

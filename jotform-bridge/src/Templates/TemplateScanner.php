@@ -458,6 +458,12 @@ final class TemplateScanner
             return ['fields' => [], 'dynamic' => 0];
         }
 
+        // A comment is not markup. Without this, the documentation block a
+        // well-commented template starts with — which naturally spells out
+        // data-jotform-field="key" — would be read as a real identifier and
+        // reported as a field the Jotform form does not have.
+        $source = self::withoutPhpComments($source);
+
         $fields  = [];
         $dynamic = 0;
 
@@ -502,6 +508,50 @@ final class TemplateScanner
             'fields'  => $keys,
             'dynamic' => $dynamic,
         ];
+    }
+
+    /**
+     * Removes PHP comments from a template source, keeping everything else.
+     *
+     * Tokenizing is lexing, not executing: `token_get_all()` never runs the
+     * code. HTML comments are left alone on purpose — an identifier commented
+     * out in markup is still one a developer might uncomment, and the report
+     * mentioning it is more useful than silence.
+     */
+    private static function withoutPhpComments(string $source): string
+    {
+        if (strpos($source, '<?') === false) {
+            return $source;
+        }
+
+        // The source may be a truncated tail of a longer file, so a warning
+        // about an unterminated token is expected rather than exceptional.
+        $tokens = @token_get_all($source);
+
+        if (!is_array($tokens) || $tokens === []) {
+            return $source;
+        }
+
+        $clean = '';
+
+        foreach ($tokens as $token) {
+            if (is_array($token)) {
+                if ($token[0] === T_COMMENT || $token[0] === T_DOC_COMMENT) {
+                    // Keep the newlines, so reported line numbers stay usable.
+                    $clean .= str_repeat("\n", substr_count((string) $token[1], "\n"));
+
+                    continue;
+                }
+
+                $clean .= (string) $token[1];
+
+                continue;
+            }
+
+            $clean .= (string) $token;
+        }
+
+        return $clean;
     }
 
     /**

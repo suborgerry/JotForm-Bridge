@@ -110,6 +110,17 @@
         return fields;
     }
 
+    /**
+     * Escapes one attribute value for use inside a querySelector.
+     *
+     * Error keys come back from the server, which echoes the identifiers the
+     * form sent. A quote or a backslash in one of them would otherwise make the
+     * selector invalid and throw instead of showing the message.
+     */
+    function quote(value) {
+        return String(value).replace(/(["\\])/g, '\\$1');
+    }
+
     function clearErrors(form) {
         var container = form.querySelector(ERROR_CONTAINER);
 
@@ -143,8 +154,9 @@
                 continue;
             }
 
-            var slot = form.querySelector('[data-jotform-field-error="' + path + '"]');
-            var input = form.querySelector('[data-jotform-field="' + path + '"]');
+            var selector = quote(path);
+            var slot = form.querySelector('[data-jotform-field-error="' + selector + '"]');
+            var input = form.querySelector('[data-jotform-field="' + selector + '"]');
 
             if (input) {
                 input.setAttribute('aria-invalid', 'true');

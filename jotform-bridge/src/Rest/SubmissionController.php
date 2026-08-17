@@ -29,6 +29,19 @@ final class SubmissionController
     public const NAMESPACE = 'jotform-bridge/v1';
     public const ROUTE     = '/submit/(?P<integration>[A-Za-z0-9_-]+)';
 
+    /**
+     * Hard cap on the raw request body, checked before the body is looked at.
+     *
+     * The validator has its own, tighter limit on the values it accepts; this one
+     * exists so an oversized body is refused as early as we can refuse it.
+     */
+    public const MAX_BODY_BYTES = 262144;
+
+    /**
+     * Longest request metadata string handed to the spam extension point.
+     */
+    private const MAX_CONTEXT_LENGTH = 512;
+
     private SubmissionPipeline $pipeline;
 
     public function __construct(SubmissionPipeline $pipeline)
@@ -75,15 +88,32 @@ final class SubmissionController
 
     public function handle(WP_REST_Request $request): WP_REST_Response
     {
+        if (strlen((string) $request->get_body()) > self::MAX_BODY_BYTES) {
+            return $this->respond(
+                new WP_REST_Response(
+                    [
+                        'success' => false,
+                        'message' => __('The submission is too large.', 'jotform-bridge'),
+                    ],
+                    413
+                )
+            );
+        }
+
         $outcome = $this->pipeline->submit(
             (string) $request->get_param('integration'),
             $request->get_param('fields'),
             $this->context($request)
         );
 
-        $response = new WP_REST_Response($outcome->body(), $outcome->status());
+        return $this->respond(new WP_REST_Response($outcome->body(), $outcome->status()));
+    }
 
-        // A submission answer is never cacheable.
+    /**
+     * A submission answer is never cacheable, whichever way it went.
+     */
+    private function respond(WP_REST_Response $response): WP_REST_Response
+    {
         $response->header('Cache-Control', 'no-store, private');
 
         return $response;
@@ -106,9 +136,22 @@ final class SubmissionController
             'ip'         => isset($_SERVER['REMOTE_ADDR'])
                 ? sanitize_text_field(wp_unslash((string) $_SERVER['REMOTE_ADDR']))
                 : '',
-            'user_agent' => $request->get_header('user_agent') ?? '',
-            'referer'    => $request->get_header('referer') ?? '',
+            // Client-controlled headers, sanitized and bounded before any
+            // extension callback — or a log line — ever sees them.
+            'user_agent' => self::header($request, 'user_agent'),
+            'referer'    => self::header($request, 'referer'),
             'spam'       => is_array($spam) ? $spam : [],
         ];
+    }
+
+    private static function header(WP_REST_Request $request, string $name): string
+    {
+        $value = $request->get_header($name);
+
+        if (!is_string($value)) {
+            return '';
+        }
+
+        return substr(sanitize_text_field($value), 0, self::MAX_CONTEXT_LENGTH);
     }
 }

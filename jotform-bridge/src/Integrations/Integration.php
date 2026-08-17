@@ -82,17 +82,17 @@ final class Integration
      */
     public static function fromInput(array $input): self
     {
-        $name = isset($input['name']) ? sanitize_text_field((string) $input['name']) : '';
+        $name = sanitize_text_field(self::scalar($input, 'name'));
 
-        $slug = isset($input['slug']) ? (string) $input['slug'] : '';
+        $slug = self::scalar($input, 'slug');
         $slug = sanitize_key($slug !== '' ? $slug : $name);
 
-        $formId = isset($input['form_id']) ? trim((string) $input['form_id']) : '';
+        $formId = self::scalar($input, 'form_id');
         $formId = ctype_digit($formId) ? $formId : '';
 
-        $mode = isset($input['mode']) ? sanitize_key((string) $input['mode']) : '';
+        $mode = sanitize_key(self::scalar($input, 'mode'));
 
-        $template = isset($input['template']) ? sanitize_key((string) $input['template']) : '';
+        $template = sanitize_key(self::scalar($input, 'template'));
 
         return new self(
             $slug,
@@ -105,19 +105,34 @@ final class Integration
     }
 
     /**
+     * Reads one value out of a raw request slice, ignoring arrays and objects.
+     *
+     * A forged `jotform_integration[slug][]=x` must not turn into the literal
+     * string "Array"; it is simply not a value this form can carry.
+     *
+     * @param array<string, mixed> $input
+     */
+    private static function scalar(array $input, string $key): string
+    {
+        return isset($input[$key]) && is_scalar($input[$key]) ? trim((string) $input[$key]) : '';
+    }
+
+    /**
      * @param array<string, mixed> $data
      */
     public static function fromArray(array $data): self
     {
+        $mode = self::scalar($data, 'mode');
+
         return new self(
-            isset($data['slug']) ? (string) $data['slug'] : '',
-            isset($data['name']) ? (string) $data['name'] : '',
-            isset($data['form_id']) ? (string) $data['form_id'] : '',
-            isset($data['mode']) ? (string) $data['mode'] : self::MODE_CUSTOM,
-            isset($data['template']) ? (string) $data['template'] : '',
+            self::scalar($data, 'slug'),
+            self::scalar($data, 'name'),
+            self::scalar($data, 'form_id'),
+            $mode !== '' ? $mode : self::MODE_CUSTOM,
+            self::scalar($data, 'template'),
             !empty($data['active']),
-            isset($data['created_at']) ? (int) $data['created_at'] : 0,
-            isset($data['updated_at']) ? (int) $data['updated_at'] : 0
+            isset($data['created_at']) && is_scalar($data['created_at']) ? (int) $data['created_at'] : 0,
+            isset($data['updated_at']) && is_scalar($data['updated_at']) ? (int) $data['updated_at'] : 0
         );
     }
 

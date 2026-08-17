@@ -58,10 +58,11 @@ final class Settings
     public function defaults(): array
     {
         return [
-            'api_key'       => '',
-            'region'        => self::REGION_STANDARD,
-            'base_url'      => '',
-            'debug_logging' => false,
+            'api_key'                  => '',
+            'region'                   => self::REGION_STANDARD,
+            'base_url'                 => '',
+            'debug_logging'            => false,
+            'delete_data_on_uninstall' => false,
         ];
     }
 
@@ -129,7 +130,8 @@ final class Settings
 
     public function region(): string
     {
-        $region = (string) $this->all()['region'];
+        $stored = $this->all()['region'];
+        $region = is_string($stored) ? $stored : '';
 
         return array_key_exists($region, self::regions()) ? $region : self::REGION_STANDARD;
     }
@@ -142,10 +144,11 @@ final class Settings
         $region = $this->region();
 
         if ($region === self::REGION_CUSTOM) {
-            $custom = trim((string) $this->all()['base_url']);
+            $stored = $this->all()['base_url'];
+            $custom = self::sanitizeBaseUrl(is_string($stored) ? $stored : '');
 
             if ($custom !== '') {
-                return untrailingslashit($custom);
+                return $custom;
             }
 
             return self::REGION_URLS[self::REGION_STANDARD];
@@ -160,6 +163,14 @@ final class Settings
     }
 
     /**
+     * Whether uninstalling may delete the integrations and the settings too.
+     */
+    public function deletesDataOnUninstall(): bool
+    {
+        return (bool) $this->all()['delete_data_on_uninstall'];
+    }
+
+    /**
      * Sanitizes raw admin input and persists it.
      *
      * @param array<string, mixed> $input Raw $_POST slice.
@@ -171,24 +182,79 @@ final class Settings
         $current = $this->all();
         $clean   = $current;
 
-        $region = isset($input['region']) ? sanitize_key((string) $input['region']) : '';
+        $region          = sanitize_key(self::scalar($input, 'region'));
         $clean['region'] = array_key_exists($region, self::regions())
             ? $region
             : self::REGION_STANDARD;
 
-        $baseUrl = isset($input['base_url']) ? trim((string) $input['base_url']) : '';
-        $clean['base_url'] = $baseUrl !== '' ? esc_url_raw($baseUrl) : '';
+        $clean['base_url'] = self::sanitizeBaseUrl(self::scalar($input, 'base_url'));
 
-        $clean['debug_logging'] = !empty($input['debug_logging']);
+        $clean['debug_logging']            = !empty($input['debug_logging']);
+        $clean['delete_data_on_uninstall'] = !empty($input['delete_data_on_uninstall']);
 
         // A constant-provided key is never overwritten from the UI.
         if (!$this->hasConstantKey()) {
-            $clean['api_key'] = $this->resolveSubmittedKey($input, (string) $current['api_key']);
+            $stored           = is_string($current['api_key']) ? $current['api_key'] : '';
+            $clean['api_key'] = $this->resolveSubmittedKey($input, $stored);
         }
 
         update_option(self::OPTION, $clean);
 
         return $clean;
+    }
+
+    /**
+     * The custom base URL is the one setting that decides where the API key is
+     * sent, so it is restricted rather than merely escaped: an absolute http(s)
+     * URL with a host, and nothing after the path.
+     */
+    public static function sanitizeBaseUrl(string $raw): string
+    {
+        $raw = trim($raw);
+
+        if ($raw === '') {
+            return '';
+        }
+
+        $url   = esc_url_raw($raw, ['http', 'https']);
+        $parts = $url !== '' ? wp_parse_url($url) : false;
+
+        if (!is_array($parts) || empty($parts['host'])) {
+            return '';
+        }
+
+        $scheme = isset($parts['scheme']) ? strtolower((string) $parts['scheme']) : '';
+
+        if ($scheme !== 'http' && $scheme !== 'https') {
+            return '';
+        }
+
+        // Credentials, query and fragment have no meaning for an API base URL
+        // and would only travel along with every request.
+        $rebuilt = $scheme . '://' . strtolower((string) $parts['host']);
+
+        if (isset($parts['port'])) {
+            $rebuilt .= ':' . (int) $parts['port'];
+        }
+
+        if (isset($parts['path'])) {
+            $rebuilt .= (string) $parts['path'];
+        }
+
+        return untrailingslashit($rebuilt);
+    }
+
+    /**
+     * Reads one value out of a raw request slice, ignoring arrays and objects.
+     *
+     * A `settings[region][]=x` request must not become the string "Array": it is
+     * simply not a value this form can carry.
+     *
+     * @param array<string, mixed> $input
+     */
+    private static function scalar(array $input, string $key): string
+    {
+        return isset($input[$key]) && is_scalar($input[$key]) ? trim((string) $input[$key]) : '';
     }
 
     /**
@@ -202,7 +268,7 @@ final class Settings
             return '';
         }
 
-        $submitted = isset($input['api_key']) ? trim(sanitize_text_field((string) $input['api_key'])) : '';
+        $submitted = trim(sanitize_text_field(self::scalar($input, 'api_key')));
 
         if ($submitted === '') {
             return $current;

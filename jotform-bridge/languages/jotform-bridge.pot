@@ -1,0 +1,1033 @@
+# Copyright (C) 2026 Jotform Bridge
+# This file is distributed under the GPL-2.0-or-later.
+msgid ""
+msgstr ""
+"Project-Id-Version: Jotform Bridge 0.1.0\n"
+"Report-Msgid-Bugs-To: https://wordpress.org/support/plugin/jotform-bridge\n"
+"Last-Translator: FULL NAME <EMAIL@ADDRESS>\n"
+"Language-Team: LANGUAGE <LL@li.org>\n"
+"MIME-Version: 1.0\n"
+"Content-Type: text/plain; charset=UTF-8\n"
+"Content-Transfer-Encoding: 8bit\n"
+"POT-Creation-Date: 2026-08-17T12:30:00+00:00\n"
+"PO-Revision-Date: YEAR-MO-DA HO:MI+ZONE\n"
+"X-Generator: WP-CLI 2.12.0\n"
+"X-Domain: jotform-bridge\n"
+
+#. Plugin Name of the plugin
+#. Author of the plugin
+#: jotform-bridge.php
+#: src/Admin/IntegrationsPage.php:75
+#: src/Admin/IntegrationsPage.php:76
+#: src/Admin/views/settings-page.php:42
+msgid "Jotform Bridge"
+msgstr ""
+
+#. Plugin URI of the plugin
+#: jotform-bridge.php
+msgid "https://github.com/suborgerry/jotform-bridge"
+msgstr ""
+
+#. Description of the plugin
+#: jotform-bridge.php
+msgid "Uses Jotform as a headless form backend for WordPress: custom markup on the site, submissions and data storage on Jotform."
+msgstr ""
+
+#. translators: 1: required PHP version, 2: current PHP version
+#: jotform-bridge.php:61
+#, php-format
+msgid "Jotform Bridge requires PHP %1$s or newer. This site runs PHP %2$s."
+msgstr ""
+
+#. translators: 1: required WordPress version, 2: current WordPress version
+#: jotform-bridge.php:74
+#, php-format
+msgid "Jotform Bridge requires WordPress %1$s or newer. This site runs WordPress %2$s."
+msgstr ""
+
+#: src/Admin/IntegrationsPage.php:86
+#: src/Admin/IntegrationsPage.php:87
+#: src/Admin/views/integrations-list.php:27
+msgid "Integrations"
+msgstr ""
+
+#: src/Admin/IntegrationsPage.php:97
+#: src/Admin/SettingsPage.php:79
+msgid "You are not allowed to access this page."
+msgstr ""
+
+#: src/Admin/IntegrationsPage.php:148
+#: src/Admin/IntegrationsPage.php:239
+#: src/Admin/IntegrationsPage.php:313
+msgid "That integration does not exist."
+msgstr ""
+
+#. translators: %s: template slug
+#: src/Admin/IntegrationsPage.php:196
+#, php-format
+msgid "The template \"%s\" is not in the registry."
+msgstr ""
+
+#: src/Admin/IntegrationsPage.php:202
+msgid "The selected Jotform form is not in the cached account form list."
+msgstr ""
+
+#: src/Admin/IntegrationsPage.php:210
+msgid "The integration could not be saved."
+msgstr ""
+
+#: src/Admin/IntegrationsPage.php:225
+msgid "Integration saved."
+msgstr ""
+
+#: src/Admin/IntegrationsPage.php:237
+msgid "Integration deleted."
+msgstr ""
+
+#: src/Admin/IntegrationsPage.php:258
+msgid "Integration activated."
+msgstr ""
+
+#: src/Admin/IntegrationsPage.php:259
+msgid "Integration deactivated."
+msgstr ""
+
+#: src/Admin/IntegrationsPage.php:262
+msgid "That integration could not be updated."
+msgstr ""
+
+#. translators: %d: number of templates
+#: src/Admin/IntegrationsPage.php:295
+#, php-format
+msgid "%d template found."
+msgid_plural "%d templates found."
+msgstr[0] ""
+msgstr[1] ""
+
+#: src/Admin/IntegrationsPage.php:333
+msgid "The Jotform form has changed since the last refresh. Compatibility was re-checked."
+msgstr ""
+
+#: src/Admin/IntegrationsPage.php:334
+msgid "Schema refreshed. The Jotform form has not changed."
+msgstr ""
+
+#: src/Admin/IntegrationsPage.php:347
+#: src/Admin/SettingsPage.php:155
+msgid "You are not allowed to perform this action."
+msgstr ""
+
+#: src/Admin/SettingsPage.php:68
+#: src/Admin/SettingsPage.php:69
+msgid "Settings"
+msgstr ""
+
+#: src/Admin/SettingsPage.php:114
+msgid "No API key configured."
+msgstr ""
+
+#: src/Admin/SettingsPage.php:194
+msgid "Settings saved."
+msgstr ""
+
+#. translators: %s: Jotform account username
+#: src/Admin/SettingsPage.php:201
+#, php-format
+msgid "Connected to Jotform as %s."
+msgstr ""
+
+#: src/Admin/SettingsPage.php:204
+msgid "Connected to Jotform."
+msgstr ""
+
+#: src/Admin/SettingsPage.php:210
+msgid "Connection to Jotform failed."
+msgstr ""
+
+#. translators: %d: number of forms
+#: src/Admin/SettingsPage.php:216
+#, php-format
+msgid "%d form loaded from Jotform."
+msgid_plural "%d forms loaded from Jotform."
+msgstr[0] ""
+msgstr[1] ""
+
+#: src/Admin/SettingsPage.php:224
+msgid "Could not load the form list from Jotform."
+msgstr ""
+
+#: src/Admin/SettingsPage.php:228
+msgid "Add a Jotform API key before using this action."
+msgstr ""
+
+#: src/Admin/views/integration-edit.php:37
+msgid "Add Integration"
+msgstr ""
+
+#: src/Admin/views/integration-edit.php:38
+msgid "Edit Integration"
+msgstr ""
+
+#: src/Admin/views/integration-edit.php:42
+msgid "Back to list"
+msgstr ""
+
+#: src/Admin/views/integration-edit.php:56
+#: src/Admin/views/integrations-list.php:47
+msgid "Name"
+msgstr ""
+
+#: src/Admin/views/integration-edit.php:72
+#: src/Admin/views/integrations-list.php:48
+#: src/Admin/views/integrations-list.php:166
+msgid "Slug"
+msgstr ""
+
+#. translators: %s: example PHP call
+#: src/Admin/views/integration-edit.php:87
+#, php-format
+msgid "The public local identifier, for example %s."
+msgstr ""
+
+#: src/Admin/views/integration-edit.php:97
+#: src/Admin/views/integrations-list.php:49
+msgid "Jotform Form"
+msgstr ""
+
+#: src/Admin/views/integration-edit.php:102
+msgid "No cached forms."
+msgstr ""
+
+#: src/Admin/views/integration-edit.php:103
+msgid "Use Refresh Forms on the Settings screen first."
+msgstr ""
+
+#: src/Admin/views/integration-edit.php:107
+msgid "— Select a form —"
+msgstr ""
+
+#: src/Admin/views/integration-edit.php:118
+msgid "Your theme never needs the Jotform form ID — only this integration does."
+msgstr ""
+
+#: src/Admin/views/integration-edit.php:126
+#: src/Admin/views/integrations-list.php:50
+msgid "Rendering Mode"
+msgstr ""
+
+#: src/Admin/views/integration-edit.php:140
+msgid "A custom template gives the theme full control of the markup. Automatic rendering builds a plain, accessible form from the Jotform schema and ignores the template below."
+msgstr ""
+
+#: src/Admin/views/integration-edit.php:147
+#: src/Admin/views/integrations-list.php:51
+#: src/Admin/views/integrations-list.php:165
+msgid "Template"
+msgstr ""
+
+#: src/Admin/views/integration-edit.php:152
+msgid "No templates registered."
+msgstr ""
+
+#: src/Admin/views/integration-edit.php:153
+msgid "Add a template to your theme /forms/ directory and rescan."
+msgstr ""
+
+#: src/Admin/views/integration-edit.php:157
+msgid "— Select a template —"
+msgstr ""
+
+#: src/Admin/views/integration-edit.php:172
+#: src/Admin/views/integrations-list.php:52
+msgid "Active"
+msgstr ""
+
+#: src/Admin/views/integration-edit.php:181
+msgid "This integration can be rendered on the site"
+msgstr ""
+
+#: src/Admin/views/integration-edit.php:187
+msgid "Create Integration"
+msgstr ""
+
+#: src/Admin/views/integration-edit.php:187
+msgid "Save Integration"
+msgstr ""
+
+#: src/Admin/views/integration-edit.php:190
+#: src/Admin/views/integrations-list.php:54
+#: src/Admin/views/settings-page.php:252
+msgid "Actions"
+msgstr ""
+
+#: src/Admin/views/integration-edit.php:197
+msgid "Refresh Schema"
+msgstr ""
+
+#: src/Admin/views/integration-edit.php:206
+#: src/Admin/views/integrations-list.php:139
+msgid "Rescan Templates"
+msgstr ""
+
+#: src/Admin/views/integration-edit.php:214
+msgid "Delete this integration?"
+msgstr ""
+
+#: src/Admin/views/integration-edit.php:219
+msgid "Delete"
+msgstr ""
+
+#: src/Admin/views/integration-edit.php:224
+#: src/Admin/views/integrations-list.php:53
+msgid "Compatibility"
+msgstr ""
+
+#. translators: 1: human readable time difference, 2: schema fingerprint
+#: src/Admin/views/integration-edit.php:237
+#, php-format
+msgid "Schema loaded %1$s ago. Fingerprint: %2$s"
+msgstr ""
+
+#: src/Admin/views/integration-edit.php:247
+msgid "The normalized schema has errors that must be fixed in Jotform:"
+msgstr ""
+
+#: src/Admin/views/integration-edit.php:260
+msgid "Label"
+msgstr ""
+
+#: src/Admin/views/integration-edit.php:261
+msgid "Semantic Key"
+msgstr ""
+
+#: src/Admin/views/integration-edit.php:262
+msgid "QID"
+msgstr ""
+
+#: src/Admin/views/integration-edit.php:263
+msgid "Type"
+msgstr ""
+
+#: src/Admin/views/integration-edit.php:264
+msgid "Required"
+msgstr ""
+
+#: src/Admin/views/integration-edit.php:265
+msgid "Template Status"
+msgstr ""
+
+#: src/Admin/views/integration-edit.php:284
+#: src/Admin/views/integrations-list.php:107
+msgid "Yes"
+msgstr ""
+
+#: src/Admin/views/integration-edit.php:285
+#: src/Admin/views/integrations-list.php:108
+msgid "No"
+msgstr ""
+
+#: src/Admin/views/integrations-list.php:29
+msgid "Add New"
+msgstr ""
+
+#: src/Admin/views/integrations-list.php:37
+msgid "An integration is the local name your theme uses. Theme code never needs a Jotform form ID."
+msgstr ""
+
+#: src/Admin/views/integrations-list.php:61
+msgid "No integrations yet. Add one to connect a Jotform form to a template."
+msgstr ""
+
+#: src/Admin/views/integrations-list.php:92
+msgid "Not in the cached form list"
+msgstr ""
+
+#: src/Admin/views/integrations-list.php:113
+msgid "Edit"
+msgstr ""
+
+#: src/Admin/views/integrations-list.php:123
+msgid "Deactivate"
+msgstr ""
+
+#: src/Admin/views/integrations-list.php:124
+msgid "Activate"
+msgstr ""
+
+#: src/Admin/views/integrations-list.php:134
+msgid "Templates"
+msgstr ""
+
+#: src/Admin/views/integrations-list.php:151
+msgid "No template directory exists yet. Create a /forms/ directory in your theme."
+msgstr ""
+
+#. translators: %s: list of scanned directories
+#: src/Admin/views/integrations-list.php:155
+#, php-format
+msgid "Scanned directories: %s"
+msgstr ""
+
+#: src/Admin/views/integrations-list.php:167
+msgid "Source"
+msgstr ""
+
+#: src/Admin/views/integrations-list.php:168
+msgid "Fields"
+msgstr ""
+
+#: src/Admin/views/integrations-list.php:169
+msgid "File"
+msgstr ""
+
+#: src/Admin/views/integrations-list.php:176
+msgid "No templates found. Add a PHP file with a Jotform template header to your theme /forms/ directory."
+msgstr ""
+
+#: src/Admin/views/integrations-list.php:188
+msgid "Child theme"
+msgstr ""
+
+#: src/Admin/views/integrations-list.php:189
+msgid "Parent theme"
+msgstr ""
+
+#: src/Admin/views/integrations-list.php:190
+msgid "Theme"
+msgstr ""
+
+#: src/Admin/views/integrations-list.php:191
+msgid "Filter"
+msgstr ""
+
+#. translators: %d: number of dynamic identifiers
+#: src/Admin/views/integrations-list.php:209
+#, php-format
+msgid "+%d dynamic"
+msgid_plural "+%d dynamic"
+msgstr[0] ""
+msgstr[1] ""
+
+#: src/Admin/views/integrations-list.php:228
+msgid "Template diagnostics"
+msgstr ""
+
+#: src/Admin/views/settings-page.php:50
+msgid "Connection"
+msgstr ""
+
+#: src/Admin/views/settings-page.php:56
+msgid "Not configured."
+msgstr ""
+
+#: src/Admin/views/settings-page.php:57
+msgid "Add a Jotform API key below."
+msgstr ""
+
+#: src/Admin/views/settings-page.php:62
+msgid "Connected."
+msgstr ""
+
+#. translators: %s: Jotform account username
+#: src/Admin/views/settings-page.php:67
+#, php-format
+msgid "Jotform account: %s"
+msgstr ""
+
+#: src/Admin/views/settings-page.php:76
+msgid "Connection failed."
+msgstr ""
+
+#: src/Admin/views/settings-page.php:82
+msgid "Not tested yet."
+msgstr ""
+
+#: src/Admin/views/settings-page.php:83
+msgid "Run Test Connection to check the API key."
+msgstr ""
+
+#. translators: %s: human readable time difference, e.g. "5 mins"
+#: src/Admin/views/settings-page.php:93
+#, php-format
+msgid "Last checked %s ago."
+msgstr ""
+
+#: src/Admin/views/settings-page.php:107
+msgid "API Key"
+msgstr ""
+
+#: src/Admin/views/settings-page.php:116
+msgid "The API key is set externally through the JOTFORM_API_KEY constant and cannot be changed here."
+msgstr ""
+
+#: src/Admin/views/settings-page.php:130
+msgid "Paste your Jotform API key"
+msgstr ""
+
+#: src/Admin/views/settings-page.php:134
+msgid "A key is stored. Leave the field empty to keep it."
+msgstr ""
+
+#: src/Admin/views/settings-page.php:139
+msgid "Remove the stored API key"
+msgstr ""
+
+#: src/Admin/views/settings-page.php:145
+msgid "The key is stored server-side only and is never sent to the frontend."
+msgstr ""
+
+#: src/Admin/views/settings-page.php:158
+msgid "API Region"
+msgstr ""
+
+#. translators: %s: currently effective API base URL
+#: src/Admin/views/settings-page.php:175
+#, php-format
+msgid "Current base URL: %s"
+msgstr ""
+
+#: src/Admin/views/settings-page.php:185
+msgid "Custom Base URL"
+msgstr ""
+
+#: src/Admin/views/settings-page.php:197
+msgid "Used only when the region is set to \"Custom base URL\"."
+msgstr ""
+
+#: src/Admin/views/settings-page.php:203
+msgid "Debug Logging"
+msgstr ""
+
+#: src/Admin/views/settings-page.php:212
+msgid "Log Jotform API failures to the PHP error log"
+msgstr ""
+
+#: src/Admin/views/settings-page.php:215
+msgid "Technical metadata only. The API key is never logged."
+msgstr ""
+
+#: src/Admin/views/settings-page.php:221
+msgid "Uninstall"
+msgstr ""
+
+#: src/Admin/views/settings-page.php:231
+msgid "Delete the integrations, the settings and the stored API key when the plugin is deleted"
+msgstr ""
+
+#: src/Admin/views/settings-page.php:239
+msgid "Off by default: deleting the plugin removes only the caches, so deactivating and reinstalling keeps your integrations. Cached data is always removed."
+msgstr ""
+
+#: src/Admin/views/settings-page.php:249
+msgid "Save Settings"
+msgstr ""
+
+#: src/Admin/views/settings-page.php:257
+msgid "Test Connection"
+msgstr ""
+
+#: src/Admin/views/settings-page.php:262
+msgid "Refresh Forms"
+msgstr ""
+
+#: src/Admin/views/settings-page.php:266
+msgid "Jotform Forms"
+msgstr ""
+
+#: src/Admin/views/settings-page.php:268
+msgid "Forms unavailable: no API key is configured."
+msgstr ""
+
+#: src/Admin/views/settings-page.php:271
+msgid "Forms unavailable."
+msgstr ""
+
+#: src/Admin/views/settings-page.php:275
+msgid "Form list has not been loaded yet. Use Refresh Forms."
+msgstr ""
+
+#. translators: 1: number of forms, 2: human readable time difference
+#: src/Admin/views/settings-page.php:281
+#, php-format
+msgid "%1$d forms cached, loaded %2$s ago."
+msgstr ""
+
+#: src/Admin/views/settings-page.php:290
+msgid "Title"
+msgstr ""
+
+#: src/Admin/views/settings-page.php:291
+msgid "Form ID"
+msgstr ""
+
+#: src/Admin/views/settings-page.php:292
+msgid "Status"
+msgstr ""
+
+#: src/Api/JotformClient.php:131
+#: src/Api/JotformClient.php:193
+#: src/Forms/SchemaRepository.php:93
+msgid "The Jotform form ID is missing or invalid."
+msgstr ""
+
+#: src/Api/JotformClient.php:200
+msgid "The submission contains no values to send."
+msgstr ""
+
+#: src/Api/JotformClient.php:230
+#: src/Api/JotformClient.php:264
+msgid "No Jotform API key is configured."
+msgstr ""
+
+#: src/Api/JotformClient.php:320
+msgid "Could not reach the Jotform API. Check the site network connection and try again."
+msgstr ""
+
+#: src/Api/JotformClient.php:336
+msgid "The Jotform API returned a malformed response."
+msgstr ""
+
+#: src/Api/JotformClient.php:377
+msgid "The Jotform API response did not contain the expected data."
+msgstr ""
+
+#. translators: %d: HTTP or API status code
+#: src/Api/JotformClient.php:405
+#, php-format
+msgid "The Jotform API returned an error (code %d)."
+msgstr ""
+
+#. translators: 1: status code, 2: message returned by Jotform
+#: src/Api/JotformClient.php:412
+#, php-format
+msgid "Jotform error %1$d: %2$s"
+msgstr ""
+
+#. translators: %s: raw Jotform field type, e.g. control_datetime
+#: src/Forms/FieldNormalizer.php:164
+#, php-format
+msgid "The Jotform field type \"%s\" is not supported yet."
+msgstr ""
+
+#. translators: 1: semantic key, 2: first qid, 3: second qid
+#: src/Forms/SchemaBuilder.php:68
+#, php-format
+msgid "The semantic key \"%1$s\" is produced by more than one Jotform field (qid %2$s and qid %3$s). Rename one of them in Jotform."
+msgstr ""
+
+#. translators: 1: field label, 2: generated semantic key
+#: src/Forms/SchemaBuilder.php:180
+#, php-format
+msgid "The Jotform field \"%1$s\" has no machine-readable name, so the key \"%2$s\" was derived from its ID. Give the field a name in Jotform to get a stable key."
+msgstr ""
+
+#. translators: %s: field label
+#: src/Forms/SchemaBuilder.php:204
+#, php-format
+msgid "The choice field \"%s\" reports no options, so its values cannot be validated against a list."
+msgstr ""
+
+#: src/Integrations/CompatibilityChecker.php:62
+msgid "No Jotform form selected"
+msgstr ""
+
+#: src/Integrations/CompatibilityChecker.php:63
+msgid "Select a Jotform form for this integration."
+msgstr ""
+
+#: src/Integrations/CompatibilityChecker.php:72
+msgid "Schema not loaded"
+msgstr ""
+
+#: src/Integrations/CompatibilityChecker.php:73
+msgid "Use Refresh Schema to load the form definition from Jotform."
+msgstr ""
+
+#: src/Integrations/CompatibilityChecker.php:87
+msgid "Auto rendering"
+msgstr ""
+
+#. translators: %s: compatibility status, e.g. "Compatible with warnings"
+#: src/Integrations/CompatibilityChecker.php:90
+#, php-format
+msgid "Auto rendering — %s"
+msgstr ""
+
+#: src/Integrations/CompatibilityChecker.php:101
+msgid "Template not found"
+msgstr ""
+
+#. translators: %s: template slug
+#: src/Integrations/CompatibilityChecker.php:104
+#, php-format
+msgid "The template \"%s\" is not in the registry. Rescan templates or pick another one."
+msgstr ""
+
+#: src/Integrations/CompatibilityChecker.php:135
+msgid "This form has no fields that can be rendered automatically."
+msgstr ""
+
+#. translators: %d: number of inputs
+#: src/Integrations/CompatibilityChecker.php:140
+#, php-format
+msgid "The form is built from the schema: %d input."
+msgid_plural "The form is built from the schema: %d inputs."
+msgstr[0] ""
+msgstr[1] ""
+
+#. translators: %d: number of skipped fields
+#: src/Integrations/CompatibilityChecker.php:152
+#, php-format
+msgid "%d Jotform field is not supported and is left out."
+msgid_plural "%d Jotform fields are not supported and are left out."
+msgstr[0] ""
+msgstr[1] ""
+
+#: src/Integrations/Integration.php:65
+msgid "Custom template"
+msgstr ""
+
+#: src/Integrations/Integration.php:66
+msgid "Auto (rendered from the schema)"
+msgstr ""
+
+#: src/Integrations/IntegrationRepository.php:180
+msgid "The integration needs a name."
+msgstr ""
+
+#: src/Integrations/IntegrationRepository.php:184
+msgid "The slug is empty or contains no usable characters. Use lowercase letters, numbers, \"-\" and \"_\"."
+msgstr ""
+
+#. translators: %s: integration slug
+#: src/Integrations/IntegrationRepository.php:191
+#, php-format
+msgid "The slug \"%s\" is already used by another integration."
+msgstr ""
+
+#: src/Integrations/IntegrationRepository.php:197
+msgid "Select the Jotform form this integration submits to."
+msgstr ""
+
+#: src/Integrations/IntegrationRepository.php:201
+msgid "A custom-template integration needs a template."
+msgstr ""
+
+#: src/Rendering/Assets.php:49
+msgid "The form could not be submitted. Please try again."
+msgstr ""
+
+#: src/Rendering/Assets.php:50
+msgid "The form could not be sent. Check your connection and try again."
+msgstr ""
+
+#: src/Rendering/AutoRenderer.php:133
+msgid "Submit"
+msgstr ""
+
+#: src/Rendering/AutoRenderer.php:294
+msgid "— Select —"
+msgstr ""
+
+#: src/Rendering/AutoRenderer.php:336
+msgid "(required)"
+msgstr ""
+
+#. translators: %s: integration slug
+#: src/Rendering/FormRenderer.php:67
+#, php-format
+msgid "There is no integration with the slug \"%s\"."
+msgstr ""
+
+#: src/Rendering/FormRenderer.php:76
+msgid "This integration is disabled."
+msgstr ""
+
+#: src/Rendering/FormRenderer.php:85
+msgid "The Jotform schema for this integration could not be loaded."
+msgstr ""
+
+#: src/Rendering/FormRenderer.php:107
+msgid "The form template raised an error."
+msgstr ""
+
+#. translators: %s: template slug
+#: src/Rendering/FormRenderer.php:115
+#, php-format
+msgid "The template \"%s\" is not registered. Rescan the templates."
+msgstr ""
+
+#: src/Rendering/FormRenderer.php:146
+msgid "This Jotform form has no fields this plugin can render automatically."
+msgstr ""
+
+#: src/Rendering/FormRenderer.php:201
+msgid "Jotform Bridge:"
+msgstr ""
+
+#: src/Rest/SubmissionController.php:96
+#: src/Submission/SubmissionValidator.php:135
+msgid "The submission is too large."
+msgstr ""
+
+#: src/Settings/Settings.php:75
+msgid "Standard (api.jotform.com)"
+msgstr ""
+
+#: src/Settings/Settings.php:76
+msgid "EU (eu-api.jotform.com)"
+msgstr ""
+
+#: src/Settings/Settings.php:77
+msgid "HIPAA (hipaa-api.jotform.com)"
+msgstr ""
+
+#: src/Settings/Settings.php:78
+msgid "Custom base URL"
+msgstr ""
+
+#: src/Submission/SpamGuard.php:57
+msgid "This submission was rejected. Please try again."
+msgstr ""
+
+#: src/Submission/SubmissionPipeline.php:83
+msgid "This form is not available."
+msgstr ""
+
+#: src/Submission/SubmissionPipeline.php:87
+msgid "This form is not accepting submissions."
+msgstr ""
+
+#: src/Submission/SubmissionPipeline.php:92
+#: src/Submission/SubmissionPipeline.php:121
+#: src/Submission/SubmissionPipeline.php:156
+msgid "Validation failed."
+msgstr ""
+
+#: src/Submission/SubmissionPipeline.php:93
+#: src/Submission/SubmissionPipeline.php:157
+msgid "No form data was submitted."
+msgstr ""
+
+#: src/Submission/SubmissionPipeline.php:142
+msgid "This form has already been submitted. Please wait a moment before sending it again."
+msgstr ""
+
+#: src/Submission/SubmissionPipeline.php:203
+msgid "Form submitted successfully."
+msgstr ""
+
+#: src/Submission/SubmissionPipeline.php:238
+msgid "The form could not be submitted right now. Please try again later."
+msgstr ""
+
+#: src/Submission/SubmissionValidator.php:73
+msgid "This field does not exist on the form."
+msgstr ""
+
+#: src/Submission/SubmissionValidator.php:75
+msgid "The submission contains a field this form does not have."
+msgstr ""
+
+#: src/Submission/SubmissionValidator.php:96
+msgid "This field is required."
+msgstr ""
+
+#: src/Submission/SubmissionValidator.php:125
+msgid "The submission contains too many fields."
+msgstr ""
+
+#: src/Submission/SubmissionValidator.php:222
+msgid "This field accepts a single value."
+msgstr ""
+
+#: src/Submission/SubmissionValidator.php:232
+#: src/Submission/SubmissionValidator.php:289
+msgid "This value is not valid."
+msgstr ""
+
+#: src/Submission/SubmissionValidator.php:280
+msgid "Too many values were selected."
+msgstr ""
+
+#. translators: %d: maximum number of characters
+#: src/Submission/SubmissionValidator.php:328
+#: src/Submission/SubmissionValidator.php:352
+#, php-format
+msgid "This value is longer than %d characters."
+msgstr ""
+
+#: src/Submission/SubmissionValidator.php:370
+msgid "Enter a valid email address."
+msgstr ""
+
+#: src/Submission/SubmissionValidator.php:385
+msgid "Enter a number."
+msgstr ""
+
+#. translators: %s: smallest accepted number
+#: src/Submission/SubmissionValidator.php:397
+#, php-format
+msgid "Enter a number of %s or more."
+msgstr ""
+
+#. translators: %s: largest accepted number
+#: src/Submission/SubmissionValidator.php:407
+#, php-format
+msgid "Enter a number of %s or less."
+msgstr ""
+
+#: src/Submission/SubmissionValidator.php:426
+msgid "Enter a valid phone number."
+msgstr ""
+
+#: src/Submission/SubmissionValidator.php:459
+msgid "Select one of the available options."
+msgstr ""
+
+#: src/Templates/CompatibilityReport.php:76
+msgid "Invalid"
+msgstr ""
+
+#: src/Templates/CompatibilityReport.php:79
+msgid "Compatible with warnings"
+msgstr ""
+
+#: src/Templates/CompatibilityReport.php:82
+msgid "Compatible"
+msgstr ""
+
+#: src/Templates/CompatibilityReport.php:168
+msgid "OK"
+msgstr ""
+
+#: src/Templates/CompatibilityReport.php:169
+msgid "Missing required"
+msgstr ""
+
+#: src/Templates/CompatibilityReport.php:170
+msgid "Missing optional"
+msgstr ""
+
+#: src/Templates/CompatibilityReport.php:171
+msgid "Unknown field"
+msgstr ""
+
+#: src/Templates/CompatibilityReport.php:172
+msgid "Unsupported required field"
+msgstr ""
+
+#: src/Templates/CompatibilityReport.php:173
+msgid "Unsupported optional field"
+msgstr ""
+
+#: src/Templates/CompatibilityReport.php:174
+msgid "Composite field used as one input"
+msgstr ""
+
+#: src/Templates/CompatibilityReport.php:175
+msgid "Not statically verifiable"
+msgstr ""
+
+#. translators: %s: directory path
+#: src/Templates/TemplateScanner.php:191
+#, php-format
+msgid "The template directory \"%s\" could not be read."
+msgstr ""
+
+#. translators: %s: file name
+#: src/Templates/TemplateScanner.php:226
+#, php-format
+msgid "\"%s\" resolves outside its template directory and was ignored."
+msgstr ""
+
+#. translators: 1: file name, 2: forbidden header name
+#: src/Templates/TemplateScanner.php:274
+#, php-format
+msgid "\"%1$s\" declares \"%2$s\". A template must not name a Jotform form — that binding belongs to the integration."
+msgstr ""
+
+#. translators: 1: file name, 2: header name
+#: src/Templates/TemplateScanner.php:294
+#: src/Templates/TemplateScanner.php:311
+#, php-format
+msgid "\"%1$s\" is missing the \"%2$s\" header."
+msgstr ""
+
+#. translators: 1: file name, 2: declared slug
+#: src/Templates/TemplateScanner.php:330
+#, php-format
+msgid "The slug \"%2$s\" declared in \"%1$s\" contains no usable characters."
+msgstr ""
+
+#. translators: 1: declared slug, 2: normalized slug
+#: src/Templates/TemplateScanner.php:347
+#, php-format
+msgid "The slug \"%1$s\" was normalized to \"%2$s\"."
+msgstr ""
+
+#. translators: 1: number of identifiers, 2: file name
+#: src/Templates/TemplateScanner.php:364
+#, php-format
+msgid "%1$d dynamic field identifier in \"%2$s\" cannot be statically validated."
+msgid_plural "%1$d dynamic field identifiers in \"%2$s\" cannot be statically validated."
+msgstr[0] ""
+msgstr[1] ""
+
+#. translators: %s: file name
+#: src/Templates/TemplateScanner.php:384
+#, php-format
+msgid "\"%s\" contains no data-jotform-field identifiers."
+msgstr ""
+
+#. translators: 1: template slug, 2: winning file path
+#: src/Templates/TemplateScanner.php:420
+#, php-format
+msgid "The template \"%1$s\" is overridden by \"%2$s\"."
+msgstr ""
+
+#. translators: 1: template slug, 2: ignored file, 3: used file
+#: src/Templates/TemplateScanner.php:434
+#, php-format
+msgid "The slug \"%1$s\" is declared twice in the same directory. \"%2$s\" was ignored in favour of \"%3$s\"."
+msgstr ""
+
+#. translators: %d: number of dynamic identifiers
+#: src/Templates/TemplateValidator.php:62
+#, php-format
+msgid "%d dynamic field identifier cannot be statically validated."
+msgid_plural "%d dynamic field identifiers cannot be statically validated."
+msgstr[0] ""
+msgstr[1] ""
+
+#: src/Templates/TemplateValidator.php:149
+#, php-format
+msgid "The required field \"%1$s\" (%2$s) uses a Jotform type this plugin cannot map yet."
+msgstr ""
+
+#: src/Templates/TemplateValidator.php:153
+#, php-format
+msgid "The optional field \"%1$s\" (%2$s) uses a Jotform type this plugin cannot map yet."
+msgstr ""
+
+#: src/Templates/TemplateValidator.php:174
+#, php-format
+msgid "The template is missing the required field \"%1$s\" (data-jotform-field=\"%2$s\")."
+msgstr ""
+
+#: src/Templates/TemplateValidator.php:175
+#, php-format
+msgid "The template is missing the optional field \"%1$s\" (data-jotform-field=\"%2$s\")."
+msgstr ""
+
+#. translators: 1: semantic key, 2: comma separated child keys
+#: src/Templates/TemplateValidator.php:209
+#, php-format
+msgid "\"%1$s\" is a composite Jotform field and cannot be a single input. Use its sub-fields instead: %2$s."
+msgstr ""
+
+#. translators: %s: semantic key used in the template
+#: src/Templates/TemplateValidator.php:228
+#, php-format
+msgid "The template declares data-jotform-field=\"%s\", which does not exist in the Jotform form."
+msgstr ""

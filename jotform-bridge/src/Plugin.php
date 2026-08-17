@@ -33,6 +33,12 @@ if (!defined('ABSPATH')) {
  */
 final class Plugin
 {
+    /**
+     * Version the caches were last built for. Not user configuration: it is
+     * bookkeeping, and losing it only costs one rebuild.
+     */
+    public const VERSION_OPTION = 'jotform_bridge_version';
+
     private static ?Plugin $instance = null;
 
     private Settings $settings;
@@ -80,6 +86,13 @@ final class Plugin
         }
 
         $this->booted = true;
+
+        self::maybeUpgrade();
+
+        // Template discovery is theme-scoped: the registry holds absolute paths
+        // in the theme that was active when it was built, so it cannot survive a
+        // theme switch.
+        add_action('switch_theme', [self::class, 'flushTemplateRegistry']);
 
         add_action(
             'init',
@@ -229,14 +242,64 @@ final class Plugin
     }
 
     /**
+     * Activation does the least it can get away with: no schema fetch, no
+     * filesystem scan, no default integrations. Everything the plugin needs is
+     * built on demand, so there is nothing here that could fatal on a site with
+     * no API key yet.
+     */
+    public static function onActivate(): void
+    {
+        self::flushCaches();
+
+        update_option(self::VERSION_OPTION, JOTFORM_BRIDGE_VERSION, false);
+    }
+
+    /**
      * Caches are disposable; configuration is left untouched on deactivation.
      */
     public static function onDeactivate(): void
     {
+        self::flushCaches();
+    }
+
+    /**
+     * Drops everything derived from Jotform or from the filesystem.
+     *
+     * Static because deactivation and activation have no built services to work
+     * with. Configuration — settings, integrations — is never touched here.
+     */
+    public static function flushCaches(): void
+    {
         delete_transient(FormRepository::TRANSIENT);
         SchemaRepository::flushAll();
+        self::flushTemplateRegistry();
+    }
 
-        // The template registry is a filesystem cache: it is rebuilt on demand.
+    /**
+     * The template registry is a filesystem cache: it is rebuilt on demand.
+     */
+    public static function flushTemplateRegistry(): void
+    {
         delete_option(TemplateRegistry::OPTION);
+    }
+
+    /**
+     * Discards derived state after an upgrade.
+     *
+     * A new version may normalize schemas differently or store a registry entry
+     * differently, and a cache written by the previous version is not worth
+     * trusting. Nothing else happens here: no migration, no data rewriting.
+     */
+    private static function maybeUpgrade(): void
+    {
+        $stored = get_option(self::VERSION_OPTION, '');
+
+        if (is_string($stored) && $stored === JOTFORM_BRIDGE_VERSION) {
+            return;
+        }
+
+        self::flushCaches();
+
+        update_option(self::VERSION_OPTION, JOTFORM_BRIDGE_VERSION, false);
     }
 }

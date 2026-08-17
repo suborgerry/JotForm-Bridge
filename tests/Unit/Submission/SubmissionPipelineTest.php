@@ -206,6 +206,105 @@ final class SubmissionPipelineTest extends TestCase
         $this->assertStringNotContainsString('test-api-key', json_encode($outcome->body()) ?: '');
     }
 
+    public function testAnIdenticalSubmissionIsRefusedRightAfterOneWasAccepted(): void
+    {
+        $this->mockPost(200, ['responseCode' => 200, 'content' => ['submissionID' => '1']]);
+
+        $first = $this->pipeline()->submit('contact', $this->valid(), ['ip' => '203.0.113.7']);
+
+        $this->assertSame(200, $first->status());
+
+        $second = $this->pipeline()->submit('contact', $this->valid(), ['ip' => '203.0.113.7']);
+
+        $this->assertSame(429, $second->status());
+        $this->assertCount(1, $this->requests, 'The duplicate must not reach Jotform.');
+    }
+
+    public function testTheDuplicateGuardOnlyRemembersAcceptedSubmissions(): void
+    {
+        $this->mockPost(500, ['responseCode' => 500, 'message' => 'boom']);
+
+        $this->assertSame(502, $this->pipeline()->submit('contact', $this->valid())->status());
+
+        $this->mockPost(200, ['responseCode' => 200, 'content' => ['submissionID' => '1']]);
+
+        $this->assertSame(
+            200,
+            $this->pipeline()->submit('contact', $this->valid())->status(),
+            'A failed submission must be retryable immediately.'
+        );
+    }
+
+    public function testADifferentSubmissionIsNotTreatedAsADuplicate(): void
+    {
+        $this->mockPost(200, ['responseCode' => 200, 'content' => ['submissionID' => '1']]);
+
+        $this->pipeline()->submit('contact', $this->valid(), ['ip' => '203.0.113.7']);
+
+        $other            = $this->valid();
+        $other['message'] = 'A different message.';
+
+        $outcome = $this->pipeline()->submit('contact', $other, ['ip' => '203.0.113.7']);
+
+        $this->assertSame(200, $outcome->status());
+        $this->assertCount(2, $this->requests);
+    }
+
+    public function testTheDuplicateGuardStoresNoSubmissionValues(): void
+    {
+        $this->mockPost(200, ['responseCode' => 200, 'content' => ['submissionID' => '1']]);
+
+        $this->pipeline()->submit('contact', $this->valid(), ['ip' => '203.0.113.7']);
+
+        $stored = json_encode($this->transients) ?: '';
+
+        $this->assertStringNotContainsString('jane@example.com', $stored);
+        $this->assertStringNotContainsString('203.0.113.7', $stored);
+    }
+
+    /**
+     * A key that is not a plausible identifier must not come back in the answer.
+     */
+    public function testAHostileFieldNameIsNotEchoedBack(): void
+    {
+        $fields = $this->valid();
+        $fields['"><script>alert(1)</script>'] = 'x';
+
+        $outcome = $this->pipeline()->submit('contact', $fields);
+
+        $this->assertSame(422, $outcome->status());
+        $this->assertArrayHasKey(ValidationResult::FORM_KEY, $outcome->errors());
+        $this->assertStringNotContainsString('<script>', json_encode($outcome->body()) ?: '');
+        $this->assertSame([], $this->requests);
+    }
+
+    public function testAnOverlongFieldNameIsNotEchoedBack(): void
+    {
+        $fields                            = $this->valid();
+        $fields[str_repeat('a', 5000)] = 'x';
+
+        $outcome = $this->pipeline()->submit('contact', $fields);
+
+        $this->assertSame(422, $outcome->status());
+        $this->assertArrayHasKey(ValidationResult::FORM_KEY, $outcome->errors());
+
+        foreach (array_keys($outcome->errors()) as $key) {
+            $this->assertLessThanOrEqual(128, strlen((string) $key));
+        }
+    }
+
+    public function testADeeplyNestedPayloadIsRefusedAsTooLarge(): void
+    {
+        $outcome = $this->pipeline()->submit(
+            'contact',
+            ['message' => [[[array_fill(0, 100, str_repeat('x', 1000))]]]]
+        );
+
+        $this->assertSame(422, $outcome->status());
+        $this->assertArrayHasKey(ValidationResult::FORM_KEY, $outcome->errors());
+        $this->assertSame([], $this->requests);
+    }
+
     private function pipeline(): SubmissionPipeline
     {
         $client = new JotformClient('test-api-key', 'https://api.jotform.com');

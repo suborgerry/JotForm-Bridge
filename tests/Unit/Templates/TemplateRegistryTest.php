@@ -93,6 +93,40 @@ final class TemplateRegistryTest extends TestCase
         $this->assertFalse($registry->has('does-not-exist'));
     }
 
+    /**
+     * The registry is the allowlist: a slug that names a path — relative,
+     * absolute or URL-shaped — resolves to nothing, whether or not the file it
+     * points at exists and is readable.
+     *
+     * @dataProvider pathShapedSlugs
+     */
+    public function testAPathShapedSlugNeverResolvesToAFile(string $slug): void
+    {
+        $this->write('contact.php', 'Contact Form', 'contact', '');
+
+        $registry = new TemplateRegistry();
+
+        $this->assertFalse($registry->has($slug), sprintf('"%s" must not be a template.', $slug));
+        $this->assertNull($registry->file($slug), sprintf('"%s" must not resolve to a file.', $slug));
+    }
+
+    /**
+     * @return array<string, array{0: string}>
+     */
+    public function pathShapedSlugs(): array
+    {
+        return [
+            'parent traversal'    => ['../../wp-config'],
+            'encoded traversal'   => ['%2e%2e%2fwp-config'],
+            'absolute path'       => ['/etc/passwd'],
+            'absolute php file'   => [__FILE__],
+            'the real template'   => ['theme/forms/contact.php'],
+            'null byte'           => ["contact\0.php"],
+            'remote url'          => ['https://evil.test/shell.php'],
+            'stream wrapper'      => ['php://input'],
+        ];
+    }
+
     public function testOnlyARegisteredTemplateResolvesToAFile(): void
     {
         $this->write('contact.php', 'Contact Form', 'contact', '');

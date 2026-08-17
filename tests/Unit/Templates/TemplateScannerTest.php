@@ -270,6 +270,56 @@ final class TemplateScannerTest extends TestCase
         $this->assertContains(TemplateScanner::CODE_DYNAMIC_FIELD, $codes);
     }
 
+    /**
+     * A well-commented template documents the attribute it uses, and that
+     * documentation must not be mistaken for a field the Jotform form has to
+     * offer — it would report the template as invalid for explaining itself.
+     */
+    public function testIdentifiersInsidePhpCommentsAreNotHarvested(): void
+    {
+        $this->write(
+            'child/forms/contact.php',
+            "<?php\n"
+            . "/**\n"
+            . " * Jotform Template Name: Contact\n"
+            . " * Jotform Template Slug: contact\n"
+            . " *\n"
+            . " * Mark an input with data-jotform-field=\"key\" to bind it, e.g.\n"
+            . " * data-jotform-field='name.first' for a composite child.\n"
+            . " */\n"
+            . "// Not a field either: data-jotform-field=\"legacy_key\"\n"
+            . "# And not this one: data-jotform-field=\"hash_key\"\n"
+            . '?>'
+            . '<input data-jotform-field="email">'
+        );
+
+        $result = (new TemplateScanner())->scan();
+
+        $this->assertSame(['email'], $result['templates']['contact']['fields']);
+        $this->assertSame(0, $result['templates']['contact']['dynamic']);
+    }
+
+    /**
+     * Commented-out markup is still markup: an identifier a developer may
+     * uncomment is worth reporting rather than hiding.
+     */
+    public function testIdentifiersInsideHtmlCommentsAreStillFound(): void
+    {
+        $this->write(
+            'child/forms/contact.php',
+            $this->template(
+                'Contact',
+                'contact',
+                '<input data-jotform-field="email">'
+                . '<!-- <input data-jotform-field="phone"> -->'
+            )
+        );
+
+        $result = (new TemplateScanner())->scan();
+
+        $this->assertSame(['email', 'phone'], $result['templates']['contact']['fields']);
+    }
+
     public function testTemplateWithoutAnyFieldIsReported(): void
     {
         $this->write('child/forms/empty.php', $this->template('Empty', 'empty', '<p>Nothing</p>'));

@@ -26,6 +26,14 @@ final class FormRepository
 
     private JotformClient $client;
 
+    /**
+     * In-request memo. The admin list asks for the form list once per row, and
+     * the answer cannot change within one request.
+     *
+     * @var array<int, array<string, string>>|null
+     */
+    private ?array $memo = null;
+
     public function __construct(JotformClient $client)
     {
         $this->client = $client;
@@ -36,9 +44,15 @@ final class FormRepository
      */
     public function all(): array
     {
+        if ($this->memo !== null) {
+            return $this->memo;
+        }
+
         $cached = get_transient(self::TRANSIENT);
 
-        return is_array($cached) ? $cached : [];
+        $this->memo = is_array($cached) ? $cached : [];
+
+        return $this->memo;
     }
 
     public function isCached(): bool
@@ -65,7 +79,8 @@ final class FormRepository
             return $response;
         }
 
-        $forms = $response->data();
+        $forms      = $response->data();
+        $this->memo = null;
 
         set_transient(self::TRANSIENT, $forms, self::CACHE_TTL);
 
@@ -82,6 +97,8 @@ final class FormRepository
 
     public function flush(): void
     {
+        $this->memo = null;
+
         delete_transient(self::TRANSIENT);
         delete_option(self::META_OPTION);
     }

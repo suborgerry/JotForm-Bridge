@@ -44,6 +44,70 @@ final class PluginPackageTest extends TestCase
         }
     }
 
+    public function testLifecycleHooksAreRegistered(): void
+    {
+        $main = (string) file_get_contents(self::PLUGIN_DIR . '/jotform-bridge.php');
+
+        $this->assertStringContainsString("register_activation_hook(__FILE__, [Plugin::class, 'onActivate'])", $main);
+        $this->assertStringContainsString("register_deactivation_hook(__FILE__, [Plugin::class, 'onDeactivate'])", $main);
+
+        $plugin = (string) file_get_contents(self::PLUGIN_DIR . '/src/Plugin.php');
+
+        $this->assertStringContainsString("add_action('switch_theme'", $plugin);
+    }
+
+    /**
+     * Uninstall must not destroy configuration nobody asked it to destroy.
+     */
+    public function testUninstallOnlyRemovesConfigurationWhenItWasOptedIn(): void
+    {
+        $uninstall = (string) file_get_contents(self::PLUGIN_DIR . '/uninstall.php');
+
+        $this->assertMatchesRegularExpression(
+            '/delete_data_on_uninstall.*\n(.*\n)*?.*delete_option\(\'jotform_bridge_integrations\'\)/',
+            $uninstall,
+            'The integrations option may only be deleted inside the opt-in branch.'
+        );
+
+        foreach (['jotform_bridge_integrations', 'jotform_bridge_settings'] as $guarded) {
+            $before = (string) strstr($uninstall, 'delete_data_on_uninstall', true);
+
+            $this->assertStringNotContainsString(
+                sprintf("delete_option('%s')", $guarded),
+                $before,
+                sprintf('%s must not be deleted unconditionally.', $guarded)
+            );
+        }
+    }
+
+    /**
+     * The shipped plugin must not require any Composer or Node artifact.
+     */
+    public function testThePackageHasNoBuildOrDependencyArtifacts(): void
+    {
+        foreach (['vendor', 'node_modules', 'composer.json', 'package.json', 'tests'] as $unwanted) {
+            $this->assertFileDoesNotExist(
+                self::PLUGIN_DIR . '/' . $unwanted,
+                sprintf('%s must not be part of the plugin directory.', $unwanted)
+            );
+        }
+
+        $files = new \RegexIterator(
+            new \RecursiveIteratorIterator(new \RecursiveDirectoryIterator(self::PLUGIN_DIR)),
+            '/\.php$/'
+        );
+
+        foreach ($files as $file) {
+            $source = (string) file_get_contents($file->getPathname());
+
+            $this->assertStringNotContainsString(
+                'vendor/autoload.php',
+                $source,
+                sprintf('%s expects a Composer autoloader.', $file->getPathname())
+            );
+        }
+    }
+
     public function testRepositoryRootContainsNoPluginPhp(): void
     {
         $root = glob(__DIR__ . '/../../*.php') ?: [];

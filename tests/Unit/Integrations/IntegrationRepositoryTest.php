@@ -216,6 +216,63 @@ final class IntegrationRepositoryTest extends TestCase
         $this->assertSame(Integration::MODE_CUSTOM, $integration->mode());
     }
 
+    /**
+     * A forged `jotform_integration[slug][]=x` must not become the string
+     * "Array" — it is simply not a value the form can carry.
+     */
+    public function testArrayInputDoesNotBecomeAValue(): void
+    {
+        $integration = Integration::fromInput(
+            [
+                'name'     => ['Contact'],
+                'slug'     => ['contact'],
+                'form_id'  => ['240000000000001'],
+                'mode'     => ['auto'],
+                'template' => ['contact'],
+                'active'   => '1',
+            ]
+        );
+
+        $this->assertSame('', $integration->name());
+        $this->assertSame('', $integration->slug());
+        $this->assertSame('', $integration->formId());
+        $this->assertSame('', $integration->templateSlug());
+        $this->assertSame(Integration::MODE_CUSTOM, $integration->mode());
+
+        $this->assertNotSame(
+            [],
+            $this->repository->save($integration),
+            'An integration built from nothing usable must not be saved.'
+        );
+    }
+
+    public function testACorruptedStoredIntegrationIsSkippedRatherThanFatal(): void
+    {
+        $this->options[IntegrationRepository::OPTION] = [
+            'contact' => [
+                'slug'    => ['nested'],
+                'name'    => ['nested'],
+                'form_id' => ['nested'],
+                'active'  => true,
+            ],
+            'careers' => [
+                'slug'    => 'careers',
+                'name'    => 'Careers',
+                'form_id' => '240000000000002',
+                'active'  => true,
+            ],
+        ];
+
+        $all = $this->repository->all();
+
+        // The key is the authority on the slug, so the entry still exists — but
+        // nothing unusable leaks out of it, and reading it does not fatal.
+        $this->assertSame(['contact', 'careers'], array_keys($all));
+        $this->assertSame('', $all['contact']->name());
+        $this->assertSame('', $all['contact']->formId());
+        $this->assertSame('240000000000002', $all['careers']->formId());
+    }
+
     private function integration(string $slug, string $name = 'Contact'): Integration
     {
         return new Integration(

@@ -59,8 +59,22 @@ abstract class TestCase extends PHPUnitTestCase
                 : false
         );
 
+        // The real esc_url_raw() drops anything outside the allowed schemes;
+        // the stub reproduces that much, because the plugin relies on it.
         Functions\when('esc_url_raw')->alias(
-            static fn($value): string => (string) $value
+            static function ($value, ?array $protocols = null): string {
+                $value     = (string) $value;
+                $protocols = $protocols ?? ['http', 'https', 'ftp', 'mailto'];
+                $scheme    = strtolower((string) parse_url($value, PHP_URL_SCHEME));
+
+                return in_array($scheme, $protocols, true) ? $value : '';
+            }
+        );
+
+        Functions\when('wp_parse_url')->alias(
+            static function (string $url, int $component = -1) {
+                return parse_url($url, $component);
+            }
         );
 
         Functions\when('is_wp_error')->alias(

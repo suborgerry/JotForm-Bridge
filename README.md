@@ -1,372 +1,345 @@
 # Jotform Bridge
 
-> **Status: target specification, not shipped documentation.**
->
-> No plugin code exists in this repository yet. This document describes the
-> intended behaviour of the finished plugin and is used as a design reference
-> while stages 1–6 (see `prompts/`) are implemented.
->
-> Code examples here are **illustrative**. Where an example conflicts with the
-> actual Jotform REST API — composite field child names in particular — the API
-> wins, and this file must be corrected rather than the implementation bent to
-> match it.
->
-> Stage 6 rewrites this file into real user documentation that reflects what was
-> actually built. Do not treat it as complete until then.
+A standalone WordPress plugin that uses Jotform as a **headless** form backend.
 
-Jotform Bridge is a standalone WordPress plugin that uses Jotform as a headless backend for custom forms.
+You write the form markup. Jotform stores the submissions, sends the
+notifications and runs its own integrations. Nothing about Jotform reaches your
+theme: templates address fields by readable identifiers such as `email` or
+`full_name.first`, never by a Jotform question ID, and never by a form ID.
 
-It allows developers to fully control the form markup and frontend experience in WordPress while using Jotform for:
+| | |
+| --- | --- |
+| Requires | WordPress 6.4+, PHP 8.0+ |
+| Depends on | nothing — no jQuery, no Composer install, no build step |
+| Text domain | `jotform-bridge` |
+| Plugin slug | `jotform-bridge` |
 
-* submissions;
-* email notifications;
-* integrations;
-* form structure and configuration;
-* submission storage.
+---
 
-## Requirements
+## Contents
 
-* WordPress 6.4+
-* PHP 8.0+
+* [How it works](#how-it-works)
+* [Installation](#installation)
+* [The API key](#the-api-key)
+* [API region](#api-region)
+* [Integrations](#integrations)
+* [Rendering modes](#rendering-modes)
+* [Custom templates](#custom-templates)
+  * [Header metadata](#header-metadata)
+  * [`data-jotform-field`](#data-jotform-field)
+  * [Composite fields](#composite-fields)
+  * [What a template receives](#what-a-template-receives)
+  * [A complete example](#a-complete-example)
+  * [Extra template directories](#extra-template-directories)
+* [Rendering a form](#rendering-a-form)
+* [Compatibility validation](#compatibility-validation)
+* [Refresh Forms, Refresh Schema, Rescan Templates](#refresh-forms-refresh-schema-rescan-templates)
+* [The REST endpoint](#the-rest-endpoint)
+* [JavaScript events](#javascript-events)
+* [Hooks](#hooks)
+* [Spam protection](#spam-protection)
+* [Caching](#caching)
+* [Supported field types](#supported-field-types)
+* [Debugging](#debugging)
+* [Uninstalling](#uninstalling)
+* [Known limitations](#known-limitations)
+* [Development](#development)
 
-The plugin does not depend on:
+---
 
-* ACF;
-* Elementor;
-* jQuery;
-* Sage or Blade;
-* frontend frameworks.
+## How it works
+
+```text
+theme:      echo jotform_form('contact')
+                    ↓
+integration:  slug "contact" → Jotform form + rendering mode + template
+                    ↓
+render:     your template, or markup generated from the schema
+                    ↓
+visitor submits → POST /wp-json/jotform-bridge/v1/submit/contact
+                    ↓
+server:     validate against the cached schema → map to qids → Jotform API
+```
+
+The browser never supplies a form ID, a question ID or credentials. It sends
+semantic field names and values; everything else is resolved on the server from
+the integration and the cached Jotform form definition.
 
 ---
 
 ## Installation
 
-Install the plugin normally through WordPress:
+1. **Plugins → Add New → Upload Plugin**, upload the ZIP, activate. Nothing else
+   is needed: no `composer install`, no `npm install`, no `npm run build`.
+2. **Jotform Bridge → Settings** — paste your Jotform API key, choose the API
+   region, save.
+3. Press **Test Connection**, then **Refresh Forms** to load your account's form
+   list.
+4. **Jotform Bridge → Integrations → Add Integration** — name it, pick the
+   Jotform form and the rendering mode.
 
-```text
-Plugins
-→ Add New
-→ Upload Plugin
-→ Activate
-```
+Get an API key from your Jotform account under **Settings → API**. A read-only
+key is enough to load forms and schemas, but creating submissions needs a key
+with write access.
 
-Then open:
+---
 
-```text
-Jotform Bridge
-→ Settings
-```
+## The API key
 
-and configure the Jotform API connection.
+Two sources, in this order:
 
-The API key can also be defined in `wp-config.php`:
+1. the `JOTFORM_API_KEY` constant;
+2. the WordPress option written on the settings screen.
 
 ```php
-define('JOTFORM_API_KEY', 'your-api-key');
+// wp-config.php
+define( 'JOTFORM_API_KEY', 'your-api-key' );
 ```
 
-When the constant is defined, it takes priority over the value stored in WordPress.
+When the constant is defined it wins, the settings screen says so, the field is
+disabled, and the value is never displayed — not even masked back into an input.
 
-The API key is never exposed to the frontend.
+Wherever the key comes from, it stays on the server. It is never printed into
+HTML, never localized into JavaScript, never returned by the REST endpoint and
+never written to a log; the admin screen only ever shows the last four
+characters. If Jotform ever echoes the key back inside an error message, the
+client strips it before the message is stored or displayed.
+
+---
+
+## API region
+
+Jotform serves EU and HIPAA accounts from their own API hosts. Picking the wrong
+one does not fail with a clear error — the standard host answers with a redirect
+that looks like a permissions problem.
+
+| Region | Base URL |
+| --- | --- |
+| Standard | `https://api.jotform.com` |
+| EU | `https://eu-api.jotform.com` |
+| HIPAA | `https://hipaa-api.jotform.com` |
+| Custom base URL | your own `http(s)://host[/path]` |
+
+A custom base URL is restricted to an absolute `http` or `https` URL with a
+host; credentials, query strings and fragments are stripped before it is stored,
+because this setting decides where the API key is sent.
 
 ---
 
 ## Integrations
 
-Forms are connected through local **Integrations**.
-
-Example:
+An **integration** is the local entity your theme addresses. It binds:
 
 ```text
-Name: Contact Form
-Slug: contact
-Jotform Form: Contact Us
-Rendering: Custom Template
-Template: Contact Form
+slug  →  Jotform form  →  rendering mode  →  optional template
 ```
 
-Theme code only uses the local integration slug:
+| Field | Meaning |
+| --- | --- |
+| Name | What you see in the admin |
+| Slug | The public identifier used in code, e.g. `contact` |
+| Jotform Form | Which form submissions go to |
+| Rendering Mode | `Custom template` or `Auto` |
+| Template | Which registered template renders it (custom mode) |
+| Active | Inactive integrations render nothing and refuse submissions |
 
-```php
-echo jotform_form('contact');
-```
+Several integrations may point at the same Jotform form. That is the point:
+`consultation`, `consultation-popup` and `consultation-footer` can share one
+Jotform form and use three different templates.
 
-or:
-
-```text
-[jotform_form id="contact"]
-```
-
-Jotform Form IDs do not need to appear in theme code.
+Renaming a slug is a real rename: update the theme code and any shortcode that
+referenced the old one.
 
 ---
 
-## Custom Templates
+## Rendering modes
 
-Custom templates are stored inside the active theme:
+**Custom template** — a plain PHP file in your theme. Full control over the
+markup. This is the main use case.
+
+**Auto** — markup built from the Jotform form definition: semantic elements,
+`jfb-` prefixed classes, labels and options from Jotform, no CSS shipped and no
+layout opinions. Use it to get an integration live before a template exists, or
+for forms whose presentation does not matter. Fields the plugin cannot map are
+left out rather than half-rendered, and the admin says which ones.
+
+---
+
+## Custom templates
+
+Templates live in a `forms/` directory inside the theme:
 
 ```text
-your-theme/
+wp-content/themes/your-theme/
 └── forms/
+    ├── contact.php
+    └── consultation.php
 ```
 
-Example:
+A child theme overrides a parent template with the same slug. Discovery is
+shallow — nested directories are an implementation detail of a template, not
+templates themselves — and it works by **reading** the file header. A template is
+never executed during discovery.
 
-```text
-forms/contact.php
-```
+After adding, renaming or removing a template file, press **Rescan Templates**.
 
-A template must contain the Jotform Bridge header:
+### Header metadata
 
 ```php
 <?php
-/*
-Jotform Template Name: Contact Form
-Jotform Template Slug: contact
-*/
-?>
+/**
+ * Jotform Template Name: Contact
+ * Jotform Template Slug: contact
+ */
 ```
 
-Do not add the Jotform Form ID to the template.
+| Header | Required | Meaning |
+| --- | --- | --- |
+| `Jotform Template Name` | yes | Label shown in the admin |
+| `Jotform Template Slug` | yes | Identifier the integration stores |
+| `Jotform Form ID` | **rejected** | Binding a template to one form is the integration's job |
 
-The relationship between a Jotform form and a template is configured through the WordPress admin.
+A file in `forms/` with neither header is ignored silently — an ordinary theme
+partial in the same directory is not an error. A file with one header and not the
+other is reported as an error, because it was clearly meant to be a template.
 
-After creating or changing templates, run:
+### `data-jotform-field`
 
-```text
-Jotform Bridge
-→ Rescan Templates
-```
-
----
-
-## Custom Template Example
-
-```php
-<?php
-/*
-Jotform Template Name: Contact Form
-Jotform Template Slug: contact
-*/
-?>
-
-<form
-    class="contact-form"
-    data-jotform-bridge
-    data-jotform-integration="<?php echo esc_attr($integration['slug']); ?>"
->
-    <label for="contact-first-name">
-        First name
-    </label>
-
-    <input
-        id="contact-first-name"
-        type="text"
-        data-jotform-field="name.first"
-    >
-
-    <label for="contact-email">
-        Email
-    </label>
-
-    <input
-        id="contact-email"
-        type="email"
-        data-jotform-field="email"
-    >
-
-    <label for="contact-message">
-        Message
-    </label>
-
-    <textarea
-        id="contact-message"
-        data-jotform-field="message"
-    ></textarea>
-
-    <div
-        data-jotform-errors
-        aria-live="polite"
-    ></div>
-
-    <button type="submit">
-        Submit
-    </button>
-</form>
-```
-
----
-
-## Semantic Fields
-
-Templates do not use internal Jotform Question IDs.
-
-Instead of:
+One attribute carries the whole contract between your markup and the plugin:
 
 ```html
+<input type="email" data-jotform-field="email">
+```
+
+Never a question ID, never a Jotform `name`:
+
+```html
+<!-- wrong -->
 <input name="q7">
 ```
 
-use semantic field identifiers:
+The identifier is derived from the Jotform field's machine name — `fullName`
+becomes `full_name`, `Phone Number` becomes `phone_number` — so it survives a
+label being renamed or translated.
+
+| Attribute | Where | Purpose |
+| --- | --- | --- |
+| `data-jotform-bridge` | `<form>` | Marks the form for the frontend script |
+| `data-jotform-integration` | `<form>` | Which integration to submit to |
+| `data-jotform-endpoint` | `<form>` | Optional explicit endpoint URL |
+| `data-jotform-field` | input, textarea, select | The field this control carries |
+| `data-jotform-field-error` | any element | Where that field's error message goes |
+| `data-jotform-errors` | any element | Where form-level errors go |
+| `data-jotform-success` | any element | Where the success message goes |
+| `data-jotform-busy` | `<form>` | Set to `true` while a submission is in flight |
+
+A radio group and a checkbox group each share one `data-jotform-field` across all
+their inputs; a checkbox group therefore submits a list. An element without the
+attribute takes no part in the payload at all, which is how a honeypot or a
+layout helper stays out of it.
+
+An identifier the schema does not know is **rejected**, not dropped: a
+template/schema mismatch surfaces instead of quietly losing an answer.
+
+### Composite fields
+
+Jotform's Full Name and Address fields are addressed through their children
+only, using a dotted path:
 
 ```html
-<input data-jotform-field="email">
-```
+<input data-jotform-field="full_name.first">
+<input data-jotform-field="full_name.last">
 
-Composite fields are supported through paths:
-
-```html
-<input data-jotform-field="name.first">
-<input data-jotform-field="name.last">
-```
-
-Address fields use the Jotform answer sub-keys:
-
-```html
 <input data-jotform-field="address.addr_line1">
-<input data-jotform-field="address.addr_line2">
 <input data-jotform-field="address.city">
-<input data-jotform-field="address.state">
 <input data-jotform-field="address.postal">
-<input data-jotform-field="address.country">
 ```
 
-The parent part of the path (`name`, `address`) is the semantic key of the field
-itself, derived from the Jotform `name` property — so a form whose address field
-is named `homeAddress` exposes `home_address.city`.
-
-Which children exist depends on the Jotform field configuration:
+The part before the dot is the field's own semantic key, so an address field
+named `homeAddress` exposes `home_address.city`.
 
 | Composite | Children |
 | --- | --- |
-| Full Name (`control_fullname`) | `first`, `last`, plus `prefix`, `middle`, `suffix` when enabled |
-| Address (`control_address`) | whichever of `addr_line1`, `addr_line2`, `city`, `state`, `postal`, `country` the field shows |
+| Full Name | `first`, `last`, plus `prefix`, `middle`, `suffix` when the field shows them |
+| Address | whichever of `addr_line1`, `addr_line2`, `city`, `state`, `postal`, `country` the field shows |
 
-> These child names come from the Jotform API, not from this document: the Full
-> Name parts are the `sublabels` keys, and the address parts are the answer /
-> prefill keys that Jotform's own `subfields` tokens (`st1`, `st2`, `city`,
-> `state`, `zip`, `country`) map onto.
+The exact set comes from the Jotform field configuration. The admin
+compatibility report lists every path a template may use for the bound form —
+read it there rather than guessing.
 
-Jotform Bridge maps these semantic identifiers to the correct Jotform Question IDs and submission structure on the server.
+### What a template receives
 
----
+Three variables, and nothing else:
 
-## Template Validation
-
-Jotform Bridge compares custom templates against the current Jotform form schema.
-
-Possible states:
-
-```text
-Compatible
-Compatible with warnings
-Invalid
+```php
+$integration  // ['slug' => string, 'name' => string, 'template' => string]
+$schema       // ['fields' => array<string, field>, 'required' => string[]]
+$endpoint     // string: the REST URL this form submits to
 ```
 
-If a required Jotform field is missing from the template, the integration is considered invalid.
+Each `$schema['fields']` entry:
 
-After modifying a form in Jotform, use:
+| Key | Type | Meaning |
+| --- | --- | --- |
+| `key` | string | The semantic identifier |
+| `label` | string | The label Jotform reports |
+| `type` | string | `text`, `textarea`, `email`, `phone`, `number`, `select`, `radio`, `checkbox` |
+| `required` | bool | Whether Jotform marks it required |
+| `multiple` | bool | True when the field carries a list |
+| `options` | array | `[['value' => string, 'label' => string], …]` |
+| `parent` | string | The composite parent key, `''` for a scalar field |
 
-```text
-Refresh Schema
+The Jotform form ID, the question IDs and the API key are not part of the context
+and cannot be reached from it. A template that wanted to leak them would have
+nothing to leak.
+
+Using `$schema` is optional. Hard-coding labels and options is fine; reading them
+from the schema only means the form follows the Jotform form when it changes.
+
+### A complete example
+
+A ready-to-copy template ships with the plugin at
+[`jotform-bridge/examples/contact.php`](jotform-bridge/examples/contact.php).
+Copy it to `your-theme/forms/contact.php` and press **Rescan Templates**. The
+short version:
+
+```php
+<?php
+/**
+ * Jotform Template Name: Contact
+ * Jotform Template Slug: contact
+ */
+?>
+<form
+    class="contact-form"
+    method="post"
+    action="<?php echo esc_url($endpoint); ?>"
+    data-jotform-bridge
+    data-jotform-integration="<?php echo esc_attr($integration['slug']); ?>"
+    novalidate
+>
+    <p data-jotform-success role="status" aria-live="polite"></p>
+    <div data-jotform-errors role="alert" aria-live="assertive"></div>
+
+    <p>
+        <label for="cf-email">Email</label>
+        <input type="email" id="cf-email" data-jotform-field="email" required>
+        <span data-jotform-field-error="email"></span>
+    </p>
+
+    <p>
+        <label for="cf-message">Message</label>
+        <textarea id="cf-message" data-jotform-field="message"></textarea>
+        <span data-jotform-field-error="message"></span>
+    </p>
+
+    <button type="submit">Send</button>
+</form>
 ```
 
-to retrieve the latest schema and revalidate the template.
+No CSS ships with the plugin. Style it as you would any other form in the theme.
 
----
-
-## Rendering Modes
-
-Jotform Bridge supports two rendering modes.
-
-### Custom Template
-
-Uses a PHP template from the active WordPress theme.
-
-This is the primary mode for fully custom form markup and design.
-
-### Auto Generate
-
-Automatically generates semantic HTML from the normalized Jotform schema.
-
-The generated markup is intentionally minimal and can be styled by the active theme.
-
----
-
-## REST API
-
-Form submissions are sent through the WordPress REST API:
-
-```text
-POST /wp-json/jotform-bridge/v1/submit/{integration}
-```
-
-Example:
-
-```text
-POST /wp-json/jotform-bridge/v1/submit/contact
-```
-
-The frontend submits semantic fields only.
-
-The server handles:
-
-```text
-Integration
-→ Schema
-→ Validation
-→ Jotform Mapping
-→ Jotform API
-```
-
-The browser does not provide authoritative Jotform Form IDs, Question IDs, or API credentials.
-
----
-
-## JavaScript Events
-
-Jotform Bridge dispatches frontend events that can be used for custom UX, analytics, redirects, or animations:
-
-```text
-jotformbridge:before-submit
-jotformbridge:success
-jotformbridge:error
-```
-
-The plugin does not force a specific success popup, redirect, or animation.
-
----
-
-## Caching
-
-The plugin caches:
-
-* Jotform form lists;
-* Jotform form schemas;
-* normalized schemas;
-* custom template registry.
-
-Jotform API requests are not performed on every frontend page load.
-
-Use the following actions when data needs to be refreshed:
-
-```text
-Refresh Forms
-Refresh Schema
-Rescan Templates
-```
-
----
-
-## Custom Template Paths
-
-The default template directory is:
-
-```text
-/forms/
-```
-
-Additional template directories can be registered with:
+### Extra template directories
 
 ```php
 add_filter('jotform_bridge_template_paths', function (array $paths): array {
@@ -376,58 +349,347 @@ add_filter('jotform_bridge_template_paths', function (array $paths): array {
 });
 ```
 
----
-
-## Security
-
-Jotform Bridge follows these core security rules:
-
-* Jotform API credentials remain server-side.
-* All submissions are validated server-side.
-* Frontend field types and Jotform IDs are never trusted.
-* Only registered theme templates can be rendered.
-* Arbitrary filesystem paths are not supported.
-* Custom templates use semantic fields instead of Jotform Question IDs.
+Paths must be absolute. Each one is resolved with `realpath()`, and every
+discovered file is verified to actually live inside it — a symlink that escapes
+its directory is reported and ignored.
 
 ---
 
-## Supported Fields
+## Rendering a form
 
-The plugin is designed to support common Jotform fields such as:
+```php
+<?php echo jotform_form('contact'); ?>
+```
 
-* text;
-* textarea;
-* email;
-* phone;
-* full name;
-* address;
-* dropdown/select;
-* radio;
-* checkbox;
-* number.
+```text
+[jotform_form id="contact"]
+```
 
-More complex Jotform widgets may require additional support.
+Both go through the same code path. `jotform_form()` never throws and never
+prints: an unknown, disabled or misconfigured integration produces an empty
+string for visitors, and a short diagnostic for administrators only — a form that
+silently vanished is the hardest kind of problem to notice. A template that
+raises an error is caught, its half-rendered output discarded, and the page
+survives.
 
-Unsupported fields are reported through integration diagnostics instead of being silently mapped to an incorrect field type.
+The frontend script is registered on every front-end request but **enqueued only
+when a form is actually rendered**, so pages without a form ship no extra
+JavaScript.
+
+---
+
+## Compatibility validation
+
+Every integration is checked against the cached schema and the cached template
+registry, and the result is shown in the integrations list and the editor:
+
+| State | Meaning |
+| --- | --- |
+| Compatible | Every required field is present |
+| Compatible with warnings | Something is worth knowing — an optional field is missing, a template has identifiers the schema does not know, a semantic key collision exists |
+| Invalid | A required Jotform field is not in the template |
+
+Validation is static: it reads the identifiers the scanner extracted from the
+template source, not a rendered form. Identifiers your PHP builds at runtime
+cannot be checked, so they are counted and reported as *dynamic* rather than
+guessed at — a wrong guess would either hide a real problem or invent one.
+
+---
+
+## Refresh Forms, Refresh Schema, Rescan Templates
+
+| Action | Where | What it does |
+| --- | --- | --- |
+| **Test Connection** | Settings | One read-only `GET /user` call; records the result |
+| **Refresh Forms** | Settings | Reloads the account form list from Jotform |
+| **Refresh Schema** | Integration editor | Reloads one form's definition, re-normalizes it and re-checks compatibility |
+| **Rescan Templates** | Integrations | Re-reads the theme `forms/` directories |
+
+After changing a form in Jotform — adding a field, making one required,
+renaming an option — press **Refresh Schema**. It reports whether the form
+actually changed since the last refresh, and re-runs the compatibility check
+against your template.
+
+---
+
+## The REST endpoint
+
+```text
+POST /wp-json/jotform-bridge/v1/submit/{integration}
+Content-Type: application/json
+
+{ "fields": { "email": "jane@example.com", "topics_of": ["Pricing"] } }
+```
+
+Answers:
+
+| Status | Body |
+| --- | --- |
+| `200` | `{"success": true, "message": "…"}` |
+| `422` | `{"success": false, "message": "Validation failed.", "errors": {"<field>": "…"}}` |
+| `403` | Integration inactive, or the spam check rejected the submission |
+| `404` | No such integration |
+| `413` | The request body is larger than 256 KB |
+| `429` | The identical submission was accepted moments ago |
+| `502` / `503` | Jotform rejected the submission, or its definition could not be loaded |
+
+The endpoint is open, because it has to serve anonymous visitors: a nonce would
+not protect it and would break page caching. The protection is that the server
+trusts nothing in the request except the values themselves —
+
+* the slug is a lookup key; the visitor cannot influence which Jotform form is
+  used;
+* every field is checked against the cached schema: unknown identifiers are
+  rejected, a list where a scalar belongs is rejected, options must be ones
+  Jotform reports, emails must be valid, lengths are bounded;
+* the payload as a whole is bounded (fields, values, bytes, nesting);
+* required means required, whatever the markup claimed;
+* the mapping to Jotform parameters is driven by the schema, not by the request.
+
+Failures never carry upstream detail. What Jotform said is logged (when debug
+logging is on) and the visitor gets a generic message.
+
+`jotform_bridge_endpoint('contact')` returns the URL if you need it in PHP; the
+template context already provides it as `$endpoint`.
+
+---
+
+## JavaScript events
+
+All three bubble from the `<form>` element and carry a `detail` object.
+
+| Event | `detail` |
+| --- | --- |
+| `jotformbridge:before-submit` | `{ integration, fields }` — cancelable with `preventDefault()` |
+| `jotformbridge:success` | `{ integration, message }` |
+| `jotformbridge:error` | `{ integration, message, errors, status }` |
+
+```js
+document.addEventListener('jotformbridge:success', function (event) {
+    window.location.href = '/thanks/';
+});
+```
+
+The plugin imposes no popup, no redirect and no animation: it toggles state
+attributes, writes messages into the slots your template provides, and dispatches
+these events.
+
+---
+
+## Hooks
+
+| Hook | Type | When |
+| --- | --- | --- |
+| `jotform_bridge_template_paths` | filter | Directories scanned for templates |
+| `jotform_bridge_normalized_schema` | filter | A schema just before it is cached |
+| `jotform_bridge_submission_fields` | filter | Sanitized values before mapping |
+| `jotform_bridge_spam_check` | filter | Immediately before the upstream call |
+| `jotform_bridge_duplicate_window` | filter | Seconds an identical submission is refused; `0` disables |
+| `jotform_bridge_auto_field_html` | filter | Markup of one automatically rendered field |
+| `jotform_bridge_before_submit` | action | A validated submission is about to be sent |
+| `jotform_bridge_after_submit` | action | Jotform accepted a submission |
+
+---
+
+## Spam protection
+
+No provider ships with the plugin, but the extension point is fixed, so adding
+one never means changing the REST controller:
+
+```php
+add_filter('jotform_bridge_spam_check', function ($allowed, $slug, $values, $context) {
+    if ($slug !== 'contact') {
+        return $allowed;
+    }
+
+    $token = $context['spam']['turnstile'] ?? '';
+
+    return my_turnstile_verify($token, $context['ip'])
+        ? true
+        : __('Please confirm you are not a robot.', 'my-theme');
+}, 10, 4);
+```
+
+Return `true` to allow, `false` to reject with the default message, or a string
+to reject with your own. The submission stops there — nothing reaches Jotform.
+
+A challenge token belongs in the request body under `spam`, not in `fields`,
+where the validator would quite correctly reject it as an unknown field.
+
+Independently of that, an identical submission from the same visitor is refused
+for 30 seconds after one was accepted, so a double click or a retried request
+cannot create two Jotform submissions. Only accepted submissions are remembered —
+after a failure you can retry immediately — and only a hash is stored, never the
+values.
+
+---
+
+## Caching
+
+| Data | Where | TTL | Invalidated by |
+| --- | --- | --- | --- |
+| Account form list | transient `jotform_bridge_forms` | 12 h | Refresh Forms, settings save |
+| Normalized schema (one per form) | transient `jotform_bridge_schema_{id}` | 12 h | Refresh Schema |
+| Template registry | option `jotform_bridge_templates` | until flushed | Rescan Templates, theme switch, plugin upgrade |
+
+A normal front-end request reads the cache and nothing else. Jotform is contacted
+on a page view only when nothing is cached yet for that form — never to refresh
+an existing cache — and a page with no form on it does not touch Jotform, the
+filesystem or the registry at all. Deactivating the plugin drops every cache and
+leaves the configuration alone.
+
+If a refresh fails, the previous cache is kept: a Jotform outage does not take
+your forms down.
+
+---
+
+## Supported field types
+
+Rendered, validated and mapped:
+
+| Jotform field | Semantic type |
+| --- | --- |
+| Short text | `text` |
+| Long text / paragraph | `textarea` |
+| Email | `email` |
+| Phone | `phone` |
+| Number / spinner | `number` |
+| Dropdown | `select` |
+| Single choice (radio) | `radio` |
+| Multiple choice (checkbox) | `checkbox` (list) |
+| Full Name | composite → `first`, `last`, `prefix`, `middle`, `suffix` |
+| Address | composite → `addr_line1`, `addr_line2`, `city`, `state`, `postal`, `country` |
+
+Not supported: file upload, signature, payment fields, date and time pickers,
+star/scale ratings, matrix, appointment, product lists, and Jotform widgets in
+general. They are listed in the integration's diagnostics and left out of the
+form. A field whose value would be dropped on the way to Jotform is never shown
+to a visitor.
+
+Presentation-only Jotform elements — headings, page breaks, dividers, the submit
+button — are not fields and are simply not part of the schema.
+
+---
+
+## Debugging
+
+Turn on **Debug Logging** on the settings screen. Failures then go to the PHP
+error log with a `[jotform-bridge]` prefix:
+
+```text
+[jotform-bridge][ERROR] Jotform returned a non-2xx status. {"path":"/user/forms","status":401}
+```
+
+Only technical metadata is logged: a path, a status, an error code, an
+integration slug. Never the API key, never an authorization header, never a
+submission payload. Logging is off by default.
+
+Common situations:
+
+| Symptom | Cause |
+| --- | --- |
+| Nothing renders, and you are logged in as an administrator but see no notice | The integration renders fine — check the browser console instead |
+| "There is no integration with the slug …" | Typo in the slug, or the integration was renamed |
+| "Schema not loaded" | Press Refresh Schema; check the API key and the region |
+| Every API call fails on an EU account | The region is still set to Standard |
+| Template not in the registry | Press Rescan Templates; check the two header lines |
+| Submission answers 503 | The cached schema has errors — open the integration editor to see which |
+| A field is missing from Auto rendering | Its Jotform type is not supported; see the diagnostics |
+
+---
+
+## Uninstalling
+
+Deactivating drops the caches and keeps everything else.
+
+Deleting the plugin removes the caches too — but **not** the integrations, the
+settings or the stored API key, so the usual "deactivate, delete, reinstall"
+round trip does not destroy work somebody did by hand. For a full removal, tick
+*Delete the integrations, the settings and the stored API key when the plugin is
+deleted* on the settings screen before deleting.
+
+---
+
+## Known limitations
+
+* **Field coverage.** Only the field types listed above. File upload, signature,
+  payment and date/time fields are not mapped.
+* **No conditional logic.** Jotform's show/hide conditions and calculations are
+  not evaluated. A template renders every supported field; conditional behaviour
+  is up to your own JavaScript.
+* **No multi-page forms.** A Jotform form with page breaks is rendered as one
+  form.
+* **No file uploads.** The submission is `application/x-www-form-urlencoded`; a
+  multipart upload path does not exist.
+* **No prefill or edit.** Existing submissions are not read back, and there is no
+  way to update one.
+* **Static template validation only.** Identifiers your PHP builds at runtime are
+  counted, not verified.
+* **Semantic key collisions.** Two Jotform fields whose machine names normalize
+  to the same identifier are reported as an error and the schema is refused
+  rather than guessed at. Rename one of the fields in Jotform.
+* **A schema refresh is manual.** There is no cron job watching Jotform for
+  changes; the cache expires after 12 hours or when you press Refresh Schema.
+* **Duplicate protection is best-effort.** It is a short window on identical
+  values from the same IP, not idempotency keys, and two genuinely simultaneous
+  requests can still both go through.
+* **One site, one Jotform account.** There is no per-integration API key.
 
 ---
 
 ## Development
 
-Project-specific Codex instructions are stored in:
+The repository is the plugin plus its dev harness. Only `jotform-bridge/` ships.
 
 ```text
-AGENTS.md
+.
+├── jotform-bridge/          # ← the plugin; this directory is the release
+│   ├── jotform-bridge.php   # main file with the plugin header
+│   ├── uninstall.php
+│   ├── readme.txt           # WordPress.org style readme
+│   ├── assets/frontend.js
+│   ├── examples/contact.php # a complete custom template
+│   ├── languages/           # jotform-bridge.pot
+│   └── src/
+│       ├── Admin/           # settings and integrations screens
+│       ├── Api/             # JotformClient, the only HTTP layer
+│       ├── Forms/           # normalization, schema, caches
+│       ├── Integrations/    # the Integration entity and its storage
+│       ├── Rendering/       # both renderers, template context, assets
+│       ├── Rest/            # the submission endpoint
+│       ├── Settings/
+│       ├── Submission/      # validation, mapping, spam guard, pipeline
+│       ├── Support/         # logger
+│       ├── Templates/       # scanner, registry, validator
+│       ├── Autoloader.php   # own PSR-4 loader, so no vendor/ in the release
+│       ├── Plugin.php       # composition root
+│       └── api.php          # jotform_form() and friends
+├── tests/                   # PHPUnit, WordPress stubbed with Brain Monkey
+├── bin/build-zip.sh         # builds the release ZIP
+├── AGENTS.md                # architectural specification
+└── prompts/                 # the staged prompts this was built from
 ```
 
-Project-scoped MCP configuration is stored in:
-
-```text
-.codex/config.toml
+```bash
+composer install          # dev dependencies (PHPUnit, Brain Monkey)
+vendor/bin/phpunit        # the whole suite; no WordPress needed
+bin/build-zip.sh          # dist/jotform-bridge-<version>.zip
 ```
 
-Development verification may use:
+Regenerating the translation template:
 
-* WordPress Playground MCP for WordPress runtime testing;
-* Playwright MCP for admin and frontend browser testing;
-* Jotform MCP for read-only inspection and end-to-end submission verification.
+```bash
+wp i18n make-pot jotform-bridge jotform-bridge/languages/jotform-bridge.pot --domain=jotform-bridge
+```
+
+Architectural invariants worth keeping — they are what the design is:
+
+* A template never knows a Jotform form ID or a question ID.
+* The integration is the only binding layer between the two worlds.
+* The normalized schema is the single schema contract.
+* Custom and Auto rendering share one submission pipeline.
+* `JotformClient` is the only code that talks to Jotform.
+* The API key is server-only.
+* `TemplateRegistry` is an allowlist; a path is renderable only because it is in
+  there.
+* Backend validation is authoritative.

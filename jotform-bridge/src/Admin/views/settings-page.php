@@ -216,6 +216,34 @@ if (!$jfbHasKey) {
                     </p>
                 </td>
             </tr>
+
+            <tr>
+                <th scope="row"><?php echo esc_html__('Uninstall', 'jotform-bridge'); ?></th>
+                <td>
+                    <label>
+                        <input
+                            type="checkbox"
+                            name="jotform_bridge[delete_data_on_uninstall]"
+                            value="1"
+                            <?php checked($settings->deletesDataOnUninstall()); ?>
+                        >
+                        <?php
+                        echo esc_html__(
+                            'Delete the integrations, the settings and the stored API key when the plugin is deleted',
+                            'jotform-bridge'
+                        );
+                        ?>
+                    </label>
+                    <p class="description">
+                        <?php
+                        echo esc_html__(
+                            'Off by default: deleting the plugin removes only the caches, so deactivating and reinstalling keeps your integrations. Cached data is always removed.',
+                            'jotform-bridge'
+                        );
+                        ?>
+                    </p>
+                </td>
+            </tr>
         </table>
 
         <?php submit_button(__('Save Settings', 'jotform-bridge')); ?>
