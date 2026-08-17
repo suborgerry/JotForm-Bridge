@@ -105,7 +105,7 @@ final class CompatibilityCheckerTest extends TestCase
         $this->assertSame(CompatibilityChecker::STATE_NO_TEMPLATE, $result['state']);
     }
 
-    public function testAutoModeIsRecognisedAsNotYetRenderable(): void
+    public function testAutoModeReportsWhatTheSchemaItselfWillProduce(): void
     {
         $this->cacheSchema();
 
@@ -114,6 +114,28 @@ final class CompatibilityCheckerTest extends TestCase
         $result = $this->checker()->check($integration);
 
         $this->assertSame(CompatibilityChecker::STATE_AUTO, $result['state']);
+        $this->assertInstanceOf(CompatibilityReport::class, $result['report']);
+
+        // Auto rendering covers every supported path by construction, so a
+        // schema the plugin fully understands can never come back incompatible.
+        $this->assertSame(CompatibilityReport::STATUS_COMPATIBLE, $result['report']->status());
+        $this->assertStringContainsString('2', $result['message'], 'Both inputs are counted.');
+    }
+
+    public function testAutoModeReportsTheFieldsItHasToLeaveOut(): void
+    {
+        $this->cacheSchemaWithUnsupportedField();
+
+        $integration = new Integration('contact', 'Contact', self::FORM_ID, Integration::MODE_AUTO, '', true);
+
+        $result = $this->checker()->check($integration);
+
+        $this->assertSame(CompatibilityReport::STATUS_WARNINGS, $result['report']->status());
+        $this->assertSame(
+            CompatibilityReport::UNSUPPORTED_OPTIONAL,
+            $result['report']->warnings()[0]['status']
+        );
+        $this->assertStringContainsString('not supported', $result['message']);
     }
 
     public function testAMatchingTemplateIsCompatible(): void
@@ -190,6 +212,33 @@ final class CompatibilityCheckerTest extends TestCase
                     'type'     => 'control_textbox',
                     'text'     => 'Company',
                     'name'     => 'company',
+                    'order'    => '2',
+                    'required' => 'No',
+                ],
+            ]
+        );
+
+        $this->transients[SchemaRepository::transientKey(self::FORM_ID)] = $schema->toArray();
+    }
+
+    private function cacheSchemaWithUnsupportedField(): void
+    {
+        $schema = (new SchemaBuilder())->build(
+            self::FORM_ID,
+            [
+                [
+                    'qid'      => '4',
+                    'type'     => 'control_email',
+                    'text'     => 'E-mail',
+                    'name'     => 'email',
+                    'order'    => '1',
+                    'required' => 'Yes',
+                ],
+                [
+                    'qid'      => '14',
+                    'type'     => 'control_fileupload',
+                    'text'     => 'Attachment',
+                    'name'     => 'attachment',
                     'order'    => '2',
                     'required' => 'No',
                 ],

@@ -13,6 +13,7 @@ use JotformBridge\Forms\SchemaRepository;
 use JotformBridge\Integrations\CompatibilityChecker;
 use JotformBridge\Integrations\IntegrationRepository;
 use JotformBridge\Rendering\Assets;
+use JotformBridge\Rendering\AutoRenderer;
 use JotformBridge\Rendering\CustomTemplateRenderer;
 use JotformBridge\Rendering\FormRenderer;
 use JotformBridge\Rest\SubmissionController;
@@ -201,7 +202,8 @@ final class Plugin
                 $this->schemas(),
                 new CustomTemplateRenderer($this->templates()),
                 $this->assets(),
-                $this->logger
+                $this->logger,
+                new AutoRenderer()
             );
         }
 

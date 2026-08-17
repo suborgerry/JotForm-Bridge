@@ -32,6 +32,8 @@ final class FormRenderer
 
     private CustomTemplateRenderer $custom;
 
+    private AutoRenderer $auto;
+
     private Assets $assets;
 
     private ?Logger $logger;
@@ -41,13 +43,15 @@ final class FormRenderer
         SchemaRepository $schemas,
         CustomTemplateRenderer $custom,
         Assets $assets,
-        ?Logger $logger = null
+        ?Logger $logger = null,
+        ?AutoRenderer $auto = null
     ) {
         $this->integrations = $integrations;
         $this->schemas      = $schemas;
         $this->custom       = $custom;
         $this->assets       = $assets;
         $this->logger       = $logger;
+        $this->auto         = $auto ?? new AutoRenderer();
     }
 
     public function render(string $slug): string
@@ -73,13 +77,6 @@ final class FormRenderer
             );
         }
 
-        if (!$integration->usesCustomTemplate()) {
-            return $this->diagnostic(
-                $slug,
-                __('Automatic rendering is not available yet. Assign a custom template.', 'jotform-bridge')
-            );
-        }
-
         $schema = $this->schema($integration);
 
         if ($schema === null) {
@@ -89,11 +86,13 @@ final class FormRenderer
             );
         }
 
-        $context = TemplateContext::build(
-            $integration,
-            $schema,
-            SubmissionController::endpoint($integration->slug())
-        );
+        $endpoint = SubmissionController::endpoint($integration->slug());
+
+        if (!$integration->usesCustomTemplate()) {
+            return $this->renderAutomatically($integration, $schema, $endpoint);
+        }
+
+        $context = TemplateContext::build($integration, $schema, $endpoint);
 
         try {
             $html = $this->custom->render($integration->templateSlug(), $context);
@@ -132,6 +131,25 @@ final class FormRenderer
         $atts = shortcode_atts(['id' => ''], is_array($atts) ? $atts : [], 'jotform_form');
 
         return $this->render((string) $atts['id']);
+    }
+
+    /**
+     * The fallback path: markup built from the schema, with no theme file involved.
+     */
+    private function renderAutomatically(Integration $integration, FormSchema $schema, string $endpoint): string
+    {
+        $html = $this->auto->render($integration, $schema, $endpoint);
+
+        if ($html === '') {
+            return $this->diagnostic(
+                $integration->slug(),
+                __('This Jotform form has no fields this plugin can render automatically.', 'jotform-bridge')
+            );
+        }
+
+        $this->assets->enqueue();
+
+        return $html;
     }
 
     /**

@@ -163,6 +163,26 @@ final class FormRendererTest extends TestCase
         $this->assertStringContainsString('company:0;', $html);
     }
 
+    public function testAnAutoIntegrationRendersWithoutAnyTemplate(): void
+    {
+        $this->storeIntegration(true, '', 'auto');
+
+        $html = $this->renderer()->render('contact');
+
+        $this->assertStringContainsString('class="jfb-form"', $html);
+        $this->assertStringContainsString('data-jotform-integration="contact"', $html);
+        $this->assertStringContainsString('data-jotform-field="email"', $html);
+        $this->assertTrue($this->enqueued);
+    }
+
+    public function testAutoRenderingIgnoresAnAssignedTemplate(): void
+    {
+        $this->writeTemplate('contact', '<form data-jotform-bridge class="theme-form"></form>');
+        $this->storeIntegration(true, 'contact', 'auto');
+
+        $this->assertStringNotContainsString('theme-form', $this->renderer()->render('contact'));
+    }
+
     public function testAnUnknownIntegrationRendersNothingForVisitors(): void
     {
         $this->assertSame('', $this->renderer()->render('missing'));
@@ -219,14 +239,14 @@ final class FormRendererTest extends TestCase
         );
     }
 
-    private function storeIntegration(bool $active, string $template): void
+    private function storeIntegration(bool $active, string $template, string $mode = 'custom'): void
     {
         $this->options[IntegrationRepository::OPTION] = [
             'contact' => [
                 'slug'     => 'contact',
                 'name'     => 'Contact',
                 'form_id'  => self::FORM_ID,
-                'mode'     => 'custom',
+                'mode'     => $mode,
                 'template' => $template,
                 'active'   => $active,
             ],
