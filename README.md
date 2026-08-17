@@ -1,5 +1,19 @@
 # Jotform Bridge
 
+> **Status: target specification, not shipped documentation.**
+>
+> No plugin code exists in this repository yet. This document describes the
+> intended behaviour of the finished plugin and is used as a design reference
+> while stages 1–6 (see `prompts/`) are implemented.
+>
+> Code examples here are **illustrative**. Where an example conflicts with the
+> actual Jotform REST API — composite field child names in particular — the API
+> wins, and this file must be corrected rather than the implementation bent to
+> match it.
+>
+> Stage 6 rewrites this file into real user documentation that reflects what was
+> actually built. Do not treat it as complete until then.
+
 Jotform Bridge is a standalone WordPress plugin that uses Jotform as a headless backend for custom forms.
 
 It allows developers to fully control the form markup and frontend experience in WordPress while using Jotform for:
@@ -214,6 +228,11 @@ For example, address fields may look like:
 <input data-jotform-field="address.state">
 <input data-jotform-field="address.zip">
 ```
+
+> The exact child names for composite fields are derived from the Jotform form
+> schema, not invented. The address example above is a placeholder written before
+> the schema was inspected; the real sub-field identifiers are established in
+> stage 2 and documented here afterwards.
 
 Jotform Bridge maps these semantic identifiers to the correct Jotform Question IDs and submission structure on the server.
 
