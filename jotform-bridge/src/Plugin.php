@@ -4,13 +4,17 @@ declare(strict_types=1);
 
 namespace JotformBridge;
 
+use JotformBridge\Admin\IntegrationsPage;
 use JotformBridge\Admin\SettingsPage;
 use JotformBridge\Api\ConnectionState;
 use JotformBridge\Api\JotformClient;
 use JotformBridge\Forms\FormRepository;
 use JotformBridge\Forms\SchemaRepository;
+use JotformBridge\Integrations\CompatibilityChecker;
+use JotformBridge\Integrations\IntegrationRepository;
 use JotformBridge\Settings\Settings;
 use JotformBridge\Support\Logger;
+use JotformBridge\Templates\TemplateRegistry;
 
 if (!defined('ABSPATH')) {
     exit;
@@ -34,6 +38,10 @@ final class Plugin
     private ?FormRepository $forms = null;
 
     private ?SchemaRepository $schemas = null;
+
+    private ?IntegrationRepository $integrations = null;
+
+    private ?TemplateRegistry $templates = null;
 
     private ConnectionState $connection;
 
@@ -75,6 +83,15 @@ final class Plugin
         );
 
         if (is_admin()) {
+            // Registration order decides the submenu order: Integrations first.
+            (new IntegrationsPage(
+                $this->integrations(),
+                $this->forms(),
+                $this->schemas(),
+                $this->templates(),
+                $this->compatibility()
+            ))->register();
+
             (new SettingsPage(
                 $this->settings,
                 $this->client(),
@@ -129,6 +146,29 @@ final class Plugin
         return $this->schemas;
     }
 
+    public function integrations(): IntegrationRepository
+    {
+        if ($this->integrations === null) {
+            $this->integrations = new IntegrationRepository();
+        }
+
+        return $this->integrations;
+    }
+
+    public function templates(): TemplateRegistry
+    {
+        if ($this->templates === null) {
+            $this->templates = new TemplateRegistry();
+        }
+
+        return $this->templates;
+    }
+
+    public function compatibility(): CompatibilityChecker
+    {
+        return new CompatibilityChecker($this->schemas(), $this->templates());
+    }
+
     /**
      * Caches are disposable; configuration is left untouched on deactivation.
      */
@@ -136,5 +176,8 @@ final class Plugin
     {
         delete_transient(FormRepository::TRANSIENT);
         SchemaRepository::flushAll();
+
+        // The template registry is a filesystem cache: it is rebuilt on demand.
+        delete_option(TemplateRegistry::OPTION);
     }
 }

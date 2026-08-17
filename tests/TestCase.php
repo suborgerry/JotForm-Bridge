@@ -25,6 +25,10 @@ abstract class TestCase extends PHPUnitTestCase
             static fn(string $value): string => rtrim($value, '/')
         );
 
+        Functions\when('trailingslashit')->alias(
+            static fn(string $value): string => rtrim($value, '/\\') . '/'
+        );
+
         Functions\when('add_query_arg')->alias(
             static function (array $args, string $url): string {
                 $separator = str_contains($url, '?') ? '&' : '?';

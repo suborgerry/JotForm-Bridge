@@ -21,7 +21,7 @@ if (!defined('ABSPATH')) {
  */
 final class SettingsPage
 {
-    public const MENU_SLUG  = 'jotform-bridge';
+    public const MENU_SLUG  = 'jotform-bridge-settings';
     public const CAPABILITY = 'manage_options';
 
     public const ACTION_SAVE    = 'jotform_bridge_save_settings';
@@ -58,20 +58,13 @@ final class SettingsPage
         add_action('admin_post_' . self::ACTION_REFRESH, [$this, 'handleRefreshForms']);
     }
 
+    /**
+     * The top-level menu belongs to IntegrationsPage; Settings is its sibling.
+     */
     public function registerMenu(): void
     {
-        add_menu_page(
-            __('Jotform Bridge', 'jotform-bridge'),
-            __('Jotform Bridge', 'jotform-bridge'),
-            self::CAPABILITY,
-            self::MENU_SLUG,
-            [$this, 'render'],
-            'dashicons-feedback',
-            58
-        );
-
         add_submenu_page(
-            self::MENU_SLUG,
+            IntegrationsPage::MENU_SLUG,
             __('Settings', 'jotform-bridge'),
             __('Settings', 'jotform-bridge'),
             self::CAPABILITY,
