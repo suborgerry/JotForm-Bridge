@@ -1,0 +1,29 @@
+{
+    "name": "jotform-bridge/jotform-bridge",
+    "description": "Development harness for the Jotform Bridge WordPress plugin. Not shipped with the release ZIP.",
+    "type": "project",
+    "license": "GPL-2.0-or-later",
+    "require": {
+        "php": ">=8.0"
+    },
+    "require-dev": {
+        "phpunit/phpunit": "^9.6",
+        "brain/monkey": "^2.6"
+    },
+    "autoload": {
+        "psr-4": {
+            "JotformBridge\\": "jotform-bridge/src/"
+        }
+    },
+    "autoload-dev": {
+        "psr-4": {
+            "JotformBridge\\Tests\\": "tests/"
+        }
+    },
+    "scripts": {
+        "test": "phpunit"
+    },
+    "config": {
+        "sort-packages": true
+    }
+}

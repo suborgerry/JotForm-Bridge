@@ -1,0 +1,272 @@
+<?php
+
+declare(strict_types=1);
+
+namespace JotformBridge\Api;
+
+use JotformBridge\Settings\Settings;
+use JotformBridge\Support\Logger;
+
+if (!defined('ABSPATH')) {
+    exit;
+}
+
+/**
+ * The only low-level layer that talks to the Jotform REST API.
+ *
+ * Authentication and endpoints follow the official documentation
+ * (https://api.jotform.com/docs/): the key travels in the `APIKEY` header,
+ * never as a query parameter, and every response uses the
+ * `{responseCode, message, content}` envelope.
+ */
+final class JotformClient
+{
+    public const ERROR_NO_API_KEY   = 'no_api_key';
+    public const ERROR_TRANSPORT    = 'transport_error';
+    public const ERROR_HTTP_STATUS  = 'http_error';
+    public const ERROR_INVALID_JSON = 'invalid_json';
+    public const ERROR_API          = 'api_error';
+    public const ERROR_UNEXPECTED   = 'unexpected_response';
+
+    private const DEFAULT_TIMEOUT   = 15;
+    private const FORMS_PAGE_LIMIT  = 1000;
+
+    private string $apiKey;
+
+    private string $baseUrl;
+
+    private ?Logger $logger;
+
+    private int $timeout;
+
+    public function __construct(string $apiKey, string $baseUrl, ?Logger $logger = null, int $timeout = self::DEFAULT_TIMEOUT)
+    {
+        $this->apiKey  = trim($apiKey);
+        $this->baseUrl = untrailingslashit(trim($baseUrl));
+        $this->logger  = $logger;
+        $this->timeout = $timeout;
+    }
+
+    public static function fromSettings(Settings $settings, ?Logger $logger = null): self
+    {
+        return new self($settings->apiKey(), $settings->baseUrl(), $logger);
+    }
+
+    /**
+     * GET /user — used as a read-only connection test.
+     */
+    public function testConnection(): ApiResponse
+    {
+        $response = $this->get('/user');
+
+        if (!$response->isSuccess()) {
+            return $response;
+        }
+
+        $content = $response->data();
+
+        return ApiResponse::success(
+            [
+                'username' => isset($content['username']) ? (string) $content['username'] : '',
+                'email'    => isset($content['email']) ? (string) $content['email'] : '',
+                'status'   => isset($content['status']) ? (string) $content['status'] : '',
+            ],
+            $response->status()
+        );
+    }
+
+    /**
+     * GET /user/forms — the account form list, reduced to the fields we need.
+     */
+    public function getForms(): ApiResponse
+    {
+        $response = $this->get(
+            '/user/forms',
+            [
+                'limit'   => self::FORMS_PAGE_LIMIT,
+                'orderby' => 'title',
+            ]
+        );
+
+        if (!$response->isSuccess()) {
+            return $response;
+        }
+
+        $content = $response->data();
+        $forms   = [];
+
+        foreach ($content as $form) {
+            if (!is_array($form) || empty($form['id'])) {
+                continue;
+            }
+
+            $forms[] = [
+                'id'      => (string) $form['id'],
+                'title'   => isset($form['title']) ? (string) $form['title'] : '',
+                'status'  => isset($form['status']) ? (string) $form['status'] : '',
+                'updated' => isset($form['updated_at']) ? (string) $form['updated_at'] : '',
+            ];
+        }
+
+        return ApiResponse::success($forms, $response->status());
+    }
+
+    /**
+     * Performs a GET request and unwraps the Jotform response envelope.
+     *
+     * @param array<string, scalar> $query
+     */
+    public function get(string $path, array $query = []): ApiResponse
+    {
+        if ($this->apiKey === '') {
+            return ApiResponse::failure(
+                self::ERROR_NO_API_KEY,
+                __('No Jotform API key is configured.', 'jotform-bridge')
+            );
+        }
+
+        $url = $this->baseUrl . '/' . ltrim($path, '/');
+
+        if ($query !== []) {
+            $url = add_query_arg($query, $url);
+        }
+
+        $response = wp_remote_get(
+            $url,
+            [
+                'timeout' => $this->timeout,
+                'headers' => [
+                    'APIKEY' => $this->apiKey,
+                    'Accept' => 'application/json',
+                ],
+            ]
+        );
+
+        if (is_wp_error($response)) {
+            $this->log('Jotform request failed on transport level.', [
+                'path'  => $path,
+                'error' => $response->get_error_code(),
+            ]);
+
+            return ApiResponse::failure(
+                self::ERROR_TRANSPORT,
+                __('Could not reach the Jotform API. Check the site network connection and try again.', 'jotform-bridge')
+            );
+        }
+
+        $status = (int) wp_remote_retrieve_response_code($response);
+        $body   = (string) wp_remote_retrieve_body($response);
+        $parsed = json_decode($body, true);
+
+        if (!is_array($parsed)) {
+            $this->log('Jotform returned a body that is not valid JSON.', [
+                'path'   => $path,
+                'status' => $status,
+            ]);
+
+            return ApiResponse::failure(
+                self::ERROR_INVALID_JSON,
+                __('The Jotform API returned a malformed response.', 'jotform-bridge'),
+                $status
+            );
+        }
+
+        if ($status < 200 || $status >= 300) {
+            $this->log('Jotform returned a non-2xx status.', [
+                'path'   => $path,
+                'status' => $status,
+            ]);
+
+            return ApiResponse::failure(
+                self::ERROR_HTTP_STATUS,
+                $this->envelopeMessage($parsed, $status),
+                $status
+            );
+        }
+
+        // The envelope carries its own response code, which can disagree with HTTP status.
+        if (isset($parsed['responseCode']) && (int) $parsed['responseCode'] !== 200) {
+            $this->log('Jotform reported an API-level error.', [
+                'path'          => $path,
+                'status'        => $status,
+                'response_code' => (int) $parsed['responseCode'],
+            ]);
+
+            return ApiResponse::failure(
+                self::ERROR_API,
+                $this->envelopeMessage($parsed, (int) $parsed['responseCode']),
+                (int) $parsed['responseCode']
+            );
+        }
+
+        if (!array_key_exists('content', $parsed) || !is_array($parsed['content'])) {
+            $this->log('Jotform response has no usable content.', [
+                'path'   => $path,
+                'status' => $status,
+            ]);
+
+            return ApiResponse::failure(
+                self::ERROR_UNEXPECTED,
+                __('The Jotform API response did not contain the expected data.', 'jotform-bridge'),
+                $status
+            );
+        }
+
+        return ApiResponse::success($parsed['content'], $status);
+    }
+
+    /**
+     * Extracts a safe, human-readable message from the response envelope.
+     *
+     * @param array<mixed> $parsed
+     */
+    private function envelopeMessage(array $parsed, int $status): string
+    {
+        $message = '';
+
+        if (isset($parsed['message']) && is_string($parsed['message'])) {
+            $message = trim($parsed['message']);
+        }
+
+        if ($message === '' && isset($parsed['info']) && is_string($parsed['info'])) {
+            $message = trim($parsed['info']);
+        }
+
+        if ($message === '') {
+            return sprintf(
+                /* translators: %d: HTTP or API status code */
+                __('The Jotform API returned an error (code %d).', 'jotform-bridge'),
+                $status
+            );
+        }
+
+        return sprintf(
+            /* translators: 1: status code, 2: message returned by Jotform */
+            __('Jotform error %1$d: %2$s', 'jotform-bridge'),
+            $status,
+            $this->stripSecrets($message)
+        );
+    }
+
+    /**
+     * Guards against an upstream message echoing the key back at us.
+     */
+    private function stripSecrets(string $message): string
+    {
+        if ($this->apiKey === '') {
+            return $message;
+        }
+
+        return str_replace($this->apiKey, '[redacted]', $message);
+    }
+
+    /**
+     * @param array<string, scalar|null> $context
+     */
+    private function log(string $message, array $context): void
+    {
+        if ($this->logger !== null) {
+            $this->logger->error($message, $context);
+        }
+    }
+}
