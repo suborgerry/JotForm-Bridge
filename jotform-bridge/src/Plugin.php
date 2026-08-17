@@ -8,6 +8,7 @@ use JotformBridge\Admin\SettingsPage;
 use JotformBridge\Api\ConnectionState;
 use JotformBridge\Api\JotformClient;
 use JotformBridge\Forms\FormRepository;
+use JotformBridge\Forms\SchemaRepository;
 use JotformBridge\Settings\Settings;
 use JotformBridge\Support\Logger;
 
@@ -31,6 +32,8 @@ final class Plugin
     private ?JotformClient $client = null;
 
     private ?FormRepository $forms = null;
+
+    private ?SchemaRepository $schemas = null;
 
     private ConnectionState $connection;
 
@@ -117,11 +120,21 @@ final class Plugin
         return $this->forms;
     }
 
+    public function schemas(): SchemaRepository
+    {
+        if ($this->schemas === null) {
+            $this->schemas = new SchemaRepository($this->client());
+        }
+
+        return $this->schemas;
+    }
+
     /**
      * Caches are disposable; configuration is left untouched on deactivation.
      */
     public static function onDeactivate(): void
     {
         delete_transient(FormRepository::TRANSIENT);
+        SchemaRepository::flushAll();
     }
 }

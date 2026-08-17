@@ -220,19 +220,32 @@ Composite fields are supported through paths:
 <input data-jotform-field="name.last">
 ```
 
-For example, address fields may look like:
+Address fields use the Jotform answer sub-keys:
 
 ```html
-<input data-jotform-field="address.street">
+<input data-jotform-field="address.addr_line1">
+<input data-jotform-field="address.addr_line2">
 <input data-jotform-field="address.city">
 <input data-jotform-field="address.state">
-<input data-jotform-field="address.zip">
+<input data-jotform-field="address.postal">
+<input data-jotform-field="address.country">
 ```
 
-> The exact child names for composite fields are derived from the Jotform form
-> schema, not invented. The address example above is a placeholder written before
-> the schema was inspected; the real sub-field identifiers are established in
-> stage 2 and documented here afterwards.
+The parent part of the path (`name`, `address`) is the semantic key of the field
+itself, derived from the Jotform `name` property — so a form whose address field
+is named `homeAddress` exposes `home_address.city`.
+
+Which children exist depends on the Jotform field configuration:
+
+| Composite | Children |
+| --- | --- |
+| Full Name (`control_fullname`) | `first`, `last`, plus `prefix`, `middle`, `suffix` when enabled |
+| Address (`control_address`) | whichever of `addr_line1`, `addr_line2`, `city`, `state`, `postal`, `country` the field shows |
+
+> These child names come from the Jotform API, not from this document: the Full
+> Name parts are the `sublabels` keys, and the address parts are the answer /
+> prefill keys that Jotform's own `subfields` tokens (`st1`, `st2`, `city`,
+> `state`, `zip`, `country`) map onto.
 
 Jotform Bridge maps these semantic identifiers to the correct Jotform Question IDs and submission structure on the server.
 

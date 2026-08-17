@@ -112,6 +112,65 @@ final class JotformClient
     }
 
     /**
+     * GET /form/{formID}/questions — the question/schema definition of one form.
+     *
+     * Documented at https://www.jotform.com/apidocs-v1/ ("Get form questions").
+     * `content` is an object keyed by qid, so the list is re-indexed and sorted
+     * by the `order` property before it leaves the client. No normalization
+     * happens here: that is FieldNormalizer's job.
+     *
+     * @return ApiResponse Data is a list of raw question arrays.
+     */
+    public function getFormQuestions(string $formId): ApiResponse
+    {
+        $formId = trim($formId);
+
+        if ($formId === '' || !ctype_digit($formId)) {
+            return ApiResponse::failure(
+                self::ERROR_UNEXPECTED,
+                __('The Jotform form ID is missing or invalid.', 'jotform-bridge')
+            );
+        }
+
+        $response = $this->get('/form/' . $formId . '/questions');
+
+        if (!$response->isSuccess()) {
+            return $response;
+        }
+
+        $questions = [];
+
+        foreach ($response->data() as $qid => $question) {
+            if (!is_array($question)) {
+                continue;
+            }
+
+            // The envelope key is the qid; the property is normally present too.
+            if (!isset($question['qid']) || (string) $question['qid'] === '') {
+                $question['qid'] = (string) $qid;
+            }
+
+            $questions[] = $question;
+        }
+
+        usort(
+            $questions,
+            static function (array $a, array $b): int {
+                $orderA = isset($a['order']) ? (int) $a['order'] : 0;
+                $orderB = isset($b['order']) ? (int) $b['order'] : 0;
+
+                if ($orderA === $orderB) {
+                    return (int) $a['qid'] <=> (int) $b['qid'];
+                }
+
+                return $orderA <=> $orderB;
+            }
+        );
+
+        return ApiResponse::success($questions, $response->status());
+    }
+
+    /**
      * Performs a GET request and unwraps the Jotform response envelope.
      *
      * @param array<string, scalar> $query

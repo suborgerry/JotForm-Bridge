@@ -503,19 +503,24 @@ Composite fields:
 Address:
 
 ```html
-<input data-jotform-field="address.street">
+<input data-jotform-field="address.addr_line1">
+<input data-jotform-field="address.addr_line2">
 <input data-jotform-field="address.city">
 <input data-jotform-field="address.state">
-<input data-jotform-field="address.zip">
+<input data-jotform-field="address.postal">
+<input data-jotform-field="address.country">
 ```
 
-**Важно:** конкретные child-имена composite fields здесь приведены как иллюстрация
-формата `parent.child`, а не как подтвержденный контракт.
+**Зафиксировано на Этапе 2** из Jotform API, а не придумано:
 
-Реальные child-идентификаторы определяются на Этапе 2 из фактической Jotform schema
-и официальной документации API. Если они отличаются от примеров выше — правильными
-считаются полученные из API, а `AGENTS.md` и `README.md` приводятся в соответствие
-с реализацией, а не наоборот.
+* Full Name — ключи `sublabels`: `prefix`, `first`, `middle`, `last`, `suffix`;
+  `first` и `last` есть всегда, остальные — только при `prefix|middle|suffix = Yes`.
+* Address — answer/prefill-ключи `addr_line1`, `addr_line2`, `city`, `state`,
+  `postal`, `country`; какие из них присутствуют, определяет свойство `subfields`
+  (токены `st1|st2|city|state|zip|country`).
+
+Родительская часть пути — это semantic key самого поля (из Jotform `name`),
+поэтому `address` в примерах выше — иллюстрация, а не фиксированное имя.
 
 Не подгонять нормализацию под примеры из документации проекта.
 

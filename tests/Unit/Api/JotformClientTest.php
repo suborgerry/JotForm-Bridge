@@ -157,4 +157,65 @@ final class JotformClientTest extends TestCase
         $this->assertTrue($result->isSuccess());
         $this->assertSame('example_account', $result->data()['username']);
     }
+
+    public function testGetFormQuestionsFlattensTheEnvelopeAndSortsByOrder(): void
+    {
+        $response = $this->httpResponse(200, $this->fixture('form-questions'));
+        Functions\when('wp_remote_get')->justReturn($response);
+
+        $result = (new JotformClient('secret-key', 'https://api.jotform.com'))
+            ->getFormQuestions('240000000000001');
+
+        $this->assertTrue($result->isSuccess());
+
+        $questions = $result->data();
+
+        $this->assertSame([0, 1, 2], array_slice(array_keys($questions), 0, 3), 'The list must be re-indexed.');
+        $this->assertSame('1', $questions[0]['qid']);
+        $this->assertSame('control_head', $questions[0]['type']);
+
+        // The submit button has order 14 and qid 2: order wins over the key.
+        $this->assertSame('2', $questions[count($questions) - 1]['qid']);
+    }
+
+    public function testGetFormQuestionsRequestsTheDocumentedEndpoint(): void
+    {
+        $captured = '';
+
+        Functions\when('wp_remote_get')->alias(
+            function (string $url) use (&$captured) {
+                $captured = $url;
+
+                return $this->httpResponse(200, ['responseCode' => 200, 'content' => []]);
+            }
+        );
+
+        (new JotformClient('secret-key', 'https://api.jotform.com'))->getFormQuestions('240000000000001');
+
+        $this->assertSame('https://api.jotform.com/form/240000000000001/questions', $captured);
+    }
+
+    public function testGetFormQuestionsRejectsANonNumericFormId(): void
+    {
+        Functions\when('wp_remote_get')->justReturn(
+            $this->httpResponse(200, ['responseCode' => 200, 'content' => []])
+        );
+
+        $result = (new JotformClient('secret-key', 'https://api.jotform.com'))
+            ->getFormQuestions('../user/forms');
+
+        $this->assertFalse($result->isSuccess());
+        $this->assertSame(JotformClient::ERROR_UNEXPECTED, $result->errorCode());
+    }
+
+    public function testGetFormQuestionsPropagatesUpstreamFailures(): void
+    {
+        Functions\when('wp_remote_get')->justReturn(new WP_Error('http_request_failed', 'timeout'));
+
+        $result = (new JotformClient('secret-key', 'https://api.jotform.com'))
+            ->getFormQuestions('240000000000001');
+
+        $this->assertFalse($result->isSuccess());
+        $this->assertSame(JotformClient::ERROR_TRANSPORT, $result->errorCode());
+    }
 }

@@ -1,0 +1,77 @@
+{
+    "responseCode": 200,
+    "message": "success",
+    "content": {
+        "3": {
+            "qid": "3",
+            "type": "control_fullname",
+            "text": "Applicant",
+            "order": "1",
+            "name": "applicant",
+            "required": "Yes",
+            "prefix": "Yes",
+            "middle": "Yes",
+            "suffix": "Yes",
+            "sublabels": "{\"prefix\":\"Title\",\"first\":\"First Name\",\"middle\":\"Middle Name\",\"last\":\"Last Name\",\"suffix\":\"Suffix\"}"
+        },
+        "4": {
+            "qid": "4",
+            "type": "control_address",
+            "text": "Home address",
+            "order": "2",
+            "name": "homeAddress",
+            "required": "Yes",
+            "subfields": "st1|city|state|country|zip",
+            "sublabels": "{\"addr_line1\":\"Street Address\",\"addr_line2\":\"Street Address Line 2\",\"city\":\"City\",\"state\":\"State \\/ Province\",\"postal\":\"Postal \\/ Zip Code\",\"country\":\"Country\"}",
+            "selectedCountry": "Germany"
+        },
+        "5": {
+            "qid": "5",
+            "type": "control_email",
+            "text": "Work e-mail",
+            "order": "3",
+            "name": "workEmail",
+            "required": "Yes",
+            "validation": "Email"
+        },
+        "6": {
+            "qid": "6",
+            "type": "control_textbox",
+            "text": "Work e-mail (confirm)",
+            "order": "4",
+            "name": "work_email",
+            "required": "Yes",
+            "validation": "None"
+        },
+        "7": {
+            "qid": "7",
+            "type": "control_textbox",
+            "text": "Reference code",
+            "order": "5",
+            "name": "",
+            "required": "No",
+            "validation": "None"
+        },
+        "8": {
+            "qid": "8",
+            "type": "control_dropdown",
+            "text": "Department",
+            "order": "6",
+            "name": "department",
+            "required": "No",
+            "special": "None",
+            "options": ""
+        },
+        "9": {
+            "qid": "9",
+            "type": "control_widget",
+            "text": "Terms of service",
+            "order": "7",
+            "name": "termsOf",
+            "required": "Yes",
+            "cfname": "Terms Conditions"
+        }
+    },
+    "duration": "17.62ms",
+    "limit-left": 9981
+}

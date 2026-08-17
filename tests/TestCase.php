@@ -61,6 +61,24 @@ abstract class TestCase extends PHPUnitTestCase
     }
 
     /**
+     * Loads a sanitized Jotform API fixture.
+     *
+     * @return array<string, mixed>
+     */
+    protected function fixture(string $name): array
+    {
+        $path = __DIR__ . '/Fixtures/Jotform/' . $name . '.json';
+
+        $this->assertFileExists($path);
+
+        $decoded = json_decode((string) file_get_contents($path), true);
+
+        $this->assertIsArray($decoded, sprintf('Fixture %s is not valid JSON.', $name));
+
+        return $decoded;
+    }
+
+    /**
      * Builds a wp_remote_get() style response array.
      *
      * @param array<string, mixed>|string $body

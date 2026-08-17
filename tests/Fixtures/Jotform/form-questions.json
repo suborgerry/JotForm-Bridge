@@ -1,0 +1,166 @@
+{
+    "responseCode": 200,
+    "message": "success",
+    "content": {
+        "1": {
+            "qid": "1",
+            "type": "control_head",
+            "text": "Contact Form",
+            "order": "1",
+            "name": "contactForm",
+            "headerType": "Large",
+            "subHeader": "Tell us how we can help."
+        },
+        "3": {
+            "qid": "3",
+            "type": "control_fullname",
+            "text": "Full Name",
+            "order": "2",
+            "name": "fullName",
+            "required": "Yes",
+            "middle": "No",
+            "prefix": "No",
+            "suffix": "No",
+            "sublabels": "{\"prefix\":\"Prefix\",\"first\":\"First Name\",\"middle\":\"Middle Name\",\"last\":\"Last Name\",\"suffix\":\"Suffix\"}",
+            "labelAlign": "Auto",
+            "readonly": "No"
+        },
+        "4": {
+            "qid": "4",
+            "type": "control_email",
+            "text": "E-mail",
+            "order": "3",
+            "name": "email",
+            "required": "Yes",
+            "validation": "Email",
+            "subLabel": "example@example.com",
+            "size": "30",
+            "maxsize": "200"
+        },
+        "5": {
+            "qid": "5",
+            "type": "control_phone",
+            "text": "Phone Number",
+            "order": "4",
+            "name": "phoneNumber",
+            "required": "No",
+            "countryCode": "No",
+            "inputMask": "enable",
+            "inputMaskValue": "(###) ###-####",
+            "sublabels": "{\"country\":\"Country Code\",\"area\":\"Area Code\",\"phone\":\"Phone Number\"}"
+        },
+        "6": {
+            "qid": "6",
+            "type": "control_address",
+            "text": "Address",
+            "order": "5",
+            "name": "address",
+            "required": "No",
+            "subfields": "st1|st2|city|state|zip",
+            "sublabels": "{\"addr_line1\":\"Street Address\",\"addr_line2\":\"Street Address Line 2\",\"city\":\"City\",\"state\":\"State \\/ Province\",\"postal\":\"Postal \\/ Zip Code\",\"country\":\"Country\"}",
+            "selectedCountry": "",
+            "labelAlign": "Auto"
+        },
+        "7": {
+            "qid": "7",
+            "type": "control_textbox",
+            "text": "Company",
+            "order": "6",
+            "name": "company",
+            "required": "No",
+            "size": "40",
+            "maxsize": "100",
+            "validation": "None"
+        },
+        "8": {
+            "qid": "8",
+            "type": "control_textarea",
+            "text": "Message",
+            "order": "7",
+            "name": "message",
+            "required": "Yes",
+            "cols": "40",
+            "rows": "6",
+            "maxsize": "500"
+        },
+        "9": {
+            "qid": "9",
+            "type": "control_dropdown",
+            "text": "How did you hear about us?",
+            "order": "8",
+            "name": "howDidYou",
+            "required": "No",
+            "special": "None",
+            "options": "Search engine|A colleague|Conference|Other",
+            "selected": "",
+            "emptyValue": "Please Select"
+        },
+        "10": {
+            "qid": "10",
+            "type": "control_radio",
+            "text": "Preferred contact method",
+            "order": "9",
+            "name": "preferredContact",
+            "required": "Yes",
+            "special": "None",
+            "options": "E-mail|Phone",
+            "allowOther": "No",
+            "spreadCols": "1"
+        },
+        "11": {
+            "qid": "11",
+            "type": "control_checkbox",
+            "text": "Topics of interest",
+            "order": "10",
+            "name": "topicsOf",
+            "required": "No",
+            "special": "None",
+            "options": "Pricing|Integrations|Support|Partnership",
+            "allowOther": "Yes",
+            "otherText": "Other",
+            "spreadCols": "2"
+        },
+        "12": {
+            "qid": "12",
+            "type": "control_number",
+            "text": "Team size",
+            "order": "11",
+            "name": "teamSize",
+            "required": "No",
+            "minValue": "1",
+            "maxValue": "500",
+            "validation": "None"
+        },
+        "13": {
+            "qid": "13",
+            "type": "control_datetime",
+            "text": "Preferred call date",
+            "order": "12",
+            "name": "preferredCall",
+            "required": "No",
+            "format": "ddmmyyyy",
+            "allowTime": "No",
+            "sublabels": "{\"month\":\"Month\",\"day\":\"Day\",\"year\":\"Year\"}"
+        },
+        "14": {
+            "qid": "14",
+            "type": "control_fileupload",
+            "text": "Attachment",
+            "order": "13",
+            "name": "attachment",
+            "required": "No",
+            "extensions": "pdf, doc, docx",
+            "maxFileSize": "10240"
+        },
+        "2": {
+            "qid": "2",
+            "type": "control_button",
+            "text": "Submit",
+            "order": "14",
+            "name": "submit",
+            "buttonAlign": "Auto"
+        }
+    },
+    "duration": "21.07ms",
+    "limit-left": 9982
+}
