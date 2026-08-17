@@ -114,6 +114,100 @@ composer install
 
 ---
 
+# Структура репозитория
+
+Код плагина живет в отдельном каталоге в корне репозитория:
+
+```text
+jotform-bridge/
+```
+
+Все остальное в корне — dev-обвязка, которая в релиз не попадает.
+
+Ориентировочная структура:
+
+```text
+.
+├── AGENTS.md
+├── README.md
+├── prompts/
+├── composer.json          # dev-зависимости и PSR-4 autoload
+├── phpunit.xml.dist
+├── tests/
+│   ├── Unit/
+│   └── Fixtures/
+└── jotform-bridge/        # ← это и есть плагин
+    ├── jotform-bridge.php # main plugin file с header
+    ├── uninstall.php      # если нужен
+    ├── src/
+    ├── assets/
+    │   └── frontend.js
+    ├── languages/
+    ├── readme.txt         # WordPress.org style, этап 6
+    └── vendor/            # только production autoload, если используется
+```
+
+Правила:
+
+* main plugin file называется `jotform-bridge.php`;
+* plugin slug: `jotform-bridge`;
+* text domain: `jotform-bridge`;
+* namespace root: `JotformBridge\`;
+* PSR-4 маппинг: `JotformBridge\` → `jotform-bridge/src/`;
+* префикс для options/transients/hooks: `jotform_bridge_`;
+* префикс для CSS-классов: `jfb-`.
+
+Не размещать PHP-код плагина в корне репозитория.
+
+Не размещать тесты и fixtures внутри `jotform-bridge/`.
+
+---
+
+# Упаковка релиза
+
+Релизный ZIP — это содержимое каталога `jotform-bridge/` и ничего больше.
+
+В ZIP не должно попадать:
+
+```text
+AGENTS.md
+prompts/
+tests/
+composer.json
+phpunit.xml.dist
+.codex/
+node_modules/
+dev-зависимости внутри vendor/
+```
+
+После распаковки в `wp-content/plugins/` плагин обязан работать без:
+
+```bash
+composer install
+npm install
+npm run build
+```
+
+Если для autoload используется Composer, в `jotform-bridge/vendor/` должен лежать
+production autoloader, сгенерированный с `--no-dev`.
+
+Если сторонних runtime-зависимостей нет — предпочтительнее собственный простой
+PSR-4 autoloader внутри `src/`, без каталога `vendor/` в релизе вообще.
+
+---
+
+# Git workflow
+
+Один этап — один осмысленный набор коммитов.
+
+* работать в ветке вида `stage-1-plugin-core`, `stage-2-schema-engine` и т. д.;
+* не коммитить в `main` напрямую;
+* не коммитить секреты, `vendor/` dev-зависимостей, локальные WordPress-файлы;
+* в конце этапа сделать коммит с внятным описанием того, что реализовано;
+* не делать merge/push и не открывать PR без явной просьбы пользователя.
+
+---
+
 # Основная архитектурная идея
 
 Не привязывать frontend к Jotform Form ID или Question ID.
@@ -298,6 +392,53 @@ define('JOTFORM_API_KEY', '...');
 
 ---
 
+# Секреты и тестовое окружение
+
+## Где брать credentials
+
+Агент **не** хранит и **не** запрашивает API key в переписке.
+
+Порядок:
+
+1. локальный `.env` в корне репозитория (в `.gitignore`, в репозиторий не попадает);
+2. переменная окружения `JOTFORM_API_KEY`;
+3. если ни того, ни другого нет — не выдумывать ключ и не просить его прислать
+   сообщением, а выполнить проверки на fixtures/mocks и явно написать в отчете,
+   что live connection не проверялось.
+
+Шаблон `.env.example` (без значений) держать в репозитории.
+
+Никогда не записывать реальный ключ в:
+
+* `AGENTS.md`;
+* `README.md`;
+* `prompts/`;
+* тесты и fixtures;
+* любой коммит.
+
+## Тестовая Jotform form
+
+```text
+Test form ID:      <не задан>
+Разрешение на live write: <не выдано>
+```
+
+Пока эти значения не заполнены, действует безопасный режим:
+
+* read-only обращения к Jotform допустимы;
+* **никаких** submissions в реальный аккаунт;
+* никаких изменений и удалений форм;
+* end-to-end проверка выполняется до upstream boundary с mock-ом Jotform API;
+* в отчете этапа явно указывается, что live upstream write не выполнялся.
+
+Этапы 4, 5 и 6 упоминают live submission как условную возможность. Условие
+считается невыполненным, пока в этом блоке не появится конкретный test form ID
+и явное разрешение.
+
+Production-форму не использовать ни при каких обстоятельствах.
+
+---
+
 # Jotform region
 
 Все API URL должны формироваться централизованно.
@@ -367,6 +508,16 @@ Address:
 <input data-jotform-field="address.state">
 <input data-jotform-field="address.zip">
 ```
+
+**Важно:** конкретные child-имена composite fields здесь приведены как иллюстрация
+формата `parent.child`, а не как подтвержденный контракт.
+
+Реальные child-идентификаторы определяются на Этапе 2 из фактической Jotform schema
+и официальной документации API. Если они отличаются от примеров выше — правильными
+считаются полученные из API, а `AGENTS.md` и `README.md` приводятся в соответствие
+с реализацией, а не наоборот.
+
+Не подгонять нормализацию под примеры из документации проекта.
 
 Разработчик template не должен знать внутренние Jotform Question IDs.
 
@@ -1266,13 +1417,17 @@ jotform_bridge_spam_check
 
 # MCP
 
-Для этого проекта настроены project-scoped MCP servers через:
+Проект может запускаться в двух средах, и набор инструментов в них разный.
+
+## Codex
+
+Project-scoped MCP servers настроены через:
 
 ```text
 .codex/config.toml
 ```
 
-Ожидаемые MCP:
+Доступны:
 
 ```text
 wordpress-playground
@@ -1280,7 +1435,38 @@ playwright
 jotform
 ```
 
-Используй их для verification, а не просто потому, что они доступны.
+## Claude Code
+
+Имена `wordpress-playground`, `playwright`, `jotform` здесь **не** существуют.
+Использовать соответствия:
+
+```text
+Playwright MCP          → встроенный браузер (mcp__Claude_Browser__*)
+                          или mcp__chrome-devtools__*
+WordPress Playground MCP→ прямого аналога нет, см. ниже
+Jotform MCP             → требует OAuth-авторизации коннектора;
+                          без нее недоступен
+```
+
+Замена WordPress Playground:
+
+* локальная установка WordPress, если она есть;
+* `wp-env` / `wp-now` через Bash, если Docker/Node доступны;
+* `@wp-playground/cli` через `npx`, если сеть доступна;
+* если ничего из этого нет — ограничиться unit-тестами и явно указать
+  в отчете, что WordPress runtime verification не выполнялась.
+
+Jotform MCP в Claude Code требует авторизации коннектора пользователем.
+Агент не должен запрашивать токены, коды или callback URL. Если коннектор
+не авторизован — сказать об этом и продолжить без него.
+
+## Общее правило
+
+Инструменты используются для реальной verification, а не потому, что они доступны.
+
+Если инструмент недоступен — см. секцию `MCP failure policy`. Никогда не выдавать
+неисполненную проверку за исполненную и не подменять фактическую проверку
+чтением собственного кода.
 
 ---
 
@@ -1410,6 +1596,85 @@ Jotform MCP verification
 Использовать fixtures с realistic Jotform API responses.
 
 Unit tests не должны требовать live Jotform API.
+
+## Стек
+
+Зафиксировано:
+
+```text
+PHPUnit ^9.6
+brain/monkey ^2.6
+mockery/mockery (транзитивно через brain/monkey)
+```
+
+PHPUnit 9.x выбран потому, что PHPUnit 10+ требует PHP 8.1+, а проект должен
+поддерживать PHP 8.0.
+
+Brain Monkey нужен, чтобы мокать WordPress-функции (`get_option`, `wp_remote_get`,
+`sanitize_text_field`, `apply_filters` и т. д.) без загрузки WordPress.
+
+Все это — **dev-зависимости**. В релизный ZIP они не попадают.
+
+## Расположение
+
+```text
+composer.json
+phpunit.xml.dist
+tests/
+├── bootstrap.php
+├── TestCase.php          # базовый класс с setUp/tearDown Brain Monkey
+├── Unit/
+│   ├── Forms/
+│   ├── Templates/
+│   ├── Submission/
+│   └── Api/
+└── Fixtures/
+    └── Jotform/          # sanitized JSON-ответы Jotform API
+```
+
+Composer PSR-4:
+
+```text
+JotformBridge\      → jotform-bridge/src/
+JotformBridge\Tests\ → tests/
+```
+
+## Запуск
+
+```bash
+composer install
+composer test          # алиас для vendor/bin/phpunit
+```
+
+Команда `composer test` должна работать начиная с Этапа 1, даже если тестов
+на тот момент почти нет. Не откладывать настройку до Этапа 2.
+
+## Правила написания
+
+Тесты домена не должны:
+
+* загружать WordPress;
+* обращаться к сети;
+* писать в файловую систему вне временного каталога;
+* зависеть от порядка выполнения.
+
+Тесты для `TemplateScanner` могут создавать временные файлы через
+`sys_get_temp_dir()` и обязаны убирать их за собой.
+
+Fixtures Jotform API должны быть sanitized: без реальных API-ключей, email,
+имен и телефонов.
+
+Если структура ответа Jotform для какого-то типа поля неизвестна — сначала
+свериться с официальной документацией или прочитать реальную schema read-only,
+и только потом создавать fixture. Выдуманный fixture хуже отсутствующего теста,
+потому что он закрепляет неверное предположение.
+
+## Lint
+
+Если настраивается статический анализ, использовать WordPress Coding Standards
+через `squizlabs/php_codesniffer` + `wp-coding-standards/wpcs` как dev-зависимость.
+
+Это желательно, но не блокирует этапы. Тесты приоритетнее линтера.
 
 ---
 
