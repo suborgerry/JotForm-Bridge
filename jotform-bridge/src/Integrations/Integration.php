@@ -20,6 +20,17 @@ final class Integration
     public const MODE_CUSTOM = 'custom';
     public const MODE_AUTO   = 'auto';
 
+    public const SUCCESS_MESSAGE  = 'message';
+    public const SUCCESS_REDIRECT = 'redirect';
+
+    /**
+     * Longest redirect delay that can be configured, in seconds.
+     *
+     * The delay exists so the success message can be read, not so a form can
+     * hold the visitor hostage: the form stays disabled for the whole delay.
+     */
+    public const MAX_REDIRECT_DELAY = 60;
+
     private string $slug;
 
     private string $name;
@@ -36,6 +47,17 @@ final class Integration
 
     private int $updatedAt;
 
+    private string $successAction;
+
+    private int $redirectPageId;
+
+    private int $redirectDelay;
+
+    /**
+     * The redirect arguments are last and optional on purpose: an integration
+     * stored before they existed is a complete integration, and reading one back
+     * must not need them.
+     */
     public function __construct(
         string $slug,
         string $name,
@@ -44,16 +66,30 @@ final class Integration
         string $templateSlug,
         bool $active,
         int $createdAt = 0,
-        int $updatedAt = 0
+        int $updatedAt = 0,
+        string $successAction = self::SUCCESS_MESSAGE,
+        int $redirectPageId = 0,
+        int $redirectDelay = 0
     ) {
-        $this->slug         = $slug;
-        $this->name         = $name;
-        $this->formId       = $formId;
-        $this->mode         = self::isMode($mode) ? $mode : self::MODE_CUSTOM;
-        $this->templateSlug = $templateSlug;
-        $this->active       = $active;
-        $this->createdAt    = $createdAt;
-        $this->updatedAt    = $updatedAt;
+        $this->slug           = $slug;
+        $this->name           = $name;
+        $this->formId         = $formId;
+        $this->mode           = self::isMode($mode) ? $mode : self::MODE_CUSTOM;
+        $this->templateSlug   = $templateSlug;
+        $this->active         = $active;
+        $this->createdAt      = $createdAt;
+        $this->updatedAt      = $updatedAt;
+        $this->successAction  = self::isSuccessAction($successAction) ? $successAction : self::SUCCESS_MESSAGE;
+        $this->redirectPageId = max(0, $redirectPageId);
+        $this->redirectDelay  = self::clampDelay($redirectDelay);
+    }
+
+    /**
+     * The number of seconds actually storable, whatever was asked for.
+     */
+    public static function clampDelay(int $seconds): int
+    {
+        return min(self::MAX_REDIRECT_DELAY, max(0, $seconds));
     }
 
     /**
@@ -70,6 +106,22 @@ final class Integration
     public static function isMode(string $mode): bool
     {
         return array_key_exists($mode, self::modes());
+    }
+
+    /**
+     * @return array<string, string> Success action => human readable label.
+     */
+    public static function successActions(): array
+    {
+        return [
+            self::SUCCESS_MESSAGE  => __('Show the success message', 'jotform-bridge'),
+            self::SUCCESS_REDIRECT => __('Redirect to a page', 'jotform-bridge'),
+        ];
+    }
+
+    public static function isSuccessAction(string $action): bool
+    {
+        return array_key_exists($action, self::successActions());
     }
 
     /**
@@ -94,13 +146,20 @@ final class Integration
 
         $template = sanitize_key(self::scalar($input, 'template'));
 
+        $successAction = sanitize_key(self::scalar($input, 'success_action'));
+
         return new self(
             $slug,
             $name,
             $formId,
             $mode,
             $template,
-            !empty($input['active'])
+            !empty($input['active']),
+            0,
+            0,
+            $successAction,
+            (int) self::scalar($input, 'redirect_page_id'),
+            (int) self::scalar($input, 'redirect_delay')
         );
     }
 
@@ -132,7 +191,12 @@ final class Integration
             self::scalar($data, 'template'),
             !empty($data['active']),
             isset($data['created_at']) && is_scalar($data['created_at']) ? (int) $data['created_at'] : 0,
-            isset($data['updated_at']) && is_scalar($data['updated_at']) ? (int) $data['updated_at'] : 0
+            isset($data['updated_at']) && is_scalar($data['updated_at']) ? (int) $data['updated_at'] : 0,
+            // Absent keys are the defaults: an integration stored by an earlier
+            // version stays valid and never needs a migration.
+            self::scalar($data, 'success_action'),
+            (int) self::scalar($data, 'redirect_page_id'),
+            (int) self::scalar($data, 'redirect_delay')
         );
     }
 
@@ -142,14 +206,17 @@ final class Integration
     public function toArray(): array
     {
         return [
-            'slug'       => $this->slug,
-            'name'       => $this->name,
-            'form_id'    => $this->formId,
-            'mode'       => $this->mode,
-            'template'   => $this->templateSlug,
-            'active'     => $this->active,
-            'created_at' => $this->createdAt,
-            'updated_at' => $this->updatedAt,
+            'slug'             => $this->slug,
+            'name'             => $this->name,
+            'form_id'          => $this->formId,
+            'mode'             => $this->mode,
+            'template'         => $this->templateSlug,
+            'active'           => $this->active,
+            'created_at'       => $this->createdAt,
+            'updated_at'       => $this->updatedAt,
+            'success_action'   => $this->successAction,
+            'redirect_page_id' => $this->redirectPageId,
+            'redirect_delay'   => $this->redirectDelay,
         ];
     }
 
@@ -186,6 +253,35 @@ final class Integration
     public function usesCustomTemplate(): bool
     {
         return $this->mode === self::MODE_CUSTOM;
+    }
+
+    public function successAction(): string
+    {
+        return $this->successAction;
+    }
+
+    public function successActionLabel(): string
+    {
+        return self::successActions()[$this->successAction] ?? $this->successAction;
+    }
+
+    /**
+     * Whether the *configuration* asks for a redirect. Whether one can actually
+     * be served is a question about the target page, answered by RedirectTarget.
+     */
+    public function redirectsOnSuccess(): bool
+    {
+        return $this->successAction === self::SUCCESS_REDIRECT;
+    }
+
+    public function redirectPageId(): int
+    {
+        return $this->redirectPageId;
+    }
+
+    public function redirectDelay(): int
+    {
+        return $this->redirectDelay;
     }
 
     public function isActive(): bool

@@ -3,7 +3,7 @@
 /**
  * Integrations list screen.
  *
- * @var array<string, array{integration:\JotformBridge\Integrations\Integration, compatibility:array<string,mixed>, form_title:string}> $rows
+ * @var array<string, array{integration:\JotformBridge\Integrations\Integration, compatibility:array<string,mixed>, redirect:array<string,mixed>, form_title:string}> $rows
  * @var \JotformBridge\Templates\TemplateRegistry $templates
  * @var array<int, array<string, string>>         $diagnostics
  * @var array<string, mixed>|null                 $notice
@@ -15,6 +15,7 @@
 declare(strict_types=1);
 
 use JotformBridge\Admin\IntegrationsPage;
+use JotformBridge\Integrations\RedirectTarget;
 use JotformBridge\Templates\TemplateScanner;
 
 if (!defined('ABSPATH')) {
@@ -51,13 +52,14 @@ $jfbNewUrl = add_query_arg(['page' => $page, 'view' => 'new'], admin_url('admin.
                 <th scope="col"><?php echo esc_html__('Template', 'jotform-bridge'); ?></th>
                 <th scope="col"><?php echo esc_html__('Active', 'jotform-bridge'); ?></th>
                 <th scope="col"><?php echo esc_html__('Compatibility', 'jotform-bridge'); ?></th>
+                <th scope="col"><?php echo esc_html__('Redirect target', 'jotform-bridge'); ?></th>
                 <th scope="col"><?php echo esc_html__('Actions', 'jotform-bridge'); ?></th>
             </tr>
         </thead>
         <tbody>
             <?php if ($rows === []) : ?>
                 <tr>
-                    <td colspan="8">
+                    <td colspan="9">
                         <?php echo esc_html__('No integrations yet. Add one to connect a Jotform form to a template.', 'jotform-bridge'); ?>
                     </td>
                 </tr>
@@ -109,6 +111,14 @@ $jfbNewUrl = add_query_arg(['page' => $page, 'view' => 'new'], admin_url('admin.
                         ?>
                     </td>
                     <td><?php echo esc_html($jfbRow['compatibility']['label']); ?></td>
+                    <td>
+                        <?php echo esc_html((string) $jfbRow['redirect']['label']); ?>
+                        <?php if (RedirectTarget::isBroken($jfbRow['redirect'])) : ?>
+                            <p class="description" style="color:#b32d2e;">
+                                <?php echo esc_html((string) $jfbRow['redirect']['message']); ?>
+                            </p>
+                        <?php endif; ?>
+                    </td>
                     <td>
                         <a href="<?php echo esc_url($jfbEditUrl); ?>"><?php echo esc_html__('Edit', 'jotform-bridge'); ?></a>
                         |

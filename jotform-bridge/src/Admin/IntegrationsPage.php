@@ -9,6 +9,7 @@ use JotformBridge\Forms\SchemaRepository;
 use JotformBridge\Integrations\CompatibilityChecker;
 use JotformBridge\Integrations\Integration;
 use JotformBridge\Integrations\IntegrationRepository;
+use JotformBridge\Integrations\RedirectTarget;
 use JotformBridge\Templates\TemplateRegistry;
 
 if (!defined('ABSPATH')) {
@@ -45,18 +46,22 @@ final class IntegrationsPage
 
     private CompatibilityChecker $compatibility;
 
+    private RedirectTarget $redirects;
+
     public function __construct(
         IntegrationRepository $integrations,
         FormRepository $forms,
         SchemaRepository $schemas,
         TemplateRegistry $templates,
-        CompatibilityChecker $compatibility
+        CompatibilityChecker $compatibility,
+        ?RedirectTarget $redirects = null
     ) {
         $this->integrations  = $integrations;
         $this->forms         = $forms;
         $this->schemas       = $schemas;
         $this->templates     = $templates;
         $this->compatibility = $compatibility;
+        $this->redirects     = $redirects ?? new RedirectTarget();
     }
 
     public function register(): void
@@ -124,6 +129,7 @@ final class IntegrationsPage
             $rows[$integration->slug()] = [
                 'integration'   => $integration,
                 'compatibility' => $this->compatibility->check($integration),
+                'redirect'      => $this->redirects->check($integration),
                 'form_title'    => $this->formTitle($integration->formId()),
             ];
         }
@@ -158,7 +164,8 @@ final class IntegrationsPage
         $originalSlug  = $view === 'edit' ? $slug : '';
         $integration   = $integration ?? new Integration('', '', '', Integration::MODE_CUSTOM, '', true);
         $compatibility = $this->compatibility->check($integration);
-        $schema        = $integration->formId() !== '' ? $this->schemas->cached($integration->formId()) : null;
+        $redirect      = $this->redirects->check($integration);
+        $schema        =$integration->formId() !== '' ? $this->schemas->cached($integration->formId()) : null;
         $schemaMeta    = $integration->formId() !== '' ? $this->schemas->meta($integration->formId()) : null;
         $forms         = $this->forms->all();
         $templates     = $this->templates->choices();
@@ -220,6 +227,15 @@ final class IntegrationsPage
         // makes the compatibility report meaningful straight away.
         if (!$this->schemas->isCached($integration->formId())) {
             $this->schemas->refresh($integration->formId());
+        }
+
+        // A broken redirect target does not stop the save — the page may be
+        // published later — but the admin is told before a visitor finds out.
+        $target = $this->redirects->check($integration);
+
+        if (RedirectTarget::isBroken($target)) {
+            $this->flash('warning', __('Integration saved.', 'jotform-bridge'), [$target['message']]);
+            $this->redirect(['view' => 'edit', 'integration' => $integration->slug()]);
         }
 
         $this->flash('success', __('Integration saved.', 'jotform-bridge'));

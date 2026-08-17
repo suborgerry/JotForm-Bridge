@@ -40,6 +40,15 @@ Both modes post to the same plugin REST endpoint, and both are validated
 server-side against the cached Jotform form definition before anything is
 forwarded.
 
+= After a submission =
+
+Each integration decides on its own what a successful submission does: show the
+success message in place, or send the visitor to a page of this site after an
+optional delay. The target is picked from the site's published pages and stored
+as a page ID, so a changed permalink takes effect at once and no URL from a
+request can ever be redirected to. If the chosen page is deleted or unpublished,
+the submission still succeeds and the success message is shown instead.
+
 = What stays on the server =
 
 The Jotform API key is never printed into HTML, never localized into JavaScript,
@@ -119,12 +128,13 @@ double click cannot create two Jotform submissions.
 
 == Screenshots ==
 
-1. The integrations list with per-integration compatibility.
-2. The integration editor: Jotform form, rendering mode and template.
+1. The integrations list with per-integration compatibility and redirect status.
+2. The integration editor: Jotform form, rendering mode, template and success action.
 3. The settings screen: API key, region and diagnostics.
 
 == Changelog ==
 
 = 0.1.0 =
 * First release: integrations, custom templates, automatic rendering, server-side
-  validation, submission mapping to Jotform, admin diagnostics.
+  validation, submission mapping to Jotform, per-integration success redirect,
+  admin diagnostics.

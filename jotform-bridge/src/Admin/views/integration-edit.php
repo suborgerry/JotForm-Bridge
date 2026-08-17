@@ -7,6 +7,7 @@
  * @var bool                                           $isNew
  * @var string                                         $originalSlug
  * @var array<string, mixed>                           $compatibility
+ * @var array{state:string, url:string, delay:int, label:string, message:string} $redirect
  * @var \JotformBridge\Forms\FormSchema|null           $schema
  * @var array{fetched_at:int, fingerprint:string, error:string}|null $schemaMeta
  * @var array<int, array<string, string>>              $forms
@@ -21,6 +22,7 @@ declare(strict_types=1);
 
 use JotformBridge\Admin\IntegrationsPage;
 use JotformBridge\Integrations\Integration;
+use JotformBridge\Integrations\RedirectTarget;
 use JotformBridge\Templates\CompatibilityReport;
 
 if (!defined('ABSPATH')) {
@@ -169,6 +171,83 @@ $jfbReport  = $compatibility['report'] instanceof CompatibilityReport ? $compati
             </tr>
 
             <tr>
+                <th scope="row">
+                    <label for="jfb-success-action"><?php echo esc_html__('Success Action', 'jotform-bridge'); ?></label>
+                </th>
+                <td>
+                    <select id="jfb-success-action" name="jotform_integration[success_action]">
+                        <?php foreach (Integration::successActions() as $jfbAction => $jfbActionLabel) : ?>
+                            <option
+                                value="<?php echo esc_attr($jfbAction); ?>"
+                                <?php selected($integration->successAction(), $jfbAction); ?>
+                            >
+                                <?php echo esc_html($jfbActionLabel); ?>
+                            </option>
+                        <?php endforeach; ?>
+                    </select>
+                    <p class="description">
+                        <?php echo esc_html__('What happens after a submission is accepted. A redirect target is resolved when the answer is sent, never stored as a URL.', 'jotform-bridge'); ?>
+                    </p>
+                </td>
+            </tr>
+
+            <tr class="jfb-redirect-field">
+                <th scope="row">
+                    <label for="jfb-redirect-page"><?php echo esc_html__('Redirect Page', 'jotform-bridge'); ?></label>
+                </th>
+                <td>
+                    <?php
+                    wp_dropdown_pages(
+                        [
+                            'id'                => 'jfb-redirect-page',
+                            'name'              => 'jotform_integration[redirect_page_id]',
+                            'selected'          => $integration->redirectPageId(),
+                            'show_option_none'  => __('— Select a page —', 'jotform-bridge'),
+                            'option_none_value' => '0',
+                            'post_status'       => 'publish',
+                        ]
+                    );
+                    ?>
+                    <p class="description">
+                        <?php echo esc_html__('Only published pages of this site can be chosen. A free URL is deliberately not accepted.', 'jotform-bridge'); ?>
+                    </p>
+                    <?php if (RedirectTarget::isBroken($redirect)) : ?>
+                        <p class="description" style="color:#b32d2e;">
+                            <strong><?php echo esc_html((string) $redirect['label']); ?>:</strong>
+                            <?php echo esc_html((string) $redirect['message']); ?>
+                        </p>
+                    <?php endif; ?>
+                </td>
+            </tr>
+
+            <tr class="jfb-redirect-field">
+                <th scope="row">
+                    <label for="jfb-redirect-delay"><?php echo esc_html__('Redirect Delay', 'jotform-bridge'); ?></label>
+                </th>
+                <td>
+                    <input
+                        type="number"
+                        class="small-text"
+                        id="jfb-redirect-delay"
+                        name="jotform_integration[redirect_delay]"
+                        value="<?php echo esc_attr((string) $integration->redirectDelay()); ?>"
+                        min="0"
+                        max="<?php echo esc_attr((string) Integration::MAX_REDIRECT_DELAY); ?>"
+                        step="1"
+                    >
+                    <p class="description">
+                        <?php
+                        printf(
+                            /* translators: %d: maximum delay in seconds */
+                            esc_html__('Seconds to wait before leaving the page, so the success message can be read. 0 redirects immediately, %d is the maximum.', 'jotform-bridge'),
+                            (int) Integration::MAX_REDIRECT_DELAY
+                        );
+                        ?>
+                    </p>
+                </td>
+            </tr>
+
+            <tr>
                 <th scope="row"><?php echo esc_html__('Active', 'jotform-bridge'); ?></th>
                 <td>
                     <label>
@@ -186,6 +265,31 @@ $jfbReport  = $compatibility['report'] instanceof CompatibilityReport ? $compati
 
         <?php submit_button($isNew ? __('Create Integration', 'jotform-bridge') : __('Save Integration', 'jotform-bridge')); ?>
     </form>
+
+    <script>
+        /* The redirect fields are only meaningful for the redirect action. With
+           JavaScript off both stay visible, which is a usable form, not a broken
+           one: the server ignores them unless the action asks for a redirect. */
+        (function () {
+            var action = document.getElementById('jfb-success-action');
+            var rows = document.querySelectorAll('.jfb-redirect-field');
+
+            if (!action) {
+                return;
+            }
+
+            function sync() {
+                var show = action.value === '<?php echo esc_js(Integration::SUCCESS_REDIRECT); ?>';
+
+                for (var i = 0; i < rows.length; i++) {
+                    rows[i].style.display = show ? '' : 'none';
+                }
+            }
+
+            action.addEventListener('change', sync);
+            sync();
+        })();
+    </script>
 
     <h2><?php echo esc_html__('Actions', 'jotform-bridge'); ?></h2>
     <div class="jfb-actions">
@@ -227,6 +331,12 @@ $jfbReport  = $compatibility['report'] instanceof CompatibilityReport ? $compati
         <?php if ((string) $compatibility['message'] !== '') : ?>
             <?php echo esc_html((string) $compatibility['message']); ?>
         <?php endif; ?>
+    </p>
+
+    <h2><?php echo esc_html__('Redirect target status', 'jotform-bridge'); ?></h2>
+    <p <?php echo RedirectTarget::isBroken($redirect) ? 'class="notice notice-warning inline"' : ''; ?>>
+        <strong><?php echo esc_html((string) $redirect['label']); ?></strong>
+        <?php echo esc_html((string) $redirect['message']); ?>
     </p>
 
     <?php if ($schemaMeta !== null && $schemaMeta['fetched_at'] > 0) : ?>

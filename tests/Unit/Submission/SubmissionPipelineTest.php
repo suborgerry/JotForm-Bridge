@@ -9,9 +9,11 @@ use JotformBridge\Api\JotformClient;
 use JotformBridge\Forms\SchemaBuilder;
 use JotformBridge\Forms\SchemaRepository;
 use JotformBridge\Integrations\IntegrationRepository;
+use JotformBridge\Settings\Settings;
 use JotformBridge\Submission\SubmissionOutcome;
 use JotformBridge\Submission\SubmissionPipeline;
 use JotformBridge\Submission\ValidationResult;
+use JotformBridge\Support\Logger;
 use JotformBridge\Tests\TestCase;
 
 /**
@@ -293,6 +295,155 @@ final class SubmissionPipelineTest extends TestCase
         }
     }
 
+    public function testASuccessWithoutAConfiguredRedirectCarriesNoRedirect(): void
+    {
+        $this->mockPost(200, ['responseCode' => 200, 'content' => ['submissionID' => '1']]);
+
+        $outcome = $this->pipeline()->submit('contact', $this->valid());
+
+        $this->assertSame(200, $outcome->status());
+        $this->assertArrayNotHasKey('redirect', $outcome->body());
+    }
+
+    public function testAConfiguredRedirectIsResolvedIntoTheSuccessResponse(): void
+    {
+        $this->mockPost(200, ['responseCode' => 200, 'content' => ['submissionID' => '1']]);
+        $this->storeIntegration(true, ['success_action' => 'redirect', 'redirect_page_id' => 42, 'redirect_delay' => 3]);
+        $this->mockPage('publish', 'https://example.com/thanks/');
+
+        $outcome = $this->pipeline()->submit('contact', $this->valid());
+
+        $this->assertSame(200, $outcome->status());
+        $this->assertSame(
+            ['url' => 'https://example.com/thanks/', 'delay' => 3],
+            $outcome->body()['redirect']
+        );
+    }
+
+    /**
+     * @dataProvider brokenTargets
+     */
+    public function testABrokenRedirectTargetStillLeavesTheSubmissionSuccessful(
+        string $status,
+        string $permalink
+    ): void {
+        $this->mockPost(200, ['responseCode' => 200, 'content' => ['submissionID' => '1']]);
+        $this->storeIntegration(true, ['success_action' => 'redirect', 'redirect_page_id' => 42]);
+        $this->mockPage($status, $permalink);
+
+        $outcome = $this->pipeline()->submit('contact', $this->valid());
+
+        $this->assertSame(200, $outcome->status());
+        $this->assertTrue($outcome->body()['success']);
+        $this->assertArrayNotHasKey('redirect', $outcome->body());
+        $this->assertCount(1, $this->requests, 'The submission itself must still have been sent.');
+    }
+
+    /**
+     * @return array<string, array{0:string, 1:string}>
+     */
+    public function brokenTargets(): array
+    {
+        return [
+            'deleted'           => ['', 'https://example.com/thanks/'],
+            'trashed'           => ['trash', 'https://example.com/thanks/'],
+            'draft'             => ['draft', 'https://example.com/thanks/'],
+            'external host'     => ['publish', 'https://evil.example/thanks/'],
+            'protocol relative' => ['publish', '//evil.example/thanks/'],
+        ];
+    }
+
+    /**
+     * The redirect is a property of the integration, so nothing the visitor
+     * sends can introduce, change or suppress one.
+     */
+    public function testRedirectInputInTheRequestIsIgnored(): void
+    {
+        $this->mockPost(200, ['responseCode' => 200, 'content' => ['submissionID' => '1']]);
+        $this->mockPage('publish', 'https://example.com/thanks/');
+
+        $fields             = $this->valid();
+        $fields['redirect'] = 'https://evil.example/';
+
+        $outcome = $this->pipeline()->submit('contact', $fields);
+
+        // An unknown semantic key is a validation failure, which is the strongest
+        // possible answer: it never even reaches the success path.
+        $this->assertSame(422, $outcome->status());
+        $this->assertArrayNotHasKey('redirect', $outcome->body());
+        $this->assertStringNotContainsString('evil.example', (string) json_encode($outcome->body()));
+    }
+
+    public function testAValidationFailureNeverCarriesARedirect(): void
+    {
+        $this->storeIntegration(true, ['success_action' => 'redirect', 'redirect_page_id' => 42]);
+        $this->mockPage('publish', 'https://example.com/thanks/');
+
+        $fields = $this->valid();
+        unset($fields['email']);
+
+        $outcome = $this->pipeline()->submit('contact', $fields);
+
+        $this->assertSame(422, $outcome->status());
+        $this->assertArrayNotHasKey('redirect', $outcome->body());
+    }
+
+    public function testAnUpstreamErrorNeverCarriesARedirect(): void
+    {
+        $this->mockPost(500, ['responseCode' => 500, 'message' => 'boom']);
+        $this->storeIntegration(true, ['success_action' => 'redirect', 'redirect_page_id' => 42]);
+        $this->mockPage('publish', 'https://example.com/thanks/');
+
+        $outcome = $this->pipeline()->submit('contact', $this->valid());
+
+        $this->assertSame(502, $outcome->status());
+        $this->assertArrayNotHasKey('redirect', $outcome->body());
+    }
+
+    /**
+     * The site owner has to be able to find out why the redirect stopped
+     * happening, and the debug log is where that goes.
+     */
+    public function testABrokenRedirectTargetIsWrittenToTheDebugLog(): void
+    {
+        $this->mockPost(200, ['responseCode' => 200, 'content' => ['submissionID' => '1']]);
+        $this->storeIntegration(true, ['success_action' => 'redirect', 'redirect_page_id' => 42]);
+        $this->mockPage('draft', 'https://example.com/thanks/');
+
+        $this->options[Settings::OPTION] = ['debug_logging' => true];
+
+        $lines = [];
+
+        Functions\when('JotformBridge\Support\error_log')->alias(
+            function (string $line) use (&$lines): bool {
+                $lines[] = $line;
+
+                return true;
+            }
+        );
+
+        $client = new JotformClient('test-api-key', 'https://api.jotform.com');
+
+        $outcome = (new SubmissionPipeline(
+            new IntegrationRepository(),
+            new SchemaRepository($client),
+            $client,
+            null,
+            null,
+            null,
+            new Logger(new Settings())
+        ))->submit('contact', $this->valid());
+
+        $this->assertSame(200, $outcome->status());
+        $this->assertArrayNotHasKey('redirect', $outcome->body());
+
+        $log = implode("\n", $lines);
+
+        $this->assertStringContainsString('redirect target could not be used', $log);
+        $this->assertStringContainsString('unpublished', $log);
+        $this->assertStringNotContainsString('test-api-key', $log);
+    }
+
     public function testADeeplyNestedPayloadIsRefusedAsTooLarge(): void
     {
         $outcome = $this->pipeline()->submit(
@@ -332,18 +483,48 @@ final class SubmissionPipelineTest extends TestCase
         );
     }
 
-    private function storeIntegration(bool $active): void
+    /**
+     * @param array<string, mixed> $extra Redirect settings, when the test needs them.
+     */
+    private function storeIntegration(bool $active, array $extra = []): void
     {
         $this->options[IntegrationRepository::OPTION] = [
-            'contact' => [
-                'slug'     => 'contact',
-                'name'     => 'Contact',
-                'form_id'  => self::FORM_ID,
-                'mode'     => 'custom',
-                'template' => 'contact',
-                'active'   => $active,
-            ],
+            'contact' => array_merge(
+                [
+                    'slug'     => 'contact',
+                    'name'     => 'Contact',
+                    'form_id'  => self::FORM_ID,
+                    'mode'     => 'custom',
+                    'template' => 'contact',
+                    'active'   => $active,
+                ],
+                $extra
+            ),
         ];
+    }
+
+    /**
+     * The WordPress side of a redirect target: one page, one status, one
+     * permalink. An empty status stands for a page that no longer exists.
+     */
+    private function mockPage(string $status, string $permalink): void
+    {
+        Functions\when('home_url')->alias(
+            static fn(string $path = ''): string => 'https://example.com' . $path
+        );
+        Functions\when('get_post_status')->justReturn($status === '' ? false : $status);
+        Functions\when('get_permalink')->justReturn($permalink);
+        Functions\when('wp_validate_redirect')->alias(
+            static function (string $location, string $default = ''): string {
+                if (str_starts_with($location, '//')) {
+                    $location = 'http:' . $location;
+                }
+
+                $host = parse_url($location, PHP_URL_HOST);
+
+                return is_string($host) && strcasecmp($host, 'example.com') === 0 ? $location : $default;
+            }
+        );
     }
 
     private function cacheSchema(): void

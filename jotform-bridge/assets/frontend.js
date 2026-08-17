@@ -6,13 +6,18 @@
  * declared through `data-jotform-field`, posts them as JSON to the plugin REST
  * endpoint and reports the server's answer back into the markup.
  *
- * The theme stays in charge of the UX. This script imposes no popup, no
- * redirect and no animation; it only toggles state attributes and dispatches
- * events the theme can listen to:
+ * The theme stays in charge of the UX. This script imposes no popup and no
+ * animation; it only toggles state attributes and dispatches events the theme
+ * can listen to:
  *
  *   jotformbridge:before-submit  { integration, fields }
- *   jotformbridge:success        { integration, message }
+ *   jotformbridge:success        { integration, message, redirect }
  *   jotformbridge:error          { integration, message, errors, status }
+ *
+ * The one thing it does impose is the redirect the integration is configured
+ * with — and only that one: the URL comes from the server's answer, is never
+ * read from the markup, and calling preventDefault() on the success event
+ * cancels it so the theme can build its own flow.
  *
  * The form never knows the Jotform form ID, the question IDs or the API key.
  */
@@ -207,6 +212,51 @@
         }
     }
 
+    /**
+     * Reads the redirect instruction out of a success body.
+     *
+     * The server only ever sends a same-origin URL it resolved itself, but the
+     * check is repeated here so that nothing but a same-origin navigation can
+     * come out of this script, whatever answered the request.
+     */
+    function redirectFrom(body) {
+        var redirect = body && body.redirect;
+
+        if (!redirect || typeof redirect.url !== 'string' || !redirect.url) {
+            return null;
+        }
+
+        var resolved = document.createElement('a');
+        resolved.href = redirect.url;
+
+        if (resolved.origin !== window.location.origin) {
+            return null;
+        }
+
+        var delay = parseInt(redirect.delay, 10);
+
+        return {
+            url: resolved.href,
+            delay: isNaN(delay) || delay < 0 ? 0 : delay
+        };
+    }
+
+    /**
+     * Leaves for the target, keeping the form disabled until the page changes so
+     * a second submit is impossible during the delay.
+     */
+    function go(redirect) {
+        if (redirect.delay > 0) {
+            window.setTimeout(function () {
+                window.location.assign(redirect.url);
+            }, redirect.delay * 1000);
+
+            return;
+        }
+
+        window.location.assign(redirect.url);
+    }
+
     function dispatch(form, name, detail) {
         var event;
 
@@ -271,12 +321,26 @@
             })
             .then(function (body) {
                 if (body && body.success) {
+                    var redirect = redirectFrom(body);
+
+                    // Order matters: state, then message, then the event, then
+                    // the navigation the event was given a chance to cancel.
                     form.reset();
                     showSuccess(form, body.message || '');
-                    dispatch(form, 'jotformbridge:success', {
+
+                    var proceed = dispatch(form, 'jotformbridge:success', {
                         integration: integration,
-                        message: body.message || ''
+                        message: body.message || '',
+                        redirect: redirect
                     });
+
+                    if (redirect && proceed) {
+                        // The form stays busy until the page is replaced, so the
+                        // visitor cannot submit again while the delay runs.
+                        go(redirect);
+
+                        return;
+                    }
 
                     setBusy(form, false);
 

@@ -31,15 +31,28 @@ final class SubmissionOutcome
         $this->body   = $body;
     }
 
-    public static function success(string $message): self
+    /**
+     * The `redirect` key exists only on a success, and only when the target
+     * resolved. Failure constructors have no way to add one, which is the
+     * guarantee that a validation error or an upstream error never carries one.
+     *
+     * @param array{url:string, delay:int}|null $redirect
+     */
+    public static function success(string $message, ?array $redirect = null): self
     {
-        return new self(
-            200,
-            [
-                'success' => true,
-                'message' => $message,
-            ]
-        );
+        $body = [
+            'success' => true,
+            'message' => $message,
+        ];
+
+        if ($redirect !== null && $redirect['url'] !== '') {
+            $body['redirect'] = [
+                'url'   => $redirect['url'],
+                'delay' => max(0, (int) $redirect['delay']),
+            ];
+        }
+
+        return new self(200, $body);
     }
 
     /**

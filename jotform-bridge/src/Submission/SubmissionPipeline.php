@@ -6,7 +6,9 @@ namespace JotformBridge\Submission;
 
 use JotformBridge\Api\JotformClient;
 use JotformBridge\Forms\SchemaRepository;
+use JotformBridge\Integrations\Integration;
 use JotformBridge\Integrations\IntegrationRepository;
+use JotformBridge\Integrations\RedirectTarget;
 use JotformBridge\Support\Logger;
 
 if (!defined('ABSPATH')) {
@@ -52,6 +54,8 @@ final class SubmissionPipeline
 
     private ?Logger $logger;
 
+    private RedirectTarget $redirects;
+
     public function __construct(
         IntegrationRepository $integrations,
         SchemaRepository $schemas,
@@ -59,8 +63,10 @@ final class SubmissionPipeline
         ?SubmissionValidator $validator = null,
         ?SubmissionMapper $mapper = null,
         ?SpamGuard $spam = null,
-        ?Logger $logger = null
+        ?Logger $logger = null,
+        ?RedirectTarget $redirects = null
     ) {
+        $this->redirects = $redirects ?? new RedirectTarget();
         $this->integrations = $integrations;
         $this->schemas      = $schemas;
         $this->client       = $client;
@@ -200,7 +206,38 @@ final class SubmissionPipeline
             (string) ($sent->data()['submission_id'] ?? '')
         );
 
-        return SubmissionOutcome::success(__('Form submitted successfully.', 'jotform-bridge'));
+        return SubmissionOutcome::success(
+            __('Form submitted successfully.', 'jotform-bridge'),
+            $this->redirect($integration)
+        );
+    }
+
+    /**
+     * The redirect for an accepted submission, resolved at answer time.
+     *
+     * A broken target is a configuration problem, not a submission problem: the
+     * submission has already been accepted by Jotform, so the answer degrades to
+     * the plain success message and the reason goes to the debug log.
+     *
+     * @return array{url:string, delay:int}|null
+     */
+    private function redirect(Integration $integration): ?array
+    {
+        $target = $this->redirects->check($integration);
+
+        if (RedirectTarget::isBroken($target)) {
+            $this->note('The configured redirect target could not be used.', [
+                'integration' => $integration->slug(),
+                'state'       => $target['state'],
+                'page_id'     => $integration->redirectPageId(),
+            ]);
+
+            return null;
+        }
+
+        return $target['state'] === RedirectTarget::STATE_OK
+            ? ['url' => $target['url'], 'delay' => $target['delay']]
+            : null;
     }
 
     /**
@@ -245,6 +282,19 @@ final class SubmissionPipeline
     {
         if ($this->logger !== null) {
             $this->logger->error($message, $context);
+        }
+    }
+
+    /**
+     * Notes something the site owner should know about, but which did not stop
+     * the submission.
+     *
+     * @param array<string, scalar|null> $context
+     */
+    private function note(string $message, array $context): void
+    {
+        if ($this->logger !== null) {
+            $this->logger->debug($message, $context);
         }
     }
 }

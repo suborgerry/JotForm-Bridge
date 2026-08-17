@@ -32,6 +32,7 @@ theme: templates address fields by readable identifiers such as `email` or
   * [A complete example](#a-complete-example)
   * [Extra template directories](#extra-template-directories)
 * [Rendering a form](#rendering-a-form)
+* [Success redirect](#success-redirect)
 * [Compatibility validation](#compatibility-validation)
 * [Refresh Forms, Refresh Schema, Rescan Templates](#refresh-forms-refresh-schema-rescan-templates)
 * [The REST endpoint](#the-rest-endpoint)
@@ -141,6 +142,9 @@ slug  →  Jotform form  →  rendering mode  →  optional template
 | Jotform Form | Which form submissions go to |
 | Rendering Mode | `Custom template` or `Auto` |
 | Template | Which registered template renders it (custom mode) |
+| Success Action | `Show the success message` or `Redirect to a page` |
+| Redirect Page | Which published page the visitor is sent to (redirect action) |
+| Redirect Delay | Seconds to wait before leaving, `0`–`60` |
 | Active | Inactive integrations render nothing and refuse submissions |
 
 Several integrations may point at the same Jotform form. That is the point:
@@ -378,6 +382,65 @@ JavaScript.
 
 ---
 
+## Success redirect
+
+Each integration decides for itself what happens after a submission is accepted:
+show the success message and stay on the page, or send the visitor to a page of
+this site. Two integrations bound to the same Jotform form can redirect to two
+different pages, and the setting is identical for custom templates and automatic
+rendering — a template knows nothing about it.
+
+On the Integration screen:
+
+| Field | Meaning |
+| --- | --- |
+| Success Action | `Show the success message` (default) or `Redirect to a page` |
+| Redirect Page | Chosen from the site's published pages — a free URL is not accepted |
+| Redirect Delay | `0`–`60` seconds, so the success message can be read first |
+
+**Only the page ID is stored.** The URL is resolved when the submission is
+answered, which means a changed permalink takes effect immediately and no stale
+or forged URL can be served. The endpoint accepts no redirect input of any kind:
+anything redirect-shaped in a request body is an unknown field and fails
+validation.
+
+If the chosen page is deleted, trashed, unpublished, or resolves off-site, the
+submission still succeeds — the answer simply carries no redirect and the form
+shows its success message instead. The Integrations list and the Integration
+screen both report this as **Redirect target status**, next to Schema status and
+Template compatibility, and the reason is written to the debug log when logging
+is on.
+
+A success answer with a redirect looks like this:
+
+```json
+{
+    "success": true,
+    "message": "Form submitted successfully.",
+    "redirect": { "url": "https://example.com/thanks/", "delay": 0 }
+}
+```
+
+The `redirect` key is absent whenever no redirect is configured or the target is
+not usable, and it never appears on a validation failure or an upstream error.
+
+The frontend script sets the success state, writes the message, dispatches
+`jotformbridge:success`, and only then navigates — with
+`window.location.assign()`, after the configured delay, keeping the form
+disabled the whole time so a second submission is impossible. A theme that wants
+its own flow cancels the navigation:
+
+```js
+document.addEventListener('jotformbridge:success', function (event) {
+    if (event.detail.redirect) {
+        event.preventDefault();               // no navigation happens
+        showThanksModal(event.detail.redirect.url);
+    }
+});
+```
+
+---
+
 ## Compatibility validation
 
 Every integration is checked against the cached schema and the cached template
@@ -425,7 +488,7 @@ Answers:
 
 | Status | Body |
 | --- | --- |
-| `200` | `{"success": true, "message": "…"}` |
+| `200` | `{"success": true, "message": "…"}`, plus `"redirect": {"url": "…", "delay": 0}` when the integration redirects |
 | `422` | `{"success": false, "message": "Validation failed.", "errors": {"<field>": "…"}}` |
 | `403` | Integration inactive, or the spam check rejected the submission |
 | `404` | No such integration |
@@ -444,7 +507,9 @@ trusts nothing in the request except the values themselves —
   Jotform reports, emails must be valid, lengths are bounded;
 * the payload as a whole is bounded (fields, values, bytes, nesting);
 * required means required, whatever the markup claimed;
-* the mapping to Jotform parameters is driven by the schema, not by the request.
+* the mapping to Jotform parameters is driven by the schema, not by the request;
+* the redirect target, if any, comes from the integration and is resolved
+  server-side — the request cannot supply, change or suppress one.
 
 Failures never carry upstream detail. What Jotform said is logged (when debug
 logging is on) and the visitor gets a generic message.
@@ -461,18 +526,24 @@ All three bubble from the `<form>` element and carry a `detail` object.
 | Event | `detail` |
 | --- | --- |
 | `jotformbridge:before-submit` | `{ integration, fields }` — cancelable with `preventDefault()` |
-| `jotformbridge:success` | `{ integration, message }` |
+| `jotformbridge:success` | `{ integration, message, redirect }` — `preventDefault()` cancels the redirect |
 | `jotformbridge:error` | `{ integration, message, errors, status }` |
+
+`redirect` is `null` unless the integration is configured to redirect and its
+target resolved; otherwise it is `{ url, delay }`, with `delay` in seconds.
 
 ```js
 document.addEventListener('jotformbridge:success', function (event) {
-    window.location.href = '/thanks/';
+    // Take over the flow: nothing navigates after this.
+    event.preventDefault();
+    showThanksModal(event.detail.message);
 });
 ```
 
-The plugin imposes no popup, no redirect and no animation: it toggles state
-attributes, writes messages into the slots your template provides, and dispatches
-these events.
+The plugin imposes no popup and no animation: it toggles state attributes,
+writes messages into the slots your template provides, dispatches these events,
+and performs the redirect the integration asks for — which the event above can
+always cancel. See [Success redirect](#success-redirect).
 
 ---
 
@@ -634,11 +705,10 @@ deleted* on the settings screen before deleting.
   values from the same IP, not idempotency keys, and two genuinely simultaneous
   requests can still both go through.
 * **One site, one Jotform account.** There is no per-integration API key.
-* **No built-in success redirect yet.** An integration cannot be pointed at a
-  thank-you page from the admin screen; send the visitor there yourself from the
-  `jotformbridge:success` event, as shown above. A per-integration redirect
-  target is specified in `AGENTS.md` (*Success redirect*) and scheduled as stage
-  7 in `prompts/7.md`.
+* **A redirect target is a page of this site.** It is picked from the published
+  pages, not typed as a URL, and an off-site target is refused by design. To send
+  a visitor elsewhere, cancel the redirect on `jotformbridge:success` and
+  navigate yourself.
 
 ---
 
