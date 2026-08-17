@@ -1,0 +1,37 @@
+# Composer
+/vendor/
+/jotform-bridge/vendor/
+composer.lock
+
+# Node (только dev-инструменты, в production не требуется)
+/node_modules/
+
+# Тесты и покрытие
+/.phpunit.result.cache
+/coverage/
+/tests/_output/
+
+# Секреты и локальная конфигурация
+.env
+.env.*
+!.env.example
+*.key
+secrets.json
+/.local/
+
+# Сборка релиза
+/build/
+/dist/
+*.zip
+
+# WordPress runtime (если рядом окажется локальная установка)
+wp-config.php
+/wp-content/
+/wordpress/
+
+# ОС и редакторы
+.DS_Store
+Thumbs.db
+.idea/
+.vscode/
+*.swp
