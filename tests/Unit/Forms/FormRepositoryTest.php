@@ -70,7 +70,7 @@ final class FormRepositoryTest extends TestCase
     {
         $repository = new FormRepository($this->client());
 
-        $this->assertFalse($repository->isCached());
+        $this->assertFalse($repository->isSynced());
         $this->assertSame([], $repository->all());
         $this->assertSame(0, $repository->meta()['fetched_at']);
     }
@@ -90,7 +90,7 @@ final class FormRepositoryTest extends TestCase
         $result     = $repository->refresh();
 
         $this->assertTrue($result->isSuccess());
-        $this->assertTrue($repository->isCached());
+        $this->assertTrue($repository->isSynced());
         $this->assertCount(2, $repository->all());
         $this->assertSame(2, $repository->meta()['count']);
         $this->assertSame('', $repository->meta()['error']);
@@ -153,7 +153,7 @@ final class FormRepositoryTest extends TestCase
         $repository->refresh();
         $repository->flush();
 
-        $this->assertFalse($repository->isCached());
+        $this->assertFalse($repository->isSynced());
         $this->assertSame(0, $repository->meta()['count']);
     }
 }

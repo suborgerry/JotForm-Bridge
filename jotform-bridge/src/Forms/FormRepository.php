@@ -12,17 +12,21 @@ if (!defined('ABSPATH')) {
 }
 
 /**
- * Cached access to the Jotform account form list.
+ * Durable, manually synchronized copy of the Jotform account form list.
  *
- * Jotform is contacted only on an explicit admin action; admin page views and
- * frontend requests read the transient.
+ * Like the schema, this is stored rather than cached: Jotform is contacted only
+ * by the explicit "Refresh Forms" action on the settings screen, and nothing
+ * expires on its own. An expiring list would silently break the integration
+ * editor — the form select would empty itself and saving would start failing —
+ * at a moment nobody chose.
  */
 final class FormRepository
 {
-    public const TRANSIENT  = 'jotform_bridge_forms';
+    public const OPTION      = 'jotform_bridge_forms';
     public const META_OPTION = 'jotform_bridge_forms_meta';
 
-    public const CACHE_TTL = 12 * HOUR_IN_SECONDS;
+    /** Where versions up to 0.1.0 kept the list. Only ever deleted. */
+    public const LEGACY_TRANSIENT = 'jotform_bridge_forms';
 
     private JotformClient $client;
 
@@ -40,7 +44,7 @@ final class FormRepository
     }
 
     /**
-     * @return array<int, array<string, string>> Empty when nothing is cached.
+     * @return array<int, array<string, string>> Empty when nothing is stored.
      */
     public function all(): array
     {
@@ -48,20 +52,20 @@ final class FormRepository
             return $this->memo;
         }
 
-        $cached = get_transient(self::TRANSIENT);
+        $stored = get_option(self::OPTION, false);
 
-        $this->memo = is_array($cached) ? $cached : [];
+        $this->memo = is_array($stored) ? $stored : [];
 
         return $this->memo;
     }
 
-    public function isCached(): bool
+    public function isSynced(): bool
     {
-        return is_array(get_transient(self::TRANSIENT));
+        return is_array(get_option(self::OPTION, false));
     }
 
     /**
-     * Fetches the list from Jotform and replaces the cache on success.
+     * Fetches the list from Jotform and replaces what is stored, on success.
      */
     public function refresh(): ApiResponse
     {
@@ -82,7 +86,7 @@ final class FormRepository
         $forms      = $response->data();
         $this->memo = null;
 
-        set_transient(self::TRANSIENT, $forms, self::CACHE_TTL);
+        update_option(self::OPTION, $forms, false);
 
         $this->saveMeta(
             [
@@ -99,7 +103,8 @@ final class FormRepository
     {
         $this->memo = null;
 
-        delete_transient(self::TRANSIENT);
+        delete_option(self::OPTION);
+        delete_transient(self::LEGACY_TRANSIENT);
         delete_option(self::META_OPTION);
     }
 

@@ -228,7 +228,7 @@ if (!$jfbHasKey) {
                     <p class="description">
                         <?php
                         echo esc_html__(
-                            'Off by default: deleting the plugin removes only the caches, so deactivating and reinstalling keeps your integrations. Cached data is always removed.',
+                            'Off by default: deleting the plugin removes only the derived data — synced schemas, the form list, the template registry — so deactivating and reinstalling keeps your integrations.',
                             'jotform-bridge'
                         );
                         ?>
@@ -269,7 +269,7 @@ if (!$jfbHasKey) {
             <?php
             printf(
                 /* translators: 1: number of forms, 2: human readable time difference */
-                esc_html__('%1$d forms cached, loaded %2$s ago.', 'jotform-bridge'),
+                esc_html__('%1$d forms stored, loaded %2$s ago.', 'jotform-bridge'),
                 (int) $formsMeta['count'],
                 esc_html(human_time_diff($formsMeta['fetched_at'] > 0 ? $formsMeta['fetched_at'] : time(), time()))
             );

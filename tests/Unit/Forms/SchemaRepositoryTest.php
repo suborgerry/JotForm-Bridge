@@ -91,20 +91,20 @@ final class SchemaRepositoryTest extends TestCase
         );
     }
 
-    public function testNothingIsCachedBeforeTheFirstFetch(): void
+    public function testNothingIsStoredBeforeTheFirstSync(): void
     {
         $repository = $this->repository();
 
-        $this->assertFalse($repository->isCached(self::FORM_ID));
-        $this->assertNull($repository->cached(self::FORM_ID));
-        $this->assertSame(0, $repository->meta(self::FORM_ID)['fetched_at']);
+        $this->assertFalse($repository->isSynced(self::FORM_ID));
+        $this->assertNull($repository->stored(self::FORM_ID));
+        $this->assertSame(0, $repository->meta(self::FORM_ID)['synced_at']);
     }
 
-    public function testRefreshNormalizesAndCachesTheSchema(): void
+    public function testSyncNormalizesAndStoresTheSchema(): void
     {
         $this->serveQuestions();
 
-        $result = $this->repository()->refresh(self::FORM_ID);
+        $result = $this->repository()->sync(self::FORM_ID);
 
         $this->assertTrue($result->isSuccess());
 
@@ -116,24 +116,27 @@ final class SchemaRepositoryTest extends TestCase
         $this->assertFalse($result->data()['changed'], 'The first fetch is not a change.');
     }
 
-    public function testCachedSchemaSurvivesTheTransientRoundTrip(): void
+    public function testStoredSchemaSurvivesTheOptionRoundTrip(): void
     {
         $this->serveQuestions();
 
         $repository = $this->repository();
-        $repository->refresh(self::FORM_ID);
+        $repository->sync(self::FORM_ID);
 
-        $cached = $repository->cached(self::FORM_ID);
+        $stored = $repository->stored(self::FORM_ID);
 
-        $this->assertInstanceOf(FormSchema::class, $cached);
-        $this->assertSame('4', $cached->qidFor('email'));
+        $this->assertInstanceOf(FormSchema::class, $stored);
+        $this->assertSame('4', $stored->qidFor('email'));
         $this->assertSame(
             ['first', 'last'],
-            array_keys($cached->field('full_name')['children'])
+            array_keys($stored->field('full_name')['children'])
         );
     }
 
-    public function testGetUsesTheCacheInsteadOfCallingJotformAgain(): void
+    /**
+     * The whole point of the storage rule: reading never becomes a request.
+     */
+    public function testGetNeverContactsJotform(): void
     {
         $this->serveQuestions();
 
@@ -141,29 +144,80 @@ final class SchemaRepositoryTest extends TestCase
 
         $repository->get(self::FORM_ID);
         $repository->get(self::FORM_ID);
-        $repository->get(self::FORM_ID);
 
-        $this->assertSame(1, $this->httpCalls);
+        $this->assertSame(0, $this->httpCalls);
     }
 
-    public function testForceRefreshAlwaysCallsJotform(): void
+    public function testGetFailsWithADistinctCodeUntilTheFormIsSynced(): void
+    {
+        $this->serveQuestions();
+
+        $repository = $this->repository();
+        $result     = $repository->get(self::FORM_ID);
+
+        $this->assertFalse($result->isSuccess());
+        $this->assertSame(SchemaRepository::ERROR_NOT_SYNCED, $result->errorCode());
+
+        $repository->sync(self::FORM_ID);
+
+        $this->assertTrue($repository->get(self::FORM_ID)->isSuccess());
+        $this->assertSame(1, $this->httpCalls, 'Only the explicit sync may fetch.');
+    }
+
+    public function testEverySyncCallsJotform(): void
     {
         $this->serveQuestions();
 
         $repository = $this->repository();
 
-        $repository->get(self::FORM_ID);
-        $repository->refresh(self::FORM_ID);
+        $repository->sync(self::FORM_ID);
+        $repository->sync(self::FORM_ID);
 
         $this->assertSame(2, $this->httpCalls);
     }
 
-    public function testRefreshReportsAChangedFingerprint(): void
+    public function testStoredSchemaIsWrittenWithoutAnExpiry(): void
+    {
+        $this->serveQuestions();
+
+        $this->repository()->sync(self::FORM_ID);
+
+        $this->assertArrayHasKey(SchemaRepository::optionKey(self::FORM_ID), $this->options);
+        $this->assertSame([], $this->transients, 'A synced schema must not live in a transient.');
+    }
+
+    public function testTheSyncingPluginVersionIsRecorded(): void
     {
         $this->serveQuestions();
 
         $repository = $this->repository();
-        $repository->refresh(self::FORM_ID);
+        $repository->sync(self::FORM_ID);
+
+        $this->assertSame(JOTFORM_BRIDGE_VERSION, $repository->meta(self::FORM_ID)['version']);
+        $this->assertFalse($repository->isStale(self::FORM_ID));
+    }
+
+    public function testASchemaSyncedByAnotherVersionIsReportedAsStale(): void
+    {
+        $this->serveQuestions();
+
+        $repository = $this->repository();
+        $repository->sync(self::FORM_ID);
+
+        $meta = $this->options[SchemaRepository::META_OPTION];
+        $meta[self::FORM_ID]['version'] = '0.0.1';
+        $this->options[SchemaRepository::META_OPTION] = $meta;
+
+        $this->assertTrue($repository->isStale(self::FORM_ID));
+        $this->assertTrue($repository->isSynced(self::FORM_ID), 'A stale schema is still used.');
+    }
+
+    public function testSyncReportsAChangedFingerprint(): void
+    {
+        $this->serveQuestions();
+
+        $repository = $this->repository();
+        $repository->sync(self::FORM_ID);
 
         $before = $repository->meta(self::FORM_ID)['fingerprint'];
 
@@ -171,7 +225,7 @@ final class SchemaRepositoryTest extends TestCase
         $modified['content']['7']['required'] = 'Yes';
         $this->serveQuestions($modified);
 
-        $result = $repository->refresh(self::FORM_ID);
+        $result = $repository->sync(self::FORM_ID);
 
         $this->assertTrue($result->data()['changed']);
         $this->assertNotSame($before, $repository->meta(self::FORM_ID)['fingerprint']);
@@ -182,25 +236,25 @@ final class SchemaRepositoryTest extends TestCase
         $this->serveQuestions();
 
         $repository = $this->repository();
-        $repository->refresh(self::FORM_ID);
-        $result = $repository->refresh(self::FORM_ID);
+        $repository->sync(self::FORM_ID);
+        $result = $repository->sync(self::FORM_ID);
 
         $this->assertFalse($result->data()['changed']);
     }
 
-    public function testFailedRefreshKeepsTheCacheAndRecordsTheError(): void
+    public function testFailedSyncKeepsTheStoredSchemaAndRecordsTheError(): void
     {
         $this->serveQuestions();
 
         $repository = $this->repository();
-        $repository->refresh(self::FORM_ID);
+        $repository->sync(self::FORM_ID);
 
         Functions\when('wp_remote_get')->justReturn(new WP_Error('http_request_failed', 'timeout'));
 
-        $result = $repository->refresh(self::FORM_ID);
+        $result = $repository->sync(self::FORM_ID);
 
         $this->assertFalse($result->isSuccess());
-        $this->assertTrue($repository->isCached(self::FORM_ID), 'A failed refresh must not drop the cache.');
+        $this->assertTrue($repository->isSynced(self::FORM_ID), 'A failed sync must not drop the stored schema.');
         $this->assertNotSame('', $repository->meta(self::FORM_ID)['error']);
     }
 
@@ -209,35 +263,35 @@ final class SchemaRepositoryTest extends TestCase
         $this->serveQuestions();
 
         $repository = $this->repository();
-        $repository->refresh(self::FORM_ID);
-        $repository->refresh('240000000000002');
+        $repository->sync(self::FORM_ID);
+        $repository->sync('240000000000002');
 
         $repository->forget(self::FORM_ID);
 
-        $this->assertFalse($repository->isCached(self::FORM_ID));
-        $this->assertTrue($repository->isCached('240000000000002'));
+        $this->assertFalse($repository->isSynced(self::FORM_ID));
+        $this->assertTrue($repository->isSynced('240000000000002'));
     }
 
-    public function testFlushAllClearsEveryCachedSchema(): void
+    public function testFlushAllClearsEveryStoredSchema(): void
     {
         $this->serveQuestions();
 
         $repository = $this->repository();
-        $repository->refresh(self::FORM_ID);
-        $repository->refresh('240000000000002');
+        $repository->sync(self::FORM_ID);
+        $repository->sync('240000000000002');
 
         SchemaRepository::flushAll();
 
-        $this->assertFalse($repository->isCached(self::FORM_ID));
-        $this->assertFalse($repository->isCached('240000000000002'));
-        $this->assertSame(0, $repository->meta(self::FORM_ID)['fetched_at']);
+        $this->assertFalse($repository->isSynced(self::FORM_ID));
+        $this->assertFalse($repository->isSynced('240000000000002'));
+        $this->assertSame(0, $repository->meta(self::FORM_ID)['synced_at']);
     }
 
     public function testANonNumericFormIdIsRejectedWithoutAnyRequest(): void
     {
         $this->serveQuestions();
 
-        $result = $this->repository()->refresh('../../evil');
+        $result = $this->repository()->sync('../../evil');
 
         $this->assertFalse($result->isSuccess());
         $this->assertSame(0, $this->httpCalls);
@@ -251,16 +305,16 @@ final class SchemaRepositoryTest extends TestCase
             ->once()
             ->with(\Mockery::type(FormSchema::class), self::FORM_ID);
 
-        $result = $this->repository()->refresh(self::FORM_ID);
+        $result = $this->repository()->sync(self::FORM_ID);
 
         $this->assertTrue($result->isSuccess());
     }
 
-    public function testTheTransientKeyIsNamespacedPerForm(): void
+    public function testTheOptionKeyIsNamespacedPerForm(): void
     {
         $this->assertSame(
             'jotform_bridge_schema_' . self::FORM_ID,
-            SchemaRepository::transientKey(self::FORM_ID)
+            SchemaRepository::optionKey(self::FORM_ID)
         );
     }
 }

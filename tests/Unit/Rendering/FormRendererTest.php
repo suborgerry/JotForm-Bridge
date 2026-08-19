@@ -214,6 +214,41 @@ final class FormRendererTest extends TestCase
         $this->assertStringContainsString('missing', $html);
     }
 
+    /**
+     * The rule that keeps a Jotform outage off the critical path of a page
+     * view: rendering reads what was synced and never fetches.
+     */
+    public function testAnUnsyncedSchemaRendersNothingAndFetchesNothing(): void
+    {
+        unset($this->options[SchemaRepository::optionKey(self::FORM_ID)]);
+
+        Functions\when('wp_remote_get')->alias(
+            static function (): void {
+                throw new \RuntimeException('Rendering must never contact Jotform.');
+            }
+        );
+
+        $this->storeIntegration(true, 'contact');
+
+        $this->assertSame('', $this->renderer()->render('contact'));
+    }
+
+    public function testAnAdministratorIsToldToSyncTheSchema(): void
+    {
+        unset($this->options[SchemaRepository::optionKey(self::FORM_ID)]);
+
+        Functions\when('current_user_can')->justReturn(true);
+        Functions\when('wp_remote_get')->alias(
+            static function (): void {
+                throw new \RuntimeException('Rendering must never contact Jotform.');
+            }
+        );
+
+        $this->storeIntegration(true, 'contact');
+
+        $this->assertStringContainsString('Sync Schema', $this->renderer()->render('contact'));
+    }
+
     public function testATemplateThatThrowsDoesNotBreakThePage(): void
     {
         $this->writeTemplate('contact', '<?php throw new \RuntimeException("template blew up"); ?>');
@@ -260,7 +295,7 @@ final class FormRendererTest extends TestCase
             array_values($this->fixture('form-questions')['content'])
         );
 
-        $this->transients[SchemaRepository::transientKey(self::FORM_ID)] = $schema->toArray();
+        $this->options[SchemaRepository::optionKey(self::FORM_ID)] = $schema->toArray();
     }
 
     private function writeTemplate(string $slug, string $body): void

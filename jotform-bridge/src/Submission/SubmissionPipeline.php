@@ -102,8 +102,11 @@ final class SubmissionPipeline
 
         $response = $this->schemas->get($integration->formId());
 
+        // Never a network call: the schema either was synced by an administrator
+        // or it was not, and a visitor's submission is not the moment to find
+        // out what Jotform currently thinks the form looks like.
         if (!$response->isSuccess()) {
-            $this->log('Submission blocked: the form schema could not be loaded.', [
+            $this->log('Submission blocked: no synced schema for this form.', [
                 'integration' => $slug,
                 'error'       => $response->errorCode(),
             ]);

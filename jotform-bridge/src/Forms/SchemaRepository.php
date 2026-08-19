@@ -12,18 +12,40 @@ if (!defined('ABSPATH')) {
 }
 
 /**
- * Cached access to the Normalized Schema of a Jotform form.
+ * Durable, manually synchronized storage of the Normalized Schema.
  *
- * One transient per form ID, plus a small option holding the per-form metadata
- * (last fetch, fingerprint, last error) that must outlive the cache. No custom
- * database table.
+ * The schema is not a cache. Nothing here expires, nothing here refetches: one
+ * option per form ID, written only by sync(), which runs only when an
+ * administrator presses "Sync Schema" for that integration. A page view, a
+ * submission and a compatibility check all read what is stored and never reach
+ * out to Jotform — so a Jotform outage, a slow API or an expired cache entry
+ * cannot influence a request a visitor is waiting on.
+ *
+ * The price is explicit and deliberate: a form changed in Jotform stays
+ * unchanged here until somebody syncs it. That is the point — the site owner
+ * decides when the contract between the theme and Jotform moves.
+ *
+ * A small option holds the per-form metadata (last sync, fingerprint, last
+ * error, plugin version at sync time) that has to outlive the schema itself.
+ * No custom database table.
  */
 final class SchemaRepository
 {
-    public const TRANSIENT_PREFIX = 'jotform_bridge_schema_';
-    public const META_OPTION      = 'jotform_bridge_schema_meta';
+    public const OPTION_PREFIX = 'jotform_bridge_schema_';
+    public const META_OPTION   = 'jotform_bridge_schema_meta';
 
-    public const CACHE_TTL = 12 * HOUR_IN_SECONDS;
+    /**
+     * Where versions up to 0.1.0 kept the schema. Only ever deleted, never read:
+     * a schema that lived in a transient was written by a different storage
+     * contract, and re-syncing it by hand is one click.
+     */
+    public const LEGACY_TRANSIENT_PREFIX = 'jotform_bridge_schema_';
+
+    /**
+     * Returned when a form has never been synced. Distinct from an API error:
+     * nothing failed, the administrator simply has not synced yet.
+     */
+    public const ERROR_NOT_SYNCED = 'schema_not_synced';
 
     private JotformClient $client;
 
@@ -36,9 +58,9 @@ final class SchemaRepository
     }
 
     /**
-     * Returns the cached schema, or null when nothing is cached.
+     * Returns the stored schema, or null when the form was never synced.
      */
-    public function cached(string $formId): ?FormSchema
+    public function stored(string $formId): ?FormSchema
     {
         $formId = self::normalizeFormId($formId);
 
@@ -46,7 +68,7 @@ final class SchemaRepository
             return null;
         }
 
-        $stored = get_transient(self::transientKey($formId));
+        $stored = get_option(self::optionKey($formId), false);
 
         if (!is_array($stored) || !isset($stored['fields'])) {
             return null;
@@ -55,35 +77,43 @@ final class SchemaRepository
         return FormSchema::fromArray($stored);
     }
 
-    public function isCached(string $formId): bool
+    public function isSynced(string $formId): bool
     {
-        return $this->cached($formId) !== null;
+        return $this->stored($formId) !== null;
     }
 
     /**
-     * The normal read path: cache first, one API call when the cache is cold.
+     * The read path used by rendering and by submissions.
      *
-     * Rendering a page must never trigger a refresh of an already cached
-     * schema — that is what refresh() is for.
+     * Never contacts Jotform: what is stored is the answer, and "nothing is
+     * stored" is a failure the caller has to handle rather than something this
+     * class silently fixes behind the request.
      */
     public function get(string $formId): ApiResponse
     {
-        $cached = $this->cached($formId);
+        $stored = $this->stored($formId);
 
-        if ($cached !== null) {
-            return ApiResponse::success(['schema' => $cached]);
+        if ($stored !== null) {
+            return ApiResponse::success(['schema' => $stored]);
         }
 
-        return $this->refresh($formId);
+        return ApiResponse::failure(
+            self::ERROR_NOT_SYNCED,
+            __('This form has not been synced yet. Open the integration and press Sync Schema.', 'jotform-bridge')
+        );
     }
 
     /**
-     * Fetches the questions from Jotform, normalizes them and replaces the
-     * cache. On failure the previous cache is left untouched.
+     * The write path: fetches the questions from Jotform, normalizes them and
+     * replaces what is stored. Called only from the explicit admin action.
+     *
+     * On failure the previously stored schema is left untouched, so a failed
+     * sync degrades to "still running on the previous definition" rather than
+     * to a form that stops working.
      *
      * @return ApiResponse Data is `['schema' => FormSchema, 'changed' => bool]`.
      */
-    public function refresh(string $formId): ApiResponse
+    public function sync(string $formId): ApiResponse
     {
         $formId = self::normalizeFormId($formId);
 
@@ -101,8 +131,9 @@ final class SchemaRepository
             $this->saveMeta(
                 $formId,
                 [
-                    'fetched_at'  => $meta['fetched_at'],
+                    'synced_at'   => $meta['synced_at'],
                     'fingerprint' => $meta['fingerprint'],
+                    'version'     => $meta['version'],
                     'error'       => $response->errorMessage(),
                 ]
             );
@@ -113,7 +144,7 @@ final class SchemaRepository
         $schema = $this->builder->build($formId, $response->data());
 
         /**
-         * Filters the normalized schema before it is cached.
+         * Filters the normalized schema before it is stored.
          *
          * @param FormSchema $schema The normalized schema.
          * @param string     $formId Jotform form ID.
@@ -126,13 +157,14 @@ final class SchemaRepository
 
         $previous = $this->meta($formId)['fingerprint'];
 
-        set_transient(self::transientKey($formId), $schema->toArray(), self::CACHE_TTL);
+        update_option(self::optionKey($formId), $schema->toArray(), false);
 
         $this->saveMeta(
             $formId,
             [
-                'fetched_at'  => time(),
+                'synced_at'   => time(),
                 'fingerprint' => $schema->fingerprint(),
+                'version'     => JOTFORM_BRIDGE_VERSION,
                 'error'       => '',
             ]
         );
@@ -147,22 +179,27 @@ final class SchemaRepository
     }
 
     /**
-     * Drops the cached schema of one form. Metadata is kept so the previous
-     * fingerprint can still be compared after the next refresh.
+     * Drops the stored schema of one form. Metadata is kept so the previous
+     * fingerprint can still be compared after the next sync.
      */
     public function forget(string $formId): void
     {
         $formId = self::normalizeFormId($formId);
 
         if ($formId !== '') {
-            delete_transient(self::transientKey($formId));
+            delete_option(self::optionKey($formId));
+            delete_transient(self::LEGACY_TRANSIENT_PREFIX . $formId);
         }
     }
 
     /**
-     * Drops every cached schema and all metadata.
+     * Drops every stored schema and all metadata.
      *
-     * Static because plugin deactivation has no built services to work with.
+     * Nothing in the plugin lifecycle calls this any more — a schema is
+     * configuration-grade state now, and losing it means every form on the site
+     * needs a manual sync. It exists for uninstall and for tests.
+     *
+     * Static because uninstall has no built services to work with.
      */
     public static function flushAll(): void
     {
@@ -170,7 +207,8 @@ final class SchemaRepository
 
         if (is_array($meta)) {
             foreach (array_keys($meta) as $formId) {
-                delete_transient(self::transientKey((string) $formId));
+                delete_option(self::optionKey((string) $formId));
+                delete_transient(self::LEGACY_TRANSIENT_PREFIX . (string) $formId);
             }
         }
 
@@ -178,7 +216,26 @@ final class SchemaRepository
     }
 
     /**
-     * @return array{fetched_at:int, fingerprint:string, error:string}
+     * Removes the transients versions up to 0.1.0 kept the schemas in.
+     *
+     * Only the legacy copies go: what an administrator synced under the current
+     * storage rule is untouched.
+     */
+    public static function purgeLegacyTransients(): void
+    {
+        $meta = get_option(self::META_OPTION, []);
+
+        if (!is_array($meta)) {
+            return;
+        }
+
+        foreach (array_keys($meta) as $formId) {
+            delete_transient(self::LEGACY_TRANSIENT_PREFIX . (string) $formId);
+        }
+    }
+
+    /**
+     * @return array{synced_at:int, fingerprint:string, version:string, error:string}
      */
     public function meta(string $formId): array
     {
@@ -187,20 +244,35 @@ final class SchemaRepository
         $meta   = isset($all[$formId]) && is_array($all[$formId]) ? $all[$formId] : [];
 
         return [
-            'fetched_at'  => isset($meta['fetched_at']) ? (int) $meta['fetched_at'] : 0,
+            'synced_at'   => isset($meta['synced_at']) ? (int) $meta['synced_at'] : 0,
             'fingerprint' => isset($meta['fingerprint']) ? (string) $meta['fingerprint'] : '',
+            'version'     => isset($meta['version']) ? (string) $meta['version'] : '',
             'error'       => isset($meta['error']) ? (string) $meta['error'] : '',
         ];
     }
 
-    public static function transientKey(string $formId): string
+    /**
+     * Whether the stored schema was written by an older plugin version.
+     *
+     * Not acted upon automatically: normalization can change between versions,
+     * so the administrator is told to re-sync instead of having the schema
+     * discarded under a running site.
+     */
+    public function isStale(string $formId): bool
     {
-        return self::TRANSIENT_PREFIX . self::normalizeFormId($formId);
+        $meta = $this->meta($formId);
+
+        return $meta['synced_at'] > 0 && $meta['version'] !== JOTFORM_BRIDGE_VERSION;
+    }
+
+    public static function optionKey(string $formId): string
+    {
+        return self::OPTION_PREFIX . self::normalizeFormId($formId);
     }
 
     /**
      * Jotform form IDs are numeric strings; anything else is rejected rather
-     * than sanitized into a different form's cache key.
+     * than sanitized into a different form's storage key.
      */
     private static function normalizeFormId(string $formId): string
     {
@@ -220,12 +292,12 @@ final class SchemaRepository
     }
 
     /**
-     * @param array{fetched_at:int, fingerprint:string, error:string} $meta
+     * @param array{synced_at:int, fingerprint:string, version:string, error:string} $meta
      */
     private function saveMeta(string $formId, array $meta): void
     {
-        $all           = $this->allMeta();
-        $all[$formId]  = $meta;
+        $all          = $this->allMeta();
+        $all[$formId] = $meta;
 
         update_option(self::META_OPTION, $all, false);
     }

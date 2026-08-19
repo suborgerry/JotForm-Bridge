@@ -19,9 +19,10 @@ if (!defined('ABSPATH')) {
 /**
  * "Jotform Bridge → Integrations": the list, the editor and their actions.
  *
- * The screen itself only reads cached state. Jotform is contacted from the
- * explicit Refresh Schema action, and the filesystem is scanned from the
- * explicit Rescan Templates action.
+ * The screen itself only reads stored state. Jotform is contacted from the
+ * explicit per-integration Sync Schema action and from nowhere else, and the
+ * filesystem is scanned from the explicit Rescan Templates action. Saving an
+ * integration, opening a screen or rendering a form never triggers a fetch.
  */
 final class IntegrationsPage
 {
@@ -32,7 +33,7 @@ final class IntegrationsPage
     public const ACTION_DELETE  = 'jotform_bridge_delete_integration';
     public const ACTION_TOGGLE  = 'jotform_bridge_toggle_integration';
     public const ACTION_RESCAN  = 'jotform_bridge_rescan_templates';
-    public const ACTION_REFRESH = 'jotform_bridge_refresh_schema';
+    public const ACTION_SYNC    = 'jotform_bridge_sync_schema';
 
     private const FLASH_PREFIX = 'jotform_bridge_notice_';
 
@@ -71,7 +72,7 @@ final class IntegrationsPage
         add_action('admin_post_' . self::ACTION_DELETE, [$this, 'handleDelete']);
         add_action('admin_post_' . self::ACTION_TOGGLE, [$this, 'handleToggle']);
         add_action('admin_post_' . self::ACTION_RESCAN, [$this, 'handleRescan']);
-        add_action('admin_post_' . self::ACTION_REFRESH, [$this, 'handleRefreshSchema']);
+        add_action('admin_post_' . self::ACTION_SYNC, [$this, 'handleSyncSchema']);
     }
 
     public function registerMenu(): void
@@ -131,6 +132,13 @@ final class IntegrationsPage
                 'compatibility' => $this->compatibility->check($integration),
                 'redirect'      => $this->redirects->check($integration),
                 'form_title'    => $this->formTitle($integration->formId()),
+                'schema_meta'   => $integration->formId() !== ''
+                    ? $this->schemas->meta($integration->formId())
+                    : null,
+                'schema_synced' => $integration->formId() !== ''
+                    && $this->schemas->isSynced($integration->formId()),
+                'schema_stale'  => $integration->formId() !== ''
+                    && $this->schemas->isStale($integration->formId()),
             ];
         }
 
@@ -165,8 +173,9 @@ final class IntegrationsPage
         $integration   = $integration ?? new Integration('', '', '', Integration::MODE_CUSTOM, '', true);
         $compatibility = $this->compatibility->check($integration);
         $redirect      = $this->redirects->check($integration);
-        $schema        =$integration->formId() !== '' ? $this->schemas->cached($integration->formId()) : null;
+        $schema        = $integration->formId() !== '' ? $this->schemas->stored($integration->formId()) : null;
         $schemaMeta    = $integration->formId() !== '' ? $this->schemas->meta($integration->formId()) : null;
+        $schemaStale   = $integration->formId() !== '' && $this->schemas->isStale($integration->formId());
         $forms         = $this->forms->all();
         $templates     = $this->templates->choices();
         $notice        = $flash;
@@ -206,7 +215,7 @@ final class IntegrationsPage
         }
 
         if ($integration->formId() !== '' && !$this->isKnownForm($integration->formId())) {
-            $errors[] = __('The selected Jotform form is not in the cached account form list.', 'jotform-bridge');
+            $errors[] = __('The selected Jotform form is not in the stored account form list. Refresh the form list on the settings screen.', 'jotform-bridge');
         }
 
         if ($errors === []) {
@@ -223,10 +232,16 @@ final class IntegrationsPage
             );
         }
 
-        // A newly bound form has no cached schema yet; fetching it here is what
-        // makes the compatibility report meaningful straight away.
-        if (!$this->schemas->isCached($integration->formId())) {
-            $this->schemas->refresh($integration->formId());
+        // Saving never fetches. A form nobody has synced yet is reported as
+        // exactly that, so the one action that talks to Jotform stays the one
+        // the administrator pressed on purpose.
+        $warnings = [];
+
+        if (!$this->schemas->isSynced($integration->formId())) {
+            $warnings[] = __(
+                'This form has not been synced yet. Press Sync Schema to load its definition from Jotform — the form cannot render until you do.',
+                'jotform-bridge'
+            );
         }
 
         // A broken redirect target does not stop the save — the page may be
@@ -234,11 +249,15 @@ final class IntegrationsPage
         $target = $this->redirects->check($integration);
 
         if (RedirectTarget::isBroken($target)) {
-            $this->flash('warning', __('Integration saved.', 'jotform-bridge'), [$target['message']]);
-            $this->redirect(['view' => 'edit', 'integration' => $integration->slug()]);
+            $warnings[] = (string) $target['message'];
         }
 
-        $this->flash('success', __('Integration saved.', 'jotform-bridge'));
+        $this->flash(
+            $warnings === [] ? 'success' : 'warning',
+            __('Integration saved.', 'jotform-bridge'),
+            $warnings
+        );
+
         $this->redirect(['view' => 'edit', 'integration' => $integration->slug()]);
     }
 
@@ -317,25 +336,39 @@ final class IntegrationsPage
         $this->redirect($this->returnArgs());
     }
 
-    public function handleRefreshSchema(): void
+    /**
+     * The only action in the plugin that fetches a form definition.
+     *
+     * It is per integration on purpose: syncing one form is a decision about
+     * one contract between a template and a Jotform form, and a site with ten
+     * integrations should never have nine of them move because somebody wanted
+     * the tenth updated.
+     */
+    public function handleSyncSchema(): void
     {
-        $this->guard(self::ACTION_REFRESH);
+        $this->guard(self::ACTION_SYNC);
 
         // phpcs:ignore WordPress.Security.NonceVerification.Missing -- verified in guard().
         $slug        = isset($_POST['integration']) ? sanitize_key((string) wp_unslash($_POST['integration'])) : '';
         $integration = $this->integrations->get($slug);
+        $return      = $this->returnArgs();
 
         if ($integration === null) {
             $this->flash('error', __('That integration does not exist.', 'jotform-bridge'));
             $this->redirect([]);
         }
 
+        if ($integration->formId() === '') {
+            $this->flash('error', __('This integration has no Jotform form selected.', 'jotform-bridge'));
+            $this->redirect($return);
+        }
+
         $before   = $this->schemas->meta($integration->formId())['fingerprint'];
-        $response = $this->schemas->refresh($integration->formId());
+        $response = $this->schemas->sync($integration->formId());
 
         if (!$response->isSuccess()) {
             $this->flash('error', $response->errorMessage());
-            $this->redirect(['view' => 'edit', 'integration' => $integration->slug()]);
+            $this->redirect($return);
         }
 
         $after   = $this->schemas->meta($integration->formId())['fingerprint'];
@@ -346,12 +379,12 @@ final class IntegrationsPage
         $this->flash(
             $report['report'] !== null && !$report['report']->isValid() ? 'warning' : 'success',
             $changed
-                ? __('The Jotform form has changed since the last refresh. Compatibility was re-checked.', 'jotform-bridge')
-                : __('Schema refreshed. The Jotform form has not changed.', 'jotform-bridge'),
+                ? __('The Jotform form has changed since the last sync. Compatibility was re-checked.', 'jotform-bridge')
+                : __('Schema synced. The Jotform form has not changed.', 'jotform-bridge'),
             $report['report'] !== null ? $report['report']->messages() : []
         );
 
-        $this->redirect(['view' => 'edit', 'integration' => $integration->slug()]);
+        $this->redirect($return);
     }
 
     /**
@@ -367,7 +400,10 @@ final class IntegrationsPage
     }
 
     /**
-     * Where a Rescan issued from the editor should return to.
+     * Where an action issued from the editor should return to.
+     *
+     * A form that posts `return_view` decides; anything else lands on the list,
+     * which is where the per-row buttons live.
      *
      * @return array<string, string>
      */

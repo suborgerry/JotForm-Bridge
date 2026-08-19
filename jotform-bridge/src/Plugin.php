@@ -267,15 +267,18 @@ final class Plugin
     }
 
     /**
-     * Drops everything derived from Jotform or from the filesystem.
+     * Drops the derived state that is cheap to rebuild.
+     *
+     * Synced schemas are deliberately not part of this. They are written only by
+     * an explicit per-integration Sync and nothing rebuilds them on its own, so
+     * dropping them here would take every form on the site down until somebody
+     * noticed and clicked through each integration by hand.
      *
      * Static because deactivation and activation have no built services to work
      * with. Configuration — settings, integrations — is never touched here.
      */
     public static function flushCaches(): void
     {
-        delete_transient(FormRepository::TRANSIENT);
-        SchemaRepository::flushAll();
         self::flushTemplateRegistry();
     }
 
@@ -290,10 +293,13 @@ final class Plugin
     /**
      * Discards derived state after an upgrade.
      *
-     * A new version may normalize schemas differently or store a registry entry
-     * differently, and a cache written by the previous version is not worth
-     * trusting. The one thing rewritten here is the settings option: a key
-     * stored by a version that still accepted one has to leave the database.
+     * A new version may store a registry entry differently, and a scan written
+     * by the previous version is not worth trusting. Synced schemas survive: a
+     * new version may normalize them differently, but that is reported as
+     * "synced by an older version — re-sync recommended" on the integration
+     * screen rather than acted on behind the site owner's back. The one thing
+     * rewritten here is the settings option: a key stored by a version that
+     * still accepted one has to leave the database.
      */
     private static function maybeUpgrade(): void
     {
@@ -305,6 +311,10 @@ final class Plugin
 
         self::flushCaches();
         Settings::purgeStoredKey();
+
+        // Storage the plugin no longer uses, left behind by an older version.
+        SchemaRepository::purgeLegacyTransients();
+        delete_transient(FormRepository::LEGACY_TRANSIENT);
 
         update_option(self::VERSION_OPTION, JOTFORM_BRIDGE_VERSION, false);
     }

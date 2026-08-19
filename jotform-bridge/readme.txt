@@ -38,8 +38,12 @@ Two rendering modes are available:
   integration can go live before anybody has written a template.
 
 Both modes post to the same plugin REST endpoint, and both are validated
-server-side against the cached Jotform form definition before anything is
+server-side against the synced Jotform form definition before anything is
 forwarded.
+
+The form definition is synchronized manually, per integration, with the **Sync
+Schema** button. Nothing expires and nothing is fetched in the background, so no
+page view ever waits on the Jotform API.
 
 = After a submission =
 
@@ -119,7 +123,8 @@ header — they are never executed during discovery.
 
 = Does uninstalling delete my integrations? =
 
-No. Deleting the plugin removes only the caches. If you want a full removal,
+No. Deleting the plugin removes only the derived data — synced schemas, the
+account form list and the template registry. If you want a full removal,
 tick **Delete the integrations and the settings when the plugin is deleted** on
 the settings screen first. The API key is not stored by the plugin at all, so
 removing it means editing `wp-config.php`.

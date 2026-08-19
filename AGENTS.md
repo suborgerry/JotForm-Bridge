@@ -1891,3 +1891,40 @@ Implementation complete
 18. MCP используется для реальной verification, когда это возможно.
 19. Redirect target приходит из Integration, резолвится backend и обязан быть
     внутренним URL; frontend никогда не диктует, куда выполняется redirect.
+20. Schema синхронизируется только вручную, кнопкой Sync Schema и только для
+    одной integration за раз. Никакого TTL, никакого cron, никакого fetch на
+    frontend path: rendering и submission читают сохранённую schema или
+    отказывают. См. «Amendment: manual schema synchronization».
+
+
+---
+
+# Amendment: manual schema synchronization
+
+Уточнение к разделам «Refresh Schema» и «Rendering», принятое после stage 7.
+
+Normalized Schema больше не cache, а сохранённое состояние:
+
+* хранится в option `jotform_bridge_schema_{formId}` (`autoload = false`), не в
+  transient, и не имеет TTL;
+* пишется единственным действием — **Sync Schema**, отдельной кнопкой для каждой
+  integration (в списке и в редакторе);
+* не пишется ничем другим: ни save integration, ни activation, ни upgrade, ни
+  page view, ни submission;
+* deactivation и upgrade её не удаляют — удаляет только uninstall. Upgrade
+  помечает schema как synced более старой версией плагина и показывает это в
+  админке, но не трогает данные.
+
+Следствия, которые обязаны сохраняться:
+
+1. `SchemaRepository::get()` никогда не делает HTTP-запрос. Если schema не
+   синхронизирована — это failure с кодом `schema_not_synced`.
+2. Rendering формы без синхронизированной schema не рендерит ничего (админу
+   показывается причина), а не пытается загрузить schema.
+3. Submission без синхронизированной schema отвечает 503 и не обращается к
+   Jotform.
+4. Account form list подчиняется тому же правилу: option без TTL, обновляется
+   только кнопкой **Refresh Forms**.
+
+Цена решения принята сознательно: форма, изменённая в Jotform, продолжает
+работать по прежнему определению, пока владелец сайта не нажмёт Sync Schema.

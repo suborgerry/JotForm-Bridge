@@ -82,7 +82,10 @@ final class FormRenderer
         if ($schema === null) {
             return $this->diagnostic(
                 $slug,
-                __('The Jotform schema for this integration could not be loaded.', 'jotform-bridge')
+                __(
+                    'The Jotform schema for this integration is not available. Open the integration and press Sync Schema.',
+                    'jotform-bridge'
+                )
             );
         }
 
@@ -153,29 +156,27 @@ final class FormRenderer
     }
 
     /**
-     * Cache-first schema access: a page view only reaches Jotform when nothing
-     * is cached yet, never to refresh an existing cache.
+     * Storage-only schema access.
+     *
+     * Rendering a page never contacts Jotform — not to refresh a schema, and
+     * not to fetch a missing one. A form whose schema was never synced does not
+     * render at all, which is a visible, one-click-fixable state; a page that
+     * hangs on an unreachable API while a visitor waits is not.
      */
     private function schema(Integration $integration): ?FormSchema
     {
-        $cached = $this->schemas->cached($integration->formId());
+        $stored = $this->schemas->stored($integration->formId());
 
-        if ($cached === null) {
-            $response = $this->schemas->get($integration->formId());
+        if ($stored === null) {
+            $this->log('The schema needed for rendering has not been synced.', [
+                'integration' => $integration->slug(),
+                'form_id'     => $integration->formId(),
+            ]);
 
-            if (!$response->isSuccess()) {
-                $this->log('The schema needed for rendering could not be loaded.', [
-                    'integration' => $integration->slug(),
-                    'error'       => $response->errorCode(),
-                ]);
-
-                return null;
-            }
-
-            $cached = $response->data()['schema'];
+            return null;
         }
 
-        return $cached->isUsable() ? $cached : null;
+        return $stored->isUsable() ? $stored : null;
     }
 
     /**

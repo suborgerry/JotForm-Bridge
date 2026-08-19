@@ -218,7 +218,7 @@ final class CompatibilityCheckerTest extends TestCase
             ]
         );
 
-        $this->transients[SchemaRepository::transientKey(self::FORM_ID)] = $schema->toArray();
+        $this->options[SchemaRepository::optionKey(self::FORM_ID)] = $schema->toArray();
     }
 
     private function cacheSchemaWithUnsupportedField(): void
@@ -245,7 +245,7 @@ final class CompatibilityCheckerTest extends TestCase
             ]
         );
 
-        $this->transients[SchemaRepository::transientKey(self::FORM_ID)] = $schema->toArray();
+        $this->options[SchemaRepository::optionKey(self::FORM_ID)] = $schema->toArray();
     }
 
     private function writeTemplate(string $slug, string $body): void

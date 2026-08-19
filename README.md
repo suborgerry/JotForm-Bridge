@@ -34,12 +34,12 @@ theme: templates address fields by readable identifiers such as `email` or
 * [Rendering a form](#rendering-a-form)
 * [Success redirect](#success-redirect)
 * [Compatibility validation](#compatibility-validation)
-* [Refresh Forms, Refresh Schema, Rescan Templates](#refresh-forms-refresh-schema-rescan-templates)
+* [Sync Schema, Refresh Forms, Rescan Templates](#sync-schema-refresh-forms-rescan-templates)
 * [The REST endpoint](#the-rest-endpoint)
 * [JavaScript events](#javascript-events)
 * [Hooks](#hooks)
 * [Spam protection](#spam-protection)
-* [Caching](#caching)
+* [Storage and synchronization](#storage-and-synchronization)
 * [Supported field types](#supported-field-types)
 * [Debugging](#debugging)
 * [Uninstalling](#uninstalling)
@@ -59,12 +59,12 @@ render:     your template, or markup generated from the schema
                     ↓
 visitor submits → POST /wp-json/jotform-bridge/v1/submit/contact
                     ↓
-server:     validate against the cached schema → map to qids → Jotform API
+server:     validate against the synced schema → map to qids → Jotform API
 ```
 
 The browser never supplies a form ID, a question ID or credentials. It sends
 semantic field names and values; everything else is resolved on the server from
-the integration and the cached Jotform form definition.
+the integration and the synced Jotform form definition.
 
 ---
 
@@ -450,7 +450,7 @@ document.addEventListener('jotformbridge:success', function (event) {
 
 ## Compatibility validation
 
-Every integration is checked against the cached schema and the cached template
+Every integration is checked against the synced schema and the scanned template
 registry, and the result is shown in the integrations list and the editor:
 
 | State | Meaning |
@@ -466,19 +466,31 @@ guessed at — a wrong guess would either hide a real problem or invent one.
 
 ---
 
-## Refresh Forms, Refresh Schema, Rescan Templates
+## Sync Schema, Refresh Forms, Rescan Templates
+
+Every call to Jotform is a button somebody pressed. There is no cron job, no
+background refresh and no expiry anywhere in the plugin.
 
 | Action | Where | What it does |
 | --- | --- | --- |
+| **Sync Schema** | Integrations list (per row) and integration editor | Reloads **one** form's definition, re-normalizes it, stores it and re-checks compatibility |
 | **Test Connection** | Settings | One read-only `GET /user` call; records the result |
 | **Refresh Forms** | Settings | Reloads the account form list from Jotform |
-| **Refresh Schema** | Integration editor | Reloads one form's definition, re-normalizes it and re-checks compatibility |
 | **Rescan Templates** | Integrations | Re-reads the theme `forms/` directories |
 
+Sync is per integration on purpose: it moves the contract between one template
+and one Jotform form, and a site with ten integrations should never have nine of
+them change because somebody wanted the tenth updated.
+
 After changing a form in Jotform — adding a field, making one required,
-renaming an option — press **Refresh Schema**. It reports whether the form
-actually changed since the last refresh, and re-runs the compatibility check
-against your template.
+renaming an option — press **Sync Schema** on the integrations that use it. It
+reports whether the form actually changed since the last sync, and re-runs the
+compatibility check against your template.
+
+A newly created integration has no schema at all until you sync it: it does not
+render, and submissions to it are refused. The editor says so, and the
+integrations list has a **Schema** column showing when each form was last
+synced.
 
 ---
 
@@ -509,7 +521,7 @@ trusts nothing in the request except the values themselves —
 
 * the slug is a lookup key; the visitor cannot influence which Jotform form is
   used;
-* every field is checked against the cached schema: unknown identifiers are
+* every field is checked against the synced schema: unknown identifiers are
   rejected, a list where a scalar belongs is rejected, options must be ones
   Jotform reports, emails must be valid, lengths are bounded;
 * the payload as a whole is bounded (fields, values, bytes, nesting);
@@ -559,7 +571,7 @@ always cancel. See [Success redirect](#success-redirect).
 | Hook | Type | When |
 | --- | --- | --- |
 | `jotform_bridge_template_paths` | filter | Directories scanned for templates |
-| `jotform_bridge_normalized_schema` | filter | A schema just before it is cached |
+| `jotform_bridge_normalized_schema` | filter | A schema just before it is stored |
 | `jotform_bridge_submission_fields` | filter | Sanitized values before mapping |
 | `jotform_bridge_spam_check` | filter | Immediately before the upstream call |
 | `jotform_bridge_duplicate_window` | filter | Seconds an identical submission is refused; `0` disables |
@@ -602,22 +614,32 @@ values.
 
 ---
 
-## Caching
+## Storage and synchronization
 
-| Data | Where | TTL | Invalidated by |
+| Data | Where | Expires | Written by |
 | --- | --- | --- | --- |
-| Account form list | transient `jotform_bridge_forms` | 12 h | Refresh Forms, settings save |
-| Normalized schema (one per form) | transient `jotform_bridge_schema_{id}` | 12 h | Refresh Schema |
-| Template registry | option `jotform_bridge_templates` | until flushed | Rescan Templates, theme switch, plugin upgrade |
+| Normalized schema (one per form) | option `jotform_bridge_schema_{id}` | never | **Sync Schema** |
+| Account form list | option `jotform_bridge_forms` | never | **Refresh Forms** |
+| Template registry | option `jotform_bridge_templates` | never | **Rescan Templates**, theme switch, plugin upgrade |
 
-A normal front-end request reads the cache and nothing else. Jotform is contacted
-on a page view only when nothing is cached yet for that form — never to refresh
-an existing cache — and a page with no form on it does not touch Jotform, the
-filesystem or the registry at all. Deactivating the plugin drops every cache and
-leaves the configuration alone.
+Nothing in this table refreshes itself, and nothing in it expires. A front-end
+request — rendering a form or accepting a submission — reads what is stored and
+contacts Jotform for exactly one thing: sending an accepted submission. It never
+fetches a schema, not even when none is stored; a page with no form on it does
+not touch Jotform, the filesystem or the registry at all.
 
-If a refresh fails, the previous cache is kept: a Jotform outage does not take
-your forms down.
+That is a deliberate trade. The site owner decides when a form definition
+changes, and an unreachable or slow Jotform API can never appear inside a page
+view a visitor is waiting on. The cost is that a form edited in Jotform keeps
+rendering the old definition until somebody presses **Sync Schema**.
+
+If a sync fails, the previously stored schema is kept and the error is shown on
+the integration screen: a Jotform outage does not take your forms down.
+
+Deactivating the plugin drops only the template registry — the schemas stay, so
+reactivating does not leave every form on the site broken. A plugin upgrade keeps
+them too, and marks them as *synced by an older plugin version* so you can
+re-sync at a moment you choose. Uninstalling removes all three.
 
 ---
 
@@ -668,19 +690,21 @@ Common situations:
 | --- | --- |
 | Nothing renders, and you are logged in as an administrator but see no notice | The integration renders fine — check the browser console instead |
 | "There is no integration with the slug …" | Typo in the slug, or the integration was renamed |
-| "Schema not loaded" | Press Refresh Schema; check the API key and the region |
+| "Schema not synced" | Press Sync Schema on that integration; check the API key and the region |
 | Every API call fails on an EU account | The region is still set to Standard |
 | Template not in the registry | Press Rescan Templates; check the two header lines |
-| Submission answers 503 | The cached schema has errors — open the integration editor to see which |
+| Submission answers 503 | The form was never synced, or the synced schema has errors — open the integration editor to see which |
 | A field is missing from Auto rendering | Its Jotform type is not supported; see the diagnostics |
 
 ---
 
 ## Uninstalling
 
-Deactivating drops the caches and keeps everything else.
+Deactivating drops the template registry and keeps everything else, synced
+schemas included.
 
-Deleting the plugin removes the caches too — but **not** the integrations or the
+Deleting the plugin removes the synced schemas, the form list and the registry
+too — but **not** the integrations or the
 settings, so the usual "deactivate, delete, reinstall" round trip does not
 destroy work somebody did by hand. For a full removal, tick *Delete the
 integrations and the settings when the plugin is deleted* on the settings screen
@@ -707,8 +731,10 @@ before deleting. The API key is not involved either way: it lives in
 * **Semantic key collisions.** Two Jotform fields whose machine names normalize
   to the same identifier are reported as an error and the schema is refused
   rather than guessed at. Rename one of the fields in Jotform.
-* **A schema refresh is manual.** There is no cron job watching Jotform for
-  changes; the cache expires after 12 hours or when you press Refresh Schema.
+* **Synchronization is manual, by design.** Nothing expires and nothing is
+  fetched in the background: a form definition changes here only when you press
+  **Sync Schema** on that integration. A form edited in Jotform and not synced
+  keeps rendering — and accepting — the previous definition.
 * **Duplicate protection is best-effort.** It is a short window on identical
   values from the same IP, not idempotency keys, and two genuinely simultaneous
   requests can still both go through.
@@ -736,7 +762,7 @@ The repository is the plugin plus its dev harness. Only `jotform-bridge/` ships.
 │   └── src/
 │       ├── Admin/           # settings and integrations screens
 │       ├── Api/             # JotformClient, the only HTTP layer
-│       ├── Forms/           # normalization, schema, caches
+│       ├── Forms/           # normalization, schema, storage
 │       ├── Integrations/    # the Integration entity and its storage
 │       ├── Rendering/       # both renderers, template context, assets
 │       ├── Rest/            # the submission endpoint

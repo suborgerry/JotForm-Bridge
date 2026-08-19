@@ -9,7 +9,8 @@
  * @var array<string, mixed>                           $compatibility
  * @var array{state:string, url:string, delay:int, label:string, message:string} $redirect
  * @var \JotformBridge\Forms\FormSchema|null           $schema
- * @var array{fetched_at:int, fingerprint:string, error:string}|null $schemaMeta
+ * @var array{synced_at:int, fingerprint:string, version:string, error:string}|null $schemaMeta
+ * @var bool                                           $schemaStale
  * @var array<int, array<string, string>>              $forms
  * @var array<string, string>                          $templates
  * @var array<string, mixed>|null                      $notice
@@ -101,7 +102,7 @@ $jfbReport  = $compatibility['report'] instanceof CompatibilityReport ? $compati
                 <td>
                     <?php if ($forms === []) : ?>
                         <p>
-                            <strong><?php echo esc_html__('No cached forms.', 'jotform-bridge'); ?></strong>
+                            <strong><?php echo esc_html__('No forms stored yet.', 'jotform-bridge'); ?></strong>
                             <?php echo esc_html__('Use Refresh Forms on the Settings screen first.', 'jotform-bridge'); ?>
                         </p>
                     <?php else : ?>
@@ -295,10 +296,12 @@ $jfbReport  = $compatibility['report'] instanceof CompatibilityReport ? $compati
     <div class="jfb-actions">
         <?php if (!$isNew) : ?>
             <form method="post" action="<?php echo esc_url(admin_url('admin-post.php')); ?>" style="display:inline-block;margin-right:8px;">
-                <input type="hidden" name="action" value="<?php echo esc_attr(IntegrationsPage::ACTION_REFRESH); ?>">
+                <input type="hidden" name="action" value="<?php echo esc_attr(IntegrationsPage::ACTION_SYNC); ?>">
                 <input type="hidden" name="integration" value="<?php echo esc_attr($integration->slug()); ?>">
-                <?php wp_nonce_field(IntegrationsPage::ACTION_REFRESH); ?>
-                <?php submit_button(__('Refresh Schema', 'jotform-bridge'), 'secondary', 'submit', false); ?>
+                <input type="hidden" name="return_view" value="edit">
+                <input type="hidden" name="return_integration" value="<?php echo esc_attr($integration->slug()); ?>">
+                <?php wp_nonce_field(IntegrationsPage::ACTION_SYNC); ?>
+                <?php submit_button(__('Sync Schema', 'jotform-bridge'), 'primary', 'submit', false); ?>
             </form>
         <?php endif; ?>
 
@@ -339,17 +342,65 @@ $jfbReport  = $compatibility['report'] instanceof CompatibilityReport ? $compati
         <?php echo esc_html((string) $redirect['message']); ?>
     </p>
 
-    <?php if ($schemaMeta !== null && $schemaMeta['fetched_at'] > 0) : ?>
+    <h2><?php echo esc_html__('Schema', 'jotform-bridge'); ?></h2>
+
+    <?php if ($schemaMeta === null || $schemaMeta['synced_at'] === 0) : ?>
+        <div class="notice notice-warning inline">
+            <p>
+                <?php
+                echo esc_html__(
+                    'This form has never been synced. Nothing is fetched automatically: press Sync Schema above to load the definition from Jotform. Until then the form does not render and submissions are refused.',
+                    'jotform-bridge'
+                );
+                ?>
+            </p>
+        </div>
+    <?php else : ?>
         <p class="description">
             <?php
             printf(
                 /* translators: 1: human readable time difference, 2: schema fingerprint */
-                esc_html__('Schema loaded %1$s ago. Fingerprint: %2$s', 'jotform-bridge'),
-                esc_html(human_time_diff($schemaMeta['fetched_at'], time())),
+                esc_html__('Last synced %1$s ago. Fingerprint: %2$s', 'jotform-bridge'),
+                esc_html(human_time_diff($schemaMeta['synced_at'], time())),
                 '<code>' . esc_html(substr($schemaMeta['fingerprint'], 0, 12)) . '</code>'
             );
             ?>
         </p>
+        <p class="description">
+            <?php
+            echo esc_html__(
+                'The stored schema never expires and is never refreshed on its own. If the form changed in Jotform, sync it here.',
+                'jotform-bridge'
+            );
+            ?>
+        </p>
+    <?php endif; ?>
+
+    <?php if ($schemaStale) : ?>
+        <div class="notice notice-warning inline">
+            <p>
+                <?php
+                printf(
+                    /* translators: 1: plugin version that stored the schema, 2: current plugin version */
+                    esc_html__(
+                        'This schema was synced by Jotform Bridge %1$s and the site now runs %2$s. It is still used as it is; sync it again when convenient.',
+                        'jotform-bridge'
+                    ),
+                    '<code>' . esc_html($schemaMeta !== null && $schemaMeta['version'] !== '' ? $schemaMeta['version'] : '?') . '</code>',
+                    '<code>' . esc_html(JOTFORM_BRIDGE_VERSION) . '</code>'
+                );
+                ?>
+            </p>
+        </div>
+    <?php endif; ?>
+
+    <?php if ($schemaMeta !== null && $schemaMeta['error'] !== '') : ?>
+        <div class="notice notice-error inline">
+            <p>
+                <strong><?php echo esc_html__('Last sync attempt failed:', 'jotform-bridge'); ?></strong>
+                <?php echo esc_html($schemaMeta['error']); ?>
+            </p>
+        </div>
     <?php endif; ?>
 
     <?php if ($schema !== null && !$schema->isUsable()) : ?>

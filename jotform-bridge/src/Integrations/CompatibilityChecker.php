@@ -17,8 +17,8 @@ if (!defined('ABSPATH')) {
 /**
  * Answers "can this integration render?" from cached state only.
  *
- * Compatibility is derived, never stored: it is a function of the cached schema
- * and the cached registry, and deriving it on demand is cheaper than keeping a
+ * Compatibility is derived, never stored: it is a function of the synced schema
+ * and the scanned registry, and deriving it on demand is cheaper than keeping a
  * third copy of the truth in sync. Jotform is never contacted from here.
  */
 final class CompatibilityChecker
@@ -64,13 +64,13 @@ final class CompatibilityChecker
             );
         }
 
-        $schema = $this->schemas->cached($integration->formId());
+        $schema = $this->schemas->stored($integration->formId());
 
         if ($schema === null) {
             return $this->state(
                 self::STATE_NO_SCHEMA,
-                __('Schema not loaded', 'jotform-bridge'),
-                __('Use Refresh Schema to load the form definition from Jotform.', 'jotform-bridge')
+                __('Schema not synced', 'jotform-bridge'),
+                __('Use Sync Schema to load the form definition from Jotform.', 'jotform-bridge')
             );
         }
 

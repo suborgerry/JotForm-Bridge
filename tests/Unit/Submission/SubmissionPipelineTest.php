@@ -120,18 +120,26 @@ final class SubmissionPipelineTest extends TestCase
         $this->assertArrayHasKey(ValidationResult::FORM_KEY, $outcome->errors());
     }
 
-    public function testAnUnavailableSchemaIsASafeServerError(): void
+    /**
+     * A form nobody has synced cannot be submitted — and, just as importantly,
+     * the submission does not turn into a Jotform request to find out what the
+     * form looks like. The visitor gets a generic message either way.
+     */
+    public function testAnUnsyncedSchemaIsASafeServerErrorWithoutAnyRequest(): void
     {
-        $this->transients = [];
+        unset($this->options[SchemaRepository::optionKey(self::FORM_ID)]);
 
-        Functions\when('wp_remote_get')->justReturn(
-            $this->httpResponse(401, ['responseCode' => 401, 'message' => 'Invalid API key: abcd1234'])
+        Functions\when('wp_remote_get')->alias(
+            static function (): void {
+                throw new \RuntimeException('The submission path must never fetch a schema.');
+            }
         );
 
         $outcome = $this->pipeline()->submit('contact', $this->valid());
 
         $this->assertSame(503, $outcome->status());
-        $this->assertStringNotContainsString('abcd1234', (string) $outcome->body()['message']);
+        $this->assertFalse($outcome->body()['success']);
+        $this->assertSame([], $this->requests);
     }
 
     public function testAnUpstreamFailureIsReportedWithoutUpstreamDetail(): void
@@ -534,7 +542,7 @@ final class SubmissionPipelineTest extends TestCase
             array_values($this->fixture('form-questions')['content'])
         );
 
-        $this->transients[SchemaRepository::transientKey(self::FORM_ID)] = $schema->toArray();
+        $this->options[SchemaRepository::optionKey(self::FORM_ID)] = $schema->toArray();
     }
 
     /**
