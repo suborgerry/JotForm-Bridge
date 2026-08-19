@@ -23,7 +23,8 @@ in an **integration**, which is a small record in the WordPress admin.
 
 = How it works =
 
-1. Connect the site to your Jotform account with an API key.
+1. Connect the site to your Jotform account with an API key defined in
+`wp-config.php`.
 2. Create an integration: a slug such as `contact`, the Jotform form it submits
    to, and how it should be rendered.
 3. Render it with `<?php echo jotform_form('contact'); ?>` or `[jotform_form
@@ -51,8 +52,9 @@ the submission still succeeds and the success message is shown instead.
 
 = What stays on the server =
 
-The Jotform API key is never printed into HTML, never localized into JavaScript,
-never returned from the REST endpoint and never written to a log. The frontend
+The Jotform API key lives in `wp-config.php` and never reaches the database. It
+is never printed into HTML, never localized into JavaScript, never returned from
+the REST endpoint and never written to a log. The frontend
 only ever sees your own markup, your integration slug and the plugin's own
 endpoint.
 
@@ -75,17 +77,20 @@ unzipping. The plugin ships its own autoloader.
 == Installation ==
 
 1. Upload the ZIP through **Plugins → Add New → Upload Plugin**, then activate.
-2. Go to **Jotform Bridge → Settings**, paste your Jotform API key, pick the API
-   region and save. Use **Test Connection** to confirm, then **Refresh Forms**.
-3. Go to **Jotform Bridge → Integrations**, add an integration, and pick its
-   Jotform form and rendering mode.
-
-Instead of storing the key in the database you can define it in `wp-config.php`:
+2. Add your Jotform API key to `wp-config.php`, above the "That's all, stop
+   editing!" comment:
 
 `define( 'JOTFORM_API_KEY', '...' );`
 
-The constant wins over the stored option, the admin screen shows that the key is
-set externally, and the value is never displayed.
+3. Go to **Jotform Bridge → Settings**, pick the API region and save. Use
+   **Test Connection** to confirm, then **Refresh Forms**.
+4. Go to **Jotform Bridge → Integrations**, add an integration, and pick its
+   Jotform form and rendering mode.
+
+The constant is the only place the plugin reads the key from: there is no key
+field in the admin area and no key in the database. Until the constant is
+defined, the plugin's screens show what to add and where, and the value itself
+is never displayed beyond its last four characters.
 
 = API region =
 
@@ -115,8 +120,9 @@ header — they are never executed during discovery.
 = Does uninstalling delete my integrations? =
 
 No. Deleting the plugin removes only the caches. If you want a full removal,
-tick **Delete the integrations, the settings and the stored API key when the
-plugin is deleted** on the settings screen first.
+tick **Delete the integrations and the settings when the plugin is deleted** on
+the settings screen first. The API key is not stored by the plugin at all, so
+removing it means editing `wp-config.php`.
 
 = Is spam protection included? =
 

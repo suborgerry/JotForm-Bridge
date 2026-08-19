@@ -67,21 +67,20 @@ final class SettingsTest extends TestCase
         $this->assertSame(Settings::REGION_STANDARD, $settings->region());
     }
 
-    public function testStoredKeyIsNeverReturnedInFullForDisplay(): void
+    public function testAKeyLeftInTheOptionIsNotAKeySource(): void
     {
-        $settings = $this->withStored(['api_key' => 'abcdefgh12345678']);
+        $settings = $this->withStored(['api_key' => 'legacy-key']);
 
-        $masked = $settings->maskedApiKey();
-
-        $this->assertSame('********5678', $masked);
-        $this->assertStringNotContainsString('abcdefgh', $masked);
-        $this->assertSame(Settings::SOURCE_OPTION, $settings->apiKeySource());
-        $this->assertFalse($settings->isApiKeyLocked());
+        $this->assertSame('', $settings->apiKey());
+        $this->assertFalse($settings->hasApiKey());
+        $this->assertSame(Settings::SOURCE_NONE, $settings->apiKeySource());
+        $this->assertSame('', $settings->maskedApiKey());
+        $this->assertArrayNotHasKey('api_key', $settings->all());
     }
 
-    public function testEmptyKeyFieldKeepsTheStoredKey(): void
+    public function testSavingDropsAKeyLeftInTheOptionAndIgnoresASubmittedOne(): void
     {
-        $settings = $this->withStored(['api_key' => 'stored-key']);
+        $settings = $this->withStored(['api_key' => 'legacy-key']);
         $saved    = null;
 
         Functions\when('update_option')->alias(
@@ -92,18 +91,24 @@ final class SettingsTest extends TestCase
             }
         );
 
-        $settings->save(['api_key' => '', 'region' => Settings::REGION_EU, 'debug_logging' => '1']);
+        $settings->save(['api_key' => 'ui-key', 'region' => Settings::REGION_EU, 'debug_logging' => '1']);
 
-        $this->assertSame('stored-key', $saved['api_key']);
+        $this->assertArrayNotHasKey('api_key', $saved);
         $this->assertSame(Settings::REGION_EU, $saved['region']);
         $this->assertTrue($saved['debug_logging']);
     }
 
-    public function testRemoveCheckboxClearsTheStoredKey(): void
+    public function testPurgeRemovesALegacyKeyFromTheOption(): void
     {
-        $settings = $this->withStored(['api_key' => 'stored-key']);
-        $saved    = null;
+        $saved = null;
 
+        Functions\when('get_option')->alias(
+            static function (string $name, $default = false) {
+                return $name === Settings::OPTION
+                    ? ['api_key' => 'legacy-key', 'region' => Settings::REGION_EU]
+                    : $default;
+            }
+        );
         Functions\when('update_option')->alias(
             static function (string $name, $value) use (&$saved): bool {
                 $saved = $value;
@@ -112,9 +117,33 @@ final class SettingsTest extends TestCase
             }
         );
 
-        $settings->save(['api_key' => '', 'remove_api_key' => '1']);
+        Settings::purgeStoredKey();
 
-        $this->assertSame('', $saved['api_key']);
+        $this->assertIsArray($saved);
+        $this->assertArrayNotHasKey('api_key', $saved);
+        $this->assertSame(Settings::REGION_EU, $saved['region']);
+    }
+
+    public function testPurgeDoesNotWriteWhenThereIsNothingToRemove(): void
+    {
+        $written = false;
+
+        Functions\when('get_option')->alias(
+            static function (string $name, $default = false) {
+                return $name === Settings::OPTION ? ['region' => Settings::REGION_EU] : $default;
+            }
+        );
+        Functions\when('update_option')->alias(
+            static function (string $name, $value) use (&$written): bool {
+                $written = true;
+
+                return true;
+            }
+        );
+
+        Settings::purgeStoredKey();
+
+        $this->assertFalse($written);
     }
 
     public function testInvalidRegionInputIsRejectedOnSave(): void
@@ -198,7 +227,7 @@ final class SettingsTest extends TestCase
 
     public function testAnArrayInsteadOfAScalarDoesNotBecomeAValue(): void
     {
-        $settings = $this->withStored(['api_key' => 'stored-key']);
+        $settings = $this->withStored([]);
         $saved    = null;
 
         Functions\when('update_option')->alias(
@@ -210,12 +239,10 @@ final class SettingsTest extends TestCase
         );
 
         $settings->save([
-            'api_key'  => ['nested'],
             'region'   => ['nested'],
             'base_url' => ['nested'],
         ]);
 
-        $this->assertSame('stored-key', $saved['api_key'], 'An array must not overwrite the key.');
         $this->assertSame(Settings::REGION_STANDARD, $saved['region']);
         $this->assertSame('', $saved['base_url']);
     }
@@ -246,11 +273,11 @@ final class SettingsTest extends TestCase
      * @runInSeparateProcess
      * @preserveGlobalState disabled
      */
-    public function testConstantWinsOverTheStoredOptionAndCannotBeOverwritten(): void
+    public function testTheConstantIsTheOnlyKeySourceAndSurvivesASave(): void
     {
-        define('JOTFORM_API_KEY', 'constant-key');
+        define('JOTFORM_API_KEY', ' constant-key ');
 
-        $settings = $this->withStored(['api_key' => 'stored-key']);
+        $settings = $this->withStored(['api_key' => 'legacy-key']);
         $saved    = null;
 
         Functions\when('update_option')->alias(
@@ -262,11 +289,12 @@ final class SettingsTest extends TestCase
         );
 
         $this->assertSame('constant-key', $settings->apiKey());
+        $this->assertTrue($settings->hasApiKey());
         $this->assertSame(Settings::SOURCE_CONSTANT, $settings->apiKeySource());
-        $this->assertTrue($settings->isApiKeyLocked());
 
         $settings->save(['api_key' => 'ui-key']);
 
-        $this->assertSame('stored-key', $saved['api_key']);
+        $this->assertArrayNotHasKey('api_key', $saved);
+        $this->assertSame('constant-key', $settings->apiKey());
     }
 }

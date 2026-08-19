@@ -225,7 +225,10 @@ final class SettingsPage
             ],
             'no_key' => [
                 'type'    => 'error',
-                'message' => __('Add a Jotform API key before using this action.', 'jotform-bridge'),
+                'message' => __(
+                    'Set the JOTFORM_API_KEY constant in wp-config.php before using this action.',
+                    'jotform-bridge'
+                ),
             ],
         ];
 

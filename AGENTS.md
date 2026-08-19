@@ -376,31 +376,29 @@ Production plugin использует Jotform REST API.
 
 # API Key
 
-Jotform API key никогда не должен попадать на frontend.
+Jotform API key никогда не должен попадать на frontend и никогда не должен
+попадать в базу данных.
 
-Приоритет источников:
-
-```text
-1. JOTFORM_API_KEY constant
-2. WordPress option
-```
-
-Например:
+Единственный источник — constant в `wp-config.php`:
 
 ```php
 define('JOTFORM_API_KEY', '...');
 ```
 
-Если constant определена:
+WordPress option как источник ключа не используется: в Admin нет поля для
+ввода ключа, `save()` ключ не пишет, а ключ, оставшийся в option от более ранней
+версии, удаляется при upgrade/activation и никогда не читается.
 
-* использовать ее;
-* не перезаписывать;
-* показать в Admin, что API key задается externally;
-* не показывать его значение.
+Если constant не определена:
 
-Сохраненный API key:
+* API-вызовы не выполняются;
+* на screens плагина и в списке плагинов показывается admin notice на английском
+  с той строкой, которую нужно добавить в `wp-config.php`;
+* на settings screen строка API Key показывает ту же инструкцию.
 
-* никогда не выводить полностью обратно;
+API key:
+
+* никогда не выводить полностью обратно (только последние 4 символа);
 * не добавлять в frontend HTML;
 * не добавлять в JavaScript;
 * не возвращать через REST API;
@@ -1365,7 +1363,7 @@ Jotform Bridge
 Минимально:
 
 ```text
-API Key
+API Key (read-only: статус constant или инструкция, как ее задать)
 Region
 Connection Status
 Debug Logging
@@ -1881,7 +1879,8 @@ Implementation complete
 7. Связь Form ↔ Template хранится в Integration.
 8. Frontend использует semantic `data-jotform-field`.
 9. Backend является authoritative source mapping.
-10. API key существует только server-side.
+10. API key существует только server-side и только в constant `wp-config.php`;
+    в базе данных его нет.
 11. Jotform REST API не вызывается на каждом page view.
 12. Все submissions валидируются server-side.
 13. Произвольный filesystem path никогда не renderится.

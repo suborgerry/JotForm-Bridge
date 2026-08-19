@@ -34,7 +34,7 @@ final class LifecycleTest extends TestCase
             TemplateRegistry::OPTION          => ['templates' => [], 'generated_at' => 1],
             SchemaRepository::META_OPTION      => ['240000000000001' => ['fingerprint' => 'abc']],
             FormRepository::META_OPTION        => ['count' => 3],
-            'jotform_bridge_settings'          => ['api_key' => 'stored-key'],
+            'jotform_bridge_settings'          => ['api_key' => 'legacy-key', 'region' => 'eu'],
             'jotform_bridge_integrations'      => ['contact' => ['slug' => 'contact']],
         ];
 
@@ -81,7 +81,7 @@ final class LifecycleTest extends TestCase
         $this->assertArrayNotHasKey(SchemaRepository::META_OPTION, $this->options);
 
         $this->assertSame(
-            ['api_key' => 'stored-key'],
+            ['api_key' => 'legacy-key', 'region' => 'eu'],
             $this->options['jotform_bridge_settings'],
             'Deactivation must not touch the settings.'
         );
@@ -95,6 +95,21 @@ final class LifecycleTest extends TestCase
         $this->assertSame([], $this->transients);
         $this->assertSame(JOTFORM_BRIDGE_VERSION, $this->options[Plugin::VERSION_OPTION]);
         $this->assertArrayHasKey('jotform_bridge_integrations', $this->options);
+    }
+
+    /**
+     * Older versions could keep the API key in the settings option. Upgrading
+     * has to take it out of the database, not just stop reading it.
+     */
+    public function testActivationRemovesAKeyLeftInTheSettingsOption(): void
+    {
+        Plugin::onActivate();
+
+        $this->assertSame(
+            ['region' => 'eu'],
+            $this->options['jotform_bridge_settings'],
+            'The key must not survive in the option.'
+        );
     }
 
     /**

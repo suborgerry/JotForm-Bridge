@@ -14,6 +14,7 @@
 
 declare(strict_types=1);
 
+use JotformBridge\Admin\ApiKeyNotice;
 use JotformBridge\Admin\SettingsPage;
 use JotformBridge\Api\ConnectionState;
 use JotformBridge\Settings\Settings;
@@ -22,8 +23,7 @@ if (!defined('ABSPATH')) {
     exit;
 }
 
-$jfbKeyLocked = $settings->isApiKeyLocked();
-$jfbHasKey    = $settings->hasApiKey();
+$jfbHasKey = $settings->hasApiKey();
 $jfbRegion    = $settings->region();
 $jfbAll       = $settings->all();
 
@@ -54,7 +54,7 @@ if (!$jfbHasKey) {
             printf(
                 '<strong>%s</strong> %s',
                 esc_html__('Not configured.', 'jotform-bridge'),
-                esc_html__('Add a Jotform API key below.', 'jotform-bridge')
+                esc_html__('Set the JOTFORM_API_KEY constant in wp-config.php; see below.', 'jotform-bridge')
             );
         } elseif ($connection['status'] === ConnectionState::STATUS_CONNECTED) {
             printf(
@@ -103,52 +103,43 @@ if (!$jfbHasKey) {
 
         <table class="form-table" role="presentation">
             <tr>
-                <th scope="row">
-                    <label for="jfb-api-key"><?php echo esc_html__('API Key', 'jotform-bridge'); ?></label>
-                </th>
+                <th scope="row"><?php echo esc_html__('API Key', 'jotform-bridge'); ?></th>
                 <td>
-                    <?php if ($jfbKeyLocked) : ?>
-                        <p>
-                            <code><?php echo esc_html($settings->maskedApiKey()); ?></code>
-                        </p>
+                    <?php if ($jfbHasKey) : ?>
+                        <p><code><?php echo esc_html($settings->maskedApiKey()); ?></code></p>
                         <p class="description">
                             <?php
-                            echo esc_html__(
-                                'The API key is set externally through the JOTFORM_API_KEY constant and cannot be changed here.',
-                                'jotform-bridge'
+                            printf(
+                                /* translators: %s: JOTFORM_API_KEY */
+                                esc_html__(
+                                    'The key comes from the %s constant in wp-config.php. It is never stored in the database and never sent to the frontend.',
+                                    'jotform-bridge'
+                                ),
+                                '<code>' . esc_html(Settings::KEY_CONSTANT) . '</code>'
                             );
                             ?>
                         </p>
                     <?php else : ?>
-                        <input
-                            type="password"
-                            class="regular-text"
-                            id="jfb-api-key"
-                            name="jotform_bridge[api_key]"
-                            value=""
-                            autocomplete="off"
-                            placeholder="<?php echo esc_attr($jfbHasKey ? $settings->maskedApiKey() : __('Paste your Jotform API key', 'jotform-bridge')); ?>"
-                        >
-                        <?php if ($jfbHasKey) : ?>
-                            <p class="description">
-                                <?php echo esc_html__('A key is stored. Leave the field empty to keep it.', 'jotform-bridge'); ?>
-                            </p>
-                            <p>
-                                <label>
-                                    <input type="checkbox" name="jotform_bridge[remove_api_key]" value="1">
-                                    <?php echo esc_html__('Remove the stored API key', 'jotform-bridge'); ?>
-                                </label>
-                            </p>
-                        <?php else : ?>
-                            <p class="description">
-                                <?php
-                                echo esc_html__(
-                                    'The key is stored server-side only and is never sent to the frontend.',
-                                    'jotform-bridge'
-                                );
-                                ?>
-                            </p>
-                        <?php endif; ?>
+                        <p>
+                            <strong><?php echo esc_html__('No API key configured.', 'jotform-bridge'); ?></strong>
+                        </p>
+                        <p class="description">
+                            <?php
+                            echo esc_html__(
+                                'Add this line to wp-config.php, above the "That\'s all, stop editing!" comment, then reload this page:',
+                                'jotform-bridge'
+                            );
+                            ?>
+                        </p>
+                        <p><code><?php echo esc_html(ApiKeyNotice::SNIPPET); ?></code></p>
+                        <p class="description">
+                            <?php
+                            echo esc_html__(
+                                'Create the key in your Jotform account under Settings → API. The plugin reads it from the constant only, so it is never stored in the database.',
+                                'jotform-bridge'
+                            );
+                            ?>
+                        </p>
                     <?php endif; ?>
                 </td>
             </tr>
@@ -229,7 +220,7 @@ if (!$jfbHasKey) {
                         >
                         <?php
                         echo esc_html__(
-                            'Delete the integrations, the settings and the stored API key when the plugin is deleted',
+                            'Delete the integrations and the settings when the plugin is deleted',
                             'jotform-bridge'
                         );
                         ?>

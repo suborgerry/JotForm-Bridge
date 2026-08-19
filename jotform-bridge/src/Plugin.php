@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace JotformBridge;
 
+use JotformBridge\Admin\ApiKeyNotice;
 use JotformBridge\Admin\IntegrationsPage;
 use JotformBridge\Admin\SettingsPage;
 use JotformBridge\Api\ConnectionState;
@@ -114,6 +115,8 @@ final class Plugin
         (new SubmissionController($this->pipeline()))->register();
 
         if (is_admin()) {
+            (new ApiKeyNotice($this->settings))->register();
+
             // Registration order decides the submenu order: Integrations first.
             (new IntegrationsPage(
                 $this->integrations(),
@@ -250,6 +253,7 @@ final class Plugin
     public static function onActivate(): void
     {
         self::flushCaches();
+        Settings::purgeStoredKey();
 
         update_option(self::VERSION_OPTION, JOTFORM_BRIDGE_VERSION, false);
     }
@@ -288,7 +292,8 @@ final class Plugin
      *
      * A new version may normalize schemas differently or store a registry entry
      * differently, and a cache written by the previous version is not worth
-     * trusting. Nothing else happens here: no migration, no data rewriting.
+     * trusting. The one thing rewritten here is the settings option: a key
+     * stored by a version that still accepted one has to leave the database.
      */
     private static function maybeUpgrade(): void
     {
@@ -299,6 +304,7 @@ final class Plugin
         }
 
         self::flushCaches();
+        Settings::purgeStoredKey();
 
         update_option(self::VERSION_OPTION, JOTFORM_BRIDGE_VERSION, false);
     }

@@ -72,11 +72,12 @@ the integration and the cached Jotform form definition.
 
 1. **Plugins → Add New → Upload Plugin**, upload the ZIP, activate. Nothing else
    is needed: no `composer install`, no `npm install`, no `npm run build`.
-2. **Jotform Bridge → Settings** — paste your Jotform API key, choose the API
-   region, save.
-3. Press **Test Connection**, then **Refresh Forms** to load your account's form
+2. Add the API key to `wp-config.php` (see below). Until it is there, the admin
+   screens say so and nothing can talk to Jotform.
+3. **Jotform Bridge → Settings** — choose the API region, save.
+4. Press **Test Connection**, then **Refresh Forms** to load your account's form
    list.
-4. **Jotform Bridge → Integrations → Add Integration** — name it, pick the
+5. **Jotform Bridge → Integrations → Add Integration** — name it, pick the
    Jotform form and the rendering mode.
 
 Get an API key from your Jotform account under **Settings → API**. A read-only
@@ -87,24 +88,30 @@ with write access.
 
 ## The API key
 
-Two sources, in this order:
-
-1. the `JOTFORM_API_KEY` constant;
-2. the WordPress option written on the settings screen.
+One source, and only one: the `JOTFORM_API_KEY` constant in `wp-config.php`.
 
 ```php
-// wp-config.php
+// wp-config.php, above the "That's all, stop editing!" comment
 define( 'JOTFORM_API_KEY', 'your-api-key' );
 ```
 
-When the constant is defined it wins, the settings screen says so, the field is
-disabled, and the value is never displayed — not even masked back into an input.
+There is no key field on the settings screen and no key in the database. A
+database is the wrong place for this secret: it is dumped into backups, copied
+into staging sites and readable by every plugin on the site, and WordPress
+offers nothing to encrypt it with that is not stored right next to it. The
+constant lives in a file that is not part of a database dump, and a site copied
+without its `wp-config.php` simply arrives unconfigured.
 
-Wherever the key comes from, it stays on the server. It is never printed into
-HTML, never localized into JavaScript, never returned by the REST endpoint and
-never written to a log; the admin screen only ever shows the last four
-characters. If Jotform ever echoes the key back inside an error message, the
-client strips it before the message is stored or displayed.
+When the constant is missing, the settings screen and an admin notice on the
+plugin's screens print the line to add and where to add it. A key left in the
+option by an earlier version is deleted on upgrade or activation and is never
+read.
+
+The key stays on the server. It is never printed into HTML, never localized into
+JavaScript, never returned by the REST endpoint and never written to a log; the
+admin screen only ever shows the last four characters. If Jotform ever echoes
+the key back inside an error message, the client strips it before the message is
+stored or displayed.
 
 ---
 
@@ -673,11 +680,12 @@ Common situations:
 
 Deactivating drops the caches and keeps everything else.
 
-Deleting the plugin removes the caches too — but **not** the integrations, the
-settings or the stored API key, so the usual "deactivate, delete, reinstall"
-round trip does not destroy work somebody did by hand. For a full removal, tick
-*Delete the integrations, the settings and the stored API key when the plugin is
-deleted* on the settings screen before deleting.
+Deleting the plugin removes the caches too — but **not** the integrations or the
+settings, so the usual "deactivate, delete, reinstall" round trip does not
+destroy work somebody did by hand. For a full removal, tick *Delete the
+integrations and the settings when the plugin is deleted* on the settings screen
+before deleting. The API key is not involved either way: it lives in
+`wp-config.php`, which is yours to edit.
 
 ---
 
@@ -764,7 +772,7 @@ Architectural invariants worth keeping — they are what the design is:
 * The normalized schema is the single schema contract.
 * Custom and Auto rendering share one submission pipeline.
 * `JotformClient` is the only code that talks to Jotform.
-* The API key is server-only.
+* The API key is server-only and constant-only; it never reaches the database.
 * `TemplateRegistry` is an allowlist; a path is renderable only because it is in
   there.
 * Backend validation is authoritative.

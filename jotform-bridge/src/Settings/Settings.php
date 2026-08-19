@@ -11,15 +11,21 @@ if (!defined('ABSPATH')) {
 /**
  * Reads and writes the plugin settings option.
  *
- * The API key never leaves the server: it is masked on output and the raw value
- * is only handed to JotformClient.
+ * The API key is deliberately not part of that option: it comes from the
+ * JOTFORM_API_KEY constant and from nowhere else, so it never reaches the
+ * database. It is masked on output and the raw value is only handed to
+ * JotformClient.
  */
 final class Settings
 {
     public const OPTION = 'jotform_bridge_settings';
 
+    /**
+     * The only place the plugin ever reads an API key from.
+     */
+    public const KEY_CONSTANT = 'JOTFORM_API_KEY';
+
     public const SOURCE_CONSTANT = 'constant';
-    public const SOURCE_OPTION   = 'option';
     public const SOURCE_NONE     = 'none';
 
     public const REGION_STANDARD = 'standard';
@@ -49,6 +55,10 @@ final class Settings
             $stored = [];
         }
 
+        // A site upgraded from a version that still kept a key in the option
+        // carries one until purgeStoredKey() runs; it is never a key source.
+        unset($stored['api_key']);
+
         return array_merge($this->defaults(), $stored);
     }
 
@@ -58,7 +68,6 @@ final class Settings
     public function defaults(): array
     {
         return [
-            'api_key'                  => '',
             'region'                   => self::REGION_STANDARD,
             'base_url'                 => '',
             'debug_logging'            => false,
@@ -80,26 +89,20 @@ final class Settings
     }
 
     /**
-     * Resolves the API key: the JOTFORM_API_KEY constant wins over the option.
+     * The configured API key, or an empty string when the constant is missing.
      */
     public function apiKey(): string
     {
-        if ($this->hasConstantKey()) {
-            return (string) constant('JOTFORM_API_KEY');
+        if (!$this->hasConstantKey()) {
+            return '';
         }
 
-        $stored = $this->all()['api_key'];
-
-        return is_string($stored) ? $stored : '';
+        return trim((string) constant(self::KEY_CONSTANT));
     }
 
     public function apiKeySource(): string
     {
-        if ($this->hasConstantKey()) {
-            return self::SOURCE_CONSTANT;
-        }
-
-        return $this->apiKey() !== '' ? self::SOURCE_OPTION : self::SOURCE_NONE;
+        return $this->hasConstantKey() ? self::SOURCE_CONSTANT : self::SOURCE_NONE;
     }
 
     public function hasApiKey(): bool
@@ -107,13 +110,8 @@ final class Settings
         return $this->apiKey() !== '';
     }
 
-    public function isApiKeyLocked(): bool
-    {
-        return $this->hasConstantKey();
-    }
-
     /**
-     * Never render the stored key back to the browser; only a hint of it.
+     * Never render the key back to the browser; only a hint of it.
      */
     public function maskedApiKey(): string
     {
@@ -179,8 +177,9 @@ final class Settings
      */
     public function save(array $input): array
     {
-        $current = $this->all();
-        $clean   = $current;
+        // all() has already dropped any legacy key, so nothing carried over
+        // here can put one back into the option.
+        $clean = $this->all();
 
         $region          = sanitize_key(self::scalar($input, 'region'));
         $clean['region'] = array_key_exists($region, self::regions())
@@ -191,12 +190,6 @@ final class Settings
 
         $clean['debug_logging']            = !empty($input['debug_logging']);
         $clean['delete_data_on_uninstall'] = !empty($input['delete_data_on_uninstall']);
-
-        // A constant-provided key is never overwritten from the UI.
-        if (!$this->hasConstantKey()) {
-            $stored           = is_string($current['api_key']) ? $current['api_key'] : '';
-            $clean['api_key'] = $this->resolveSubmittedKey($input, $stored);
-        }
 
         update_option(self::OPTION, $clean);
 
@@ -258,27 +251,26 @@ final class Settings
     }
 
     /**
-     * An empty field keeps the stored key; "remove" clears it.
+     * Removes a key left in the option by an earlier version of the plugin.
      *
-     * @param array<string, mixed> $input
+     * Runs on upgrade rather than on read: a key that once reached the database
+     * has to be taken out of it, not merely ignored on the way back.
      */
-    private function resolveSubmittedKey(array $input, string $current): string
+    public static function purgeStoredKey(): void
     {
-        if (!empty($input['remove_api_key'])) {
-            return '';
+        $stored = get_option(self::OPTION, []);
+
+        if (!is_array($stored) || !array_key_exists('api_key', $stored)) {
+            return;
         }
 
-        $submitted = trim(sanitize_text_field(self::scalar($input, 'api_key')));
+        unset($stored['api_key']);
 
-        if ($submitted === '') {
-            return $current;
-        }
-
-        return $submitted;
+        update_option(self::OPTION, $stored);
     }
 
     private function hasConstantKey(): bool
     {
-        return defined('JOTFORM_API_KEY') && trim((string) constant('JOTFORM_API_KEY')) !== '';
+        return defined(self::KEY_CONSTANT) && trim((string) constant(self::KEY_CONSTANT)) !== '';
     }
 }
