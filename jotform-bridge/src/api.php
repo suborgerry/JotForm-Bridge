@@ -61,6 +61,20 @@ if (!function_exists('jotform_bridge_honeypot')) {
     }
 }
 
+if (!function_exists('jotform_bridge_challenge')) {
+    /**
+     * The challenge widget markup for a custom template, if one is configured.
+     *
+     * Empty when the site has no challenge keys, so it is safe to print
+     * unconditionally. Templates rendered through the plugin already receive
+     * the same string as `$turnstile`.
+     */
+    function jotform_bridge_challenge(): string
+    {
+        return \JotformBridge\Submission\Guards\Turnstile::markup();
+    }
+}
+
 if (!function_exists('jotform_bridge_endpoint')) {
     /**
      * The REST endpoint an integration submits to.

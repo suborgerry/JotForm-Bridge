@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace JotformBridge\Rendering;
 
 use JotformBridge\Rest\SubmissionController;
+use JotformBridge\Submission\Guards\Turnstile;
 
 if (!defined('ABSPATH')) {
     exit;
@@ -21,6 +22,13 @@ if (!defined('ABSPATH')) {
 final class Assets
 {
     public const HANDLE = 'jotform-bridge';
+
+    /**
+     * The challenge widget, loaded only when a form is on the page and only
+     * when the site has configured it. A third-party script is not something to
+     * put on pages that do not need it.
+     */
+    public const TURNSTILE_HANDLE = 'jotform-bridge-turnstile';
 
     private bool $registered = false;
 
@@ -39,6 +47,16 @@ final class Assets
             JOTFORM_BRIDGE_VERSION,
             true
         );
+
+        if (Turnstile::isConfigured()) {
+            wp_register_script(
+                self::TURNSTILE_HANDLE,
+                Turnstile::SCRIPT_URL,
+                [],
+                null,
+                ['strategy' => 'defer', 'in_footer' => true]
+            );
+        }
 
         wp_localize_script(
             self::HANDLE,
@@ -63,5 +81,9 @@ final class Assets
         $this->register();
 
         wp_enqueue_script(self::HANDLE);
+
+        if (Turnstile::isConfigured()) {
+            wp_enqueue_script(self::TURNSTILE_HANDLE);
+        }
     }
 }

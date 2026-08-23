@@ -8,6 +8,7 @@ use JotformBridge\Forms\FieldNormalizer;
 use JotformBridge\Forms\FormSchema;
 use JotformBridge\Integrations\Integration;
 use JotformBridge\Submission\Guards\Honeypot;
+use JotformBridge\Submission\Guards\Turnstile;
 
 if (!defined('ABSPATH')) {
     exit;
@@ -132,9 +133,10 @@ final class AutoRenderer
             esc_url($endpoint),
             esc_attr($slug),
             implode('', $parts),
-            // Every automatically rendered form carries the decoy. A custom
-            // template decides for itself, through $honeypot in its context.
-            Honeypot::markup($prefix),
+            // Every automatically rendered form carries the decoy, and the
+            // challenge widget when one is configured. A custom template decides
+            // for itself, through $honeypot and $turnstile in its context.
+            Honeypot::markup($prefix) . Turnstile::markup(),
             esc_html__('Submit', 'jotform-bridge')
         );
     }

@@ -7,6 +7,7 @@ namespace JotformBridge\Rendering;
 use JotformBridge\Forms\FormSchema;
 use JotformBridge\Integrations\Integration;
 use JotformBridge\Submission\Guards\Honeypot;
+use JotformBridge\Submission\Guards\Turnstile;
 
 if (!defined('ABSPATH')) {
     exit;
@@ -27,7 +28,8 @@ final class TemplateContext
      *     integration: array<string, string>,
      *     schema: array<string, mixed>,
      *     endpoint: string,
-     *     honeypot: string
+     *     honeypot: string,
+     *     turnstile: string
      * }
      */
     public static function build(Integration $integration, FormSchema $schema, string $endpoint): array
@@ -47,6 +49,9 @@ final class TemplateContext
             // echoes it gets the decoy right, and one that forgets is no worse
             // off than before.
             'honeypot'    => Honeypot::markup('jfb-' . $integration->slug()),
+            // Empty unless the site configured a challenge, so a template can
+            // print it unconditionally.
+            'turnstile'   => Turnstile::markup(),
         ];
     }
 

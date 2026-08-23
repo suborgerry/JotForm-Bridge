@@ -62,6 +62,36 @@ the REST endpoint and never written to a log. The frontend
 only ever sees your own markup, your integration slug and the plugin's own
 endpoint.
 
+= Protecting the endpoint =
+
+Going headless means the form no longer sits behind Jotform's own defences, so
+the plugin brings its own. Three are on from the start and cost a visitor
+nothing: a honeypot field, a minimum time between opening a form and sending it,
+and a rate limit per visitor address. Above them sits a circuit breaker that
+stops sending when a day's traffic is far above the site's normal or the account
+is running out of its monthly allowance — spending that allowance switches off
+every form on the Jotform account, embedded ones included, until it resets.
+
+Every refusal is counted per integration and shown in the admin, because a form
+that turns real people away looks exactly like a form that works.
+
+Cloudflare Turnstile is optional and is the only layer that stops something
+driving a real browser. Two constants in `wp-config.php` enable it:
+
+`define( 'JOTFORM_BRIDGE_TURNSTILE_SITE_KEY', '...' );`
+`define( 'JOTFORM_BRIDGE_TURNSTILE_SECRET', '...' );`
+
+Flush your page cache after enabling it. A submission without a challenge token
+is refused, and pages cached before the change do not carry the widget.
+
+If the site sits behind a CDN or reverse proxy, tell the plugin which forwarded
+header to believe, or every visitor will look like the proxy:
+
+`define( 'JOTFORM_BRIDGE_TRUSTED_PROXY_HEADER', 'CF-Connecting-IP' );`
+
+Custom templates print `$honeypot` and `$turnstile`; automatically rendered
+forms include both already.
+
 = Supported Jotform field types =
 
 Short text, long text, email, phone, number, dropdown, radio, checkbox group,

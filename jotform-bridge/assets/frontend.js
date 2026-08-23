@@ -141,9 +141,11 @@
      * submission. They travel in their own container instead, which only the
      * spam extension point ever reads.
      *
-     * A checkbox contributes whether it is checked; everything else contributes
-     * its value. Nothing here is ever shown to the visitor, so there is no
-     * per-type handling beyond that.
+     * A checkbox contributes whether it is checked, a control contributes its
+     * value, and an element that is not a control at all contributes the value
+     * of the control inside it. That last case is what a challenge widget needs:
+     * it writes its token into an input it creates itself, so the attribute has
+     * to go on the container it is told to fill.
      */
     function collectSpam(form) {
         var spam = {};
@@ -165,7 +167,15 @@
                 continue;
             }
 
-            spam[key] = typeof element.value === 'string' ? element.value : '';
+            if (typeof element.value === 'string') {
+                spam[key] = element.value;
+
+                continue;
+            }
+
+            var inner = element.querySelector('input[name], textarea[name]');
+
+            spam[key] = inner && typeof inner.value === 'string' ? inner.value : '';
         }
 
         var elapsed = elapsedSeconds(form);

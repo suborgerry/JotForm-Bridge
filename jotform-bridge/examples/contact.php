@@ -51,8 +51,8 @@
  *
  * The two attributes are separate on purpose: `data-jotform-field` values are
  * checked against the Jotform schema and an unknown one fails the submission,
- * so a honeypot marked that way would break every send. `$honeypot` below is
- * ready-made markup that uses the right one.
+ * so a honeypot marked that way would break every send. `$honeypot` and
+ * `$turnstile` below are ready-made markup that uses the right one.
  *
  * Nothing here is required to be dynamic: hard-coding the labels and the options
  * is perfectly fine. Reading them from `$schema` only means the form follows the
@@ -97,7 +97,7 @@ $required = static function (string $key) use ($fields): bool {
     <p class="contact-form__success" data-jotform-success role="status" aria-live="polite"></p>
     <div class="contact-form__errors" data-jotform-errors role="alert" aria-live="assertive"></div>
 
-    <?php // Escaped by the plugin; print it as it is, anywhere inside the form. ?>
+    <?php // Escaped by the plugin; print them as they are, anywhere inside the form. ?>
     <?php echo $honeypot; // phpcs:ignore WordPress.Security.EscapeOutput.OutputNotEscaped ?>
 
     <?php if ($hasField('full_name.first')) : ?>
@@ -220,6 +220,9 @@ $required = static function (string $key) use ($fields): bool {
         ></textarea>
         <span class="contact-form__error" id="cf-message-error" data-jotform-field-error="message"></span>
     </p>
+
+    <?php // Empty unless the site configured a challenge, so it can be printed always. ?>
+    <?php echo $turnstile; // phpcs:ignore WordPress.Security.EscapeOutput.OutputNotEscaped ?>
 
     <p class="contact-form__actions">
         <button type="submit">Send</button>
