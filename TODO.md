@@ -79,3 +79,31 @@ assembles.
 
 **Depends on.** Committing `composer.lock`, which is currently gitignored — CI
 without a lock file is not reproducible.
+
+---
+
+## 5. Interfaces, so the storage can be replaced
+
+**Problem.** `IntegrationRepository` and `SchemaRepository` are `final` and read
+their own options directly. Behaviour is adjustable through fifteen filters, but
+neither can be swapped for a different implementation.
+
+**Why it might matter.** One concrete scenario, not a general wish for
+flexibility: keeping integrations and schemas **in code** rather than in the
+database. A developer who wants staging and production to be provably identical,
+wants the configuration to go through review, and does not want a deployment to
+require clicking "Sync Schema" on every environment by hand, currently cannot —
+the option in the database is the only source there is. It is the same argument
+that already put the API key in `wp-config.php`, applied to the rest of the
+configuration.
+
+**Shape.** An interface for each of the two, a filter on the composition root in
+`Plugin` so a site can substitute its own, and a file-backed implementation to
+prove the interface is actually usable.
+
+**Why it is parked.** The usual argument for interfaces — testability — does not
+apply here: Brain Monkey stubs `get_option`, and 454 tests run against the real
+classes without complaint. That leaves only the scenario above, and until
+somebody actually wants configuration in code, an interface with a single
+implementation is an extra file and a false promise of flexibility. Worth doing
+properly when the need is real; not worth doing speculatively.
