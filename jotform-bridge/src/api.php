@@ -19,19 +19,19 @@ if (!defined('ABSPATH')) {
     exit;
 }
 
-if (!function_exists('jotform_form')) {
+if (!function_exists('jotform_bridge_render')) {
     /**
      * Returns the rendered HTML of one integration.
      *
      * Usage in a theme:
      *
-     *     echo jotform_form('contact');
+     *     echo jotform_bridge_render('contact');
      *
      * Never throws and never prints: an unknown, disabled or misconfigured
      * integration yields an empty string for visitors and a short diagnostic for
      * administrators, so a template mistake cannot break the page.
      */
-    function jotform_form(string $slug): string
+    function jotform_bridge_render(string $slug): string
     {
         try {
             return Plugin::instance()->renderer()->render($slug);

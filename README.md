@@ -51,7 +51,7 @@ theme: templates address fields by readable identifiers such as `email` or
 ## How it works
 
 ```text
-theme:      echo jotform_form('contact')
+theme:      echo jotform_bridge_render('contact')
                     ↓
 integration:  slug "contact" → Jotform form + rendering mode + template
                     ↓
@@ -369,14 +369,14 @@ its directory is reported and ignored.
 ## Rendering a form
 
 ```php
-<?php echo jotform_form('contact'); ?>
+<?php echo jotform_bridge_render('contact'); ?>
 ```
 
 ```text
 [jotform_form id="contact"]
 ```
 
-Both go through the same code path. `jotform_form()` never throws and never
+Both go through the same code path. `jotform_bridge_render()` never throws and never
 prints: an unknown, disabled or misconfigured integration produces an empty
 string for visitors, and a short diagnostic for administrators only — a form that
 silently vanished is the hardest kind of problem to notice. A template that
@@ -772,7 +772,7 @@ The repository is the plugin plus its dev harness. Only `jotform-bridge/` ships.
 │       ├── Templates/       # scanner, registry, validator
 │       ├── Autoloader.php   # own PSR-4 loader, so no vendor/ in the release
 │       ├── Plugin.php       # composition root
-│       └── api.php          # jotform_form() and friends
+│       └── api.php          # jotform_bridge_render() and friends
 ├── tests/                   # PHPUnit, WordPress stubbed with Brain Monkey
 ├── bin/build-zip.sh         # builds the release ZIP
 ├── AGENTS.md                # architectural specification

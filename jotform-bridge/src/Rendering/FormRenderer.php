@@ -18,7 +18,7 @@ if (!defined('ABSPATH')) {
 /**
  * The single entry point for rendering a form.
  *
- * Both the `jotform_form()` helper and the `[jotform_form]` shortcode go
+ * Both the `jotform_bridge_render()` helper and the `[jotform_form]` shortcode go
  * through here, so there is exactly one implementation of "what does this slug
  * render to". Nothing in this class can fail loudly: a missing, disabled or
  * broken integration produces empty output on a live site and a diagnostic only

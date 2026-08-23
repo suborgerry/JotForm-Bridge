@@ -865,7 +865,7 @@ Normalized Schema
 Предоставить public helper:
 
 ```php
-jotform_form('contact')
+jotform_bridge_render('contact')
 ```
 
 Предпочтительно helper возвращает HTML.
@@ -873,7 +873,7 @@ jotform_form('contact')
 Использование:
 
 ```php
-echo jotform_form('contact');
+echo jotform_bridge_render('contact');
 ```
 
 Также предоставить shortcode:

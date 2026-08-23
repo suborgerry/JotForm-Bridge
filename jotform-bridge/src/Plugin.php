@@ -240,7 +240,7 @@ final class Plugin
     }
 
     /**
-     * The service behind both `jotform_form()` and the shortcode.
+     * The service behind both `jotform_bridge_render()` and the shortcode.
      */
     public function renderer(): FormRenderer
     {

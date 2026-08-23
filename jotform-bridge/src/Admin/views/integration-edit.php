@@ -88,7 +88,7 @@ $jfbReport  = $compatibility['report'] instanceof CompatibilityReport ? $compati
                         printf(
                             /* translators: %s: example PHP call */
                             esc_html__('The public local identifier, for example %s.', 'jotform-bridge'),
-                            '<code>' . esc_html("jotform_form('contact')") . '</code>'
+                            '<code>' . esc_html("jotform_bridge_render('contact')") . '</code>'
                         );
                         ?>
                     </p>

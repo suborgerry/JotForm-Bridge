@@ -27,7 +27,7 @@ in an **integration**, which is a small record in the WordPress admin.
 `wp-config.php`.
 2. Create an integration: a slug such as `contact`, the Jotform form it submits
    to, and how it should be rendered.
-3. Render it with `<?php echo jotform_form('contact'); ?>` or `[jotform_form
+3. Render it with `<?php echo jotform_bridge_render('contact'); ?>` or `[jotform_form
    id="contact"]`.
 
 Two rendering modes are available:
