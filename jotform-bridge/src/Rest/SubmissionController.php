@@ -43,11 +43,33 @@ final class SubmissionController
      */
     private const MAX_CONTEXT_LENGTH = 512;
 
-    private SubmissionPipeline $pipeline;
+    /**
+     * Built on the first submission rather than handed in ready-made.
+     *
+     * The route has to be registered on every request; the machinery behind it
+     * is needed on almost none of them. A factory keeps that difference honest
+     * — and keeps a mistake inside the pipeline from taking down requests that
+     * would never have touched it.
+     *
+     * @var callable(): SubmissionPipeline
+     */
+    private $factory;
 
-    public function __construct(SubmissionPipeline $pipeline)
+    private ?SubmissionPipeline $pipeline = null;
+
+    /**
+     * @param callable(): SubmissionPipeline|SubmissionPipeline $pipeline
+     */
+    public function __construct($pipeline)
     {
-        $this->pipeline = $pipeline;
+        if ($pipeline instanceof SubmissionPipeline) {
+            $this->pipeline = $pipeline;
+            $this->factory  = static fn(): SubmissionPipeline => $pipeline;
+
+            return;
+        }
+
+        $this->factory = $pipeline;
     }
 
     public function register(): void
@@ -101,7 +123,7 @@ final class SubmissionController
             );
         }
 
-        $outcome = $this->pipeline->submit(
+        $outcome = $this->pipeline()->submit(
             (string) $request->get_param('integration'),
             $request->get_param('fields'),
             $this->context($request)
@@ -115,6 +137,15 @@ final class SubmissionController
         }
 
         return $this->respond($response);
+    }
+
+    private function pipeline(): SubmissionPipeline
+    {
+        if ($this->pipeline === null) {
+            $this->pipeline = ($this->factory)();
+        }
+
+        return $this->pipeline;
     }
 
     /**

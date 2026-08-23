@@ -118,11 +118,26 @@ final class Plugin
             }
         );
 
-        // Rendering and submitting are front-end concerns, but the REST route
-        // must also exist for a logged-in editor previewing a page.
-        add_action('wp_enqueue_scripts', [$this->assets(), 'register']);
+        // Everything below is registered through a closure rather than by
+        // handing WordPress a built object. The hooks have to exist on every
+        // request; the services behind them are needed on almost none of them —
+        // not in the admin, not during cron, not on a REST call belonging to
+        // another plugin. Building them anyway would also mean that a fault
+        // anywhere in the graph takes down every request on the site, including
+        // the admin screens somebody would use to fix it.
+        add_action(
+            'wp_enqueue_scripts',
+            static function (): void {
+                self::instance()->assets()->register();
+            }
+        );
 
-        add_shortcode('jotform_form', [$this->renderer(), 'shortcode']);
+        add_shortcode(
+            'jotform_form',
+            static function ($atts): string {
+                return self::instance()->renderer()->shortcode($atts);
+            }
+        );
 
         // The shipped anti-abuse providers register themselves on the spam
         // extension point, exactly like a third-party one would. Registering is
@@ -134,7 +149,7 @@ final class Plugin
         // Registers itself only when the site has configured keys for it.
         (new Turnstile($this->logger))->register();
 
-        (new SubmissionController($this->pipeline()))->register();
+        (new SubmissionController(static fn(): SubmissionPipeline => self::instance()->pipeline()))->register();
 
         if (is_admin()) {
             (new ApiKeyNotice($this->settings))->register();
