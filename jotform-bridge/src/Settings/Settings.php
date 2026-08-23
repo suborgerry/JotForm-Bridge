@@ -34,6 +34,18 @@ final class Settings
     public const REGION_CUSTOM   = 'custom';
 
     /**
+     * Hosts a custom base URL may point at.
+     *
+     * The custom region exists for Jotform deployments the plugin does not know
+     * the address of — a new region, an enterprise host. It is not a general
+     * "send my API key wherever" setting, and left unrestricted that is exactly
+     * what it was: one settings save, and every request carries the key to
+     * somebody else's server. An administrator who genuinely needs another host
+     * can add it in code, where the decision is visible and reviewable.
+     */
+    private const DEFAULT_ALLOWED_HOSTS = ['jotform.com'];
+
+    /**
      * Base URLs documented by Jotform (https://api.jotform.com/docs/).
      *
      * @var array<string, string>
@@ -214,7 +226,7 @@ final class Settings
     /**
      * The custom base URL is the one setting that decides where the API key is
      * sent, so it is restricted rather than merely escaped: an absolute http(s)
-     * URL with a host, and nothing after the path.
+     * URL, on an allowed host, and nothing after the path.
      */
     public static function sanitizeBaseUrl(string $raw): string
     {
@@ -237,6 +249,10 @@ final class Settings
             return '';
         }
 
+        if (!self::isAllowedHost(strtolower((string) $parts['host']))) {
+            return '';
+        }
+
         // Credentials, query and fragment have no meaning for an API base URL
         // and would only travel along with every request.
         $rebuilt = $scheme . '://' . strtolower((string) $parts['host']);
@@ -250,6 +266,54 @@ final class Settings
         }
 
         return untrailingslashit($rebuilt);
+    }
+
+    /**
+     * Whether a host may receive the API key.
+     *
+     * An entry matches the host itself and any subdomain of it, and nothing
+     * else: "notjotform.com" must not pass because it ends with the same
+     * letters.
+     */
+    public static function isAllowedHost(string $host): bool
+    {
+        $host = strtolower(trim($host, " \t\n\r\0\x0B."));
+
+        if ($host === '') {
+            return false;
+        }
+
+        /**
+         * Filters the hosts a custom Jotform API base URL may point at.
+         *
+         * Each entry matches that host and its subdomains. Adding one means
+         * accepting that the API key will be sent there.
+         *
+         * @param array<int, string> $hosts Allowed hosts.
+         */
+        $allowed = apply_filters('jotform_bridge_allowed_api_hosts', self::DEFAULT_ALLOWED_HOSTS);
+
+        if (!is_array($allowed)) {
+            $allowed = self::DEFAULT_ALLOWED_HOSTS;
+        }
+
+        foreach ($allowed as $candidate) {
+            if (!is_string($candidate)) {
+                continue;
+            }
+
+            $candidate = strtolower(trim($candidate, " \t\n\r\0\x0B."));
+
+            if ($candidate === '') {
+                continue;
+            }
+
+            if ($host === $candidate || str_ends_with($host, '.' . $candidate)) {
+                return true;
+            }
+        }
+
+        return false;
     }
 
     /**

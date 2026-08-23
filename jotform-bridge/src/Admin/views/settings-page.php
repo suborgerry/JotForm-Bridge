@@ -185,7 +185,12 @@ if (!$jfbHasKey) {
                         placeholder="https://api.jotform.com"
                     >
                     <p class="description">
-                        <?php echo esc_html__('Used only when the region is set to "Custom base URL".', 'jotform-bridge'); ?>
+                        <?php
+                        echo esc_html__(
+                            'Used only when the region is set to "Custom base URL". Must be a jotform.com address: the API key travels to whatever is entered here, so other hosts are refused. If you genuinely need one, add it with the jotform_bridge_allowed_api_hosts filter.',
+                            'jotform-bridge'
+                        );
+                        ?>
                     </p>
                 </td>
             </tr>

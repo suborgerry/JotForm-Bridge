@@ -47,10 +47,53 @@ final class SettingsTest extends TestCase
     {
         $settings = $this->withStored([
             'region'   => Settings::REGION_CUSTOM,
+            'base_url' => 'https://enterprise.jotform.com/api/',
+        ]);
+
+        $this->assertSame('https://enterprise.jotform.com/api', $settings->baseUrl());
+    }
+
+    /**
+     * The custom region exists for Jotform deployments the plugin does not know
+     * about, not for sending the API key to an arbitrary server.
+     */
+    public function testACustomUrlOnAnotherHostIsRefused(): void
+    {
+        $settings = $this->withStored([
+            'region'   => Settings::REGION_CUSTOM,
             'base_url' => 'https://forms.example.com/api/',
         ]);
 
-        $this->assertSame('https://forms.example.com/api', $settings->baseUrl());
+        $this->assertSame('https://api.jotform.com', $settings->baseUrl());
+    }
+
+    /**
+     * A host that merely ends with the same letters is a different host.
+     */
+    public function testALookalikeHostIsRefused(): void
+    {
+        $this->assertFalse(Settings::isAllowedHost('notjotform.com'));
+        $this->assertFalse(Settings::isAllowedHost('jotform.com.evil.example'));
+        $this->assertTrue(Settings::isAllowedHost('jotform.com'));
+        $this->assertTrue(Settings::isAllowedHost('eu-api.jotform.com'));
+        $this->assertTrue(Settings::isAllowedHost('API.JOTFORM.COM'));
+    }
+
+    public function testTheAllowedHostsAreFilterable(): void
+    {
+        Functions\when('apply_filters')->alias(
+            static function (string $hook, $value) {
+                return $hook === 'jotform_bridge_allowed_api_hosts'
+                    ? ['jotform.com', 'forms.internal.example']
+                    : $value;
+            }
+        );
+
+        $this->assertTrue(Settings::isAllowedHost('forms.internal.example'));
+        $this->assertSame(
+            'https://forms.internal.example/api',
+            Settings::sanitizeBaseUrl('https://forms.internal.example/api/')
+        );
     }
 
     public function testCustomRegionWithoutUrlFallsBackToStandard(): void
@@ -219,10 +262,10 @@ final class SettingsTest extends TestCase
 
         $settings->save([
             'region'   => Settings::REGION_CUSTOM,
-            'base_url' => 'https://user:pw@Forms.Example.com:8443/api/?key=leak#frag',
+            'base_url' => 'https://user:pw@EU-API.Jotform.com:8443/api/?key=leak#frag',
         ]);
 
-        $this->assertSame('https://forms.example.com:8443/api', $saved['base_url']);
+        $this->assertSame('https://eu-api.jotform.com:8443/api', $saved['base_url']);
     }
 
     public function testAnArrayInsteadOfAScalarDoesNotBecomeAValue(): void
