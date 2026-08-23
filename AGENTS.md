@@ -1232,8 +1232,13 @@ Success submission никогда не должен падать из-за сл�
 Порядок обязателен:
 
 1. success state формы;
-2. dispatch `jotformbridge:success`;
-3. redirect.
+2. dispatch `jotformbridge:success` — форма ещё заполнена, `detail.fields`
+   содержит отправленные значения;
+3. очистка формы (`reset()`, сброс таймера и proof of work);
+4. redirect.
+
+Очистка идёт после события намеренно: обработчику темы нужны отправленные
+значения, а из очищенной формы их уже не прочитать.
 
 Событие `jotformbridge:success` должно быть cancelable в части redirect: если
 theme вызывает `preventDefault()`, redirect не выполняется, и theme строит

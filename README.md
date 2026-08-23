@@ -545,11 +545,21 @@ All three bubble from the `<form>` element and carry a `detail` object.
 | Event | `detail` |
 | --- | --- |
 | `jotformbridge:before-submit` | `{ integration, fields }` — cancelable with `preventDefault()` |
-| `jotformbridge:success` | `{ integration, message, redirect }` — `preventDefault()` cancels the redirect |
-| `jotformbridge:error` | `{ integration, message, errors, status }` |
+| `jotformbridge:success` | `{ integration, fields, message, redirect }` — `preventDefault()` cancels the redirect |
+| `jotformbridge:error` | `{ integration, message, errors, status }` — `preventDefault()` keeps the plugin from moving focus |
 
 `redirect` is `null` unless the integration is configured to redirect and its
 target resolved; otherwise it is `{ url, delay }`, with `delay` in seconds.
+
+`fields` on the success event carries the values that were sent, and the form is
+still filled in when it fires — the reset happens afterwards. That is what an
+analytics or CRM handler needs, and reading it back from the DOM would not work
+if the order were the other way round.
+
+After an error the plugin moves focus to the first rejected field, or to the
+form-level error container when there is no field to blame; after an accepted
+submission that does not redirect, it moves focus to the success message. A
+theme that manages focus itself calls `preventDefault()` on the error event.
 
 ```js
 document.addEventListener('jotformbridge:success', function (event) {

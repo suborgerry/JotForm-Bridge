@@ -18,7 +18,7 @@
  * can listen to:
  *
  *   jotformbridge:before-submit  { integration, fields }
- *   jotformbridge:success        { integration, message, redirect }
+ *   jotformbridge:success        { integration, fields, message, redirect }
  *   jotformbridge:error          { integration, message, errors, status }
  *
  * The one thing it does impose is the redirect the integration is configured
@@ -519,6 +519,79 @@
         container.textContent = unplaced.length ? unplaced.join(' ') : text;
     }
 
+    /**
+     * Sends the visitor to the thing that went wrong.
+     *
+     * The live region announces the message, but announcing is not the same as
+     * arriving: without this the keyboard focus stays on the submit button, and
+     * finding which of twelve fields was rejected means tabbing back through all
+     * of them. On a long form a sighted visitor may not even see the message,
+     * because it is above the fold.
+     *
+     * The first invalid control in document order, not the first key in the
+     * response — the server answers with a map, and a map has no order worth
+     * relying on.
+     */
+    function focusFirstError(form) {
+        var target = form.querySelector('[aria-invalid="true"]');
+
+        if (!target) {
+            var container = form.querySelector(ERROR_CONTAINER);
+
+            if (!container || !container.textContent) {
+                return;
+            }
+
+            // Containers are not focusable by default, and making one reachable
+            // by tab would put an empty stop in the middle of every form.
+            if (!container.hasAttribute('tabindex')) {
+                container.setAttribute('tabindex', '-1');
+            }
+
+            target = container;
+        }
+
+        focusQuietly(target);
+    }
+
+    /**
+     * Moves focus and brings the element into view, without letting an old
+     * browser throw its way out of the submit handler.
+     */
+    function focusQuietly(element) {
+        try {
+            element.focus();
+
+            if (element.scrollIntoView) {
+                element.scrollIntoView({ block: 'center', behavior: 'smooth' });
+            }
+        } catch (error) {
+            // Focusing is a courtesy, never a requirement.
+        }
+    }
+
+    /**
+     * Puts the visitor next to the confirmation once a form is accepted.
+     *
+     * Only when the page is not about to be replaced: moving focus and then
+     * navigating away is noise. The polite live region already announces the
+     * message; this is about where the visitor ends up afterwards, which would
+     * otherwise be the submit button of a form that just emptied itself.
+     */
+    function focusSuccess(form) {
+        var container = form.querySelector('[data-jotform-success]');
+
+        if (!container || !container.textContent) {
+            return;
+        }
+
+        if (!container.hasAttribute('tabindex')) {
+            container.setAttribute('tabindex', '-1');
+        }
+
+        focusQuietly(container);
+    }
+
     function showSuccess(form, text) {
         var container = form.querySelector('[data-jotform-success]');
 
@@ -667,18 +740,24 @@
                 if (body && body.success) {
                     var redirect = redirectFrom(body);
 
-                    // Order matters: state, then message, then the event, then
-                    // the navigation the event was given a chance to cancel.
-                    form.reset();
-                    form[STARTED_AT] = 0;
-                    form[SOLUTION] = null;
                     showSuccess(form, body.message || '');
 
+                    // The event goes out before anything is cleared, and carries
+                    // what was sent. A theme wiring up analytics needs the
+                    // values, and until now they were gone by the time it could
+                    // ask — out of the event, and out of the DOM.
                     var proceed = dispatch(form, 'jotformbridge:success', {
                         integration: integration,
+                        fields: fields,
                         message: body.message || '',
                         redirect: redirect
                     });
+
+                    // Only now: the form is emptied, the clock restarts and the
+                    // spent proof of work is dropped, all in one place.
+                    form.reset();
+                    form[STARTED_AT] = 0;
+                    form[SOLUTION] = null;
 
                     if (redirect && proceed) {
                         // The form stays busy until the page is replaced, so the
@@ -688,6 +767,7 @@
                         return;
                     }
 
+                    focusSuccess(form);
                     setBusy(form, false);
 
                     return;
@@ -697,23 +777,32 @@
                 var text = (body && body.message) || message('error');
 
                 showErrors(form, text, errors);
-                dispatch(form, 'jotformbridge:error', {
+
+                // After the event, and only if the theme did not take over: a
+                // theme that scrolls somewhere of its own, or opens a wizard
+                // step, must not have to fight us for the focus.
+                if (dispatch(form, 'jotformbridge:error', {
                     integration: integration,
                     message: text,
                     errors: errors,
                     status: status
-                });
+                })) {
+                    focusFirstError(form);
+                }
 
                 setBusy(form, false);
             })
             .catch(function () {
                 showErrors(form, message('network'), {});
-                dispatch(form, 'jotformbridge:error', {
+
+                if (dispatch(form, 'jotformbridge:error', {
                     integration: integration,
                     message: message('network'),
                     errors: {},
                     status: status
-                });
+                })) {
+                    focusFirstError(form);
+                }
 
                 setBusy(form, false);
             });
