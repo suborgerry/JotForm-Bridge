@@ -65,9 +65,21 @@ endpoint.
 = Protecting the endpoint =
 
 Going headless means the form no longer sits behind Jotform's own defences, so
-the plugin brings its own. Three are on from the start and cost a visitor
+the plugin brings its own. Four are on from the start and cost a visitor
 nothing: a honeypot field, a minimum time between opening a form and sending it,
-and a rate limit per visitor address. Above them sits a circuit breaker that
+a rate limit per visitor address, and a small proof of work.
+
+The proof of work is what covers the gap the others leave. Before a form is
+sent, the browser has to find a number that makes a SHA-256 hash start with a
+run of zero bits — roughly 65,000 hashes, a fraction of a second, and it runs in
+the background while the visitor is still typing. Nobody is asked to identify
+themselves, click anything, or talk to a third party. Sending one submission
+costs nothing worth measuring; sending a hundred thousand costs real machine
+time, which is the entire business model of spam.
+
+It is also the only marker whose absence is refused. A submission with no proof
+did not run the plugin's script at all, which is exactly what posting straight
+to the endpoint looks like. Above them sits a circuit breaker that
 stops sending when a day's traffic is far above the site's normal — two hundred
 submissions a day, or six times the recent median once there is one to compare
 against. It also stops if Jotform itself reports the account is out of

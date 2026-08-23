@@ -23,6 +23,7 @@ use JotformBridge\Rest\SubmissionController;
 use JotformBridge\Settings\Settings;
 use JotformBridge\Submission\Guards\Honeypot;
 use JotformBridge\Submission\Guards\MinimumTime;
+use JotformBridge\Submission\Guards\ProofOfWork;
 use JotformBridge\Submission\Guards\Turnstile;
 use JotformBridge\Submission\QuotaGuard;
 use JotformBridge\Submission\SubmissionPipeline;
@@ -128,6 +129,7 @@ final class Plugin
         // free: a form without the matching markup never triggers them.
         (new Honeypot())->register();
         (new MinimumTime())->register();
+        (new ProofOfWork())->register();
 
         // Registers itself only when the site has configured keys for it.
         (new Turnstile($this->logger))->register();

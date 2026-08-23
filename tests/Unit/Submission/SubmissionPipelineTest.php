@@ -11,6 +11,7 @@ use JotformBridge\Forms\SchemaRepository;
 use JotformBridge\Integrations\IntegrationRepository;
 use JotformBridge\Settings\Settings;
 use JotformBridge\Submission\Guards\Honeypot;
+use JotformBridge\Submission\Guards\ProofOfWork;
 use JotformBridge\Submission\QuotaGuard;
 use JotformBridge\Submission\RateLimiter;
 use JotformBridge\Submission\SubmissionOutcome;
@@ -588,6 +589,44 @@ final class SubmissionPipelineTest extends TestCase
         $this->assertSame(512, (new QuotaGuard(new Settings()))->status()['limit_left']);
     }
 
+    /**
+     * A bot posting straight to the endpoint runs none of the page's script, so
+     * it carries no proof of work — and that is the one marker whose absence is
+     * refused rather than shrugged at.
+     */
+    public function testASubmissionWithoutAProofOfWorkIsRefused(): void
+    {
+        $this->mockPost(200, ['responseCode' => 200, 'content' => ['submissionID' => '1']]);
+        $this->routeSpamFilterThroughProofOfWork();
+
+        $outcome = $this->pipeline()->submit('contact', $this->valid(), ['ip' => '203.0.113.7']);
+
+        $this->assertSame(403, $outcome->status());
+        $this->assertSame([], $this->requests, 'It must not reach Jotform.');
+    }
+
+    public function testASubmissionWithAProofOfWorkGoesThrough(): void
+    {
+        $this->mockPost(200, ['responseCode' => 200, 'content' => ['submissionID' => '1']]);
+        $this->routeSpamFilterThroughProofOfWork();
+
+        $timestamp = time();
+        $nonce     = 0;
+
+        while (!ProofOfWork::meets('contact', $timestamp, $nonce)) {
+            $nonce++;
+        }
+
+        $outcome = $this->pipeline()->submit(
+            'contact',
+            $this->valid(),
+            ['ip' => '203.0.113.7', 'spam' => [ProofOfWork::KEY => $timestamp . ':' . $nonce]]
+        );
+
+        $this->assertSame(200, $outcome->status());
+        $this->assertCount(1, $this->requests);
+    }
+
     public function testTheOutcomeNeverLeaksTheApiKey(): void
     {
         $this->mockPost(500, ['responseCode' => 500, 'message' => 'boom']);
@@ -843,6 +882,21 @@ final class SubmissionPipelineTest extends TestCase
         $this->assertSame(422, $outcome->status());
         $this->assertArrayHasKey(ValidationResult::FORM_KEY, $outcome->errors());
         $this->assertSame([], $this->requests);
+    }
+
+    private function routeSpamFilterThroughProofOfWork(): void
+    {
+        $guard = new ProofOfWork();
+
+        Functions\when('apply_filters')->alias(
+            static function (string $hook, $value, ...$args) use ($guard) {
+                if ($hook !== 'jotform_bridge_spam_check') {
+                    return $value;
+                }
+
+                return $guard->check($value, (string) $args[0], $args[1], $args[2]);
+            }
+        );
     }
 
     /**

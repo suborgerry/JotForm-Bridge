@@ -8,8 +8,8 @@
  *
  * Beside the semantic fields it carries a second, separate channel: any element
  * marked with `data-jotform-spam` is collected into `spam`, together with how
- * long the visitor has had the form open. None of it passes through the field
- * validator. That is what an anti-abuse provider — a honeypot,
+ * long the visitor has had the form open and a small proof of work. None of it
+ * passes through the field validator. That is what an anti-abuse provider — a honeypot,
  * a challenge token — travels in, because a value that is not part of the
  * Jotform form must not be sent as if it were.
  *
@@ -46,6 +46,219 @@
      * text.
      */
     var STARTED_AT = '__jotformBridgeStartedAt';
+
+    /** Where a computed proof of work is parked, and its in-progress flag. */
+    var SOLUTION = '__jotformBridgeSolution';
+    var SOLVING = '__jotformBridgeSolving';
+
+    /**
+     * Leading zero bits a proof of work must have.
+     *
+     * Sixteen is about 65,000 hashes on average: a fraction of a second on a
+     * phone, and a wall for anything trying to send thousands of submissions.
+     * The server decides what it accepts; this only has to agree with it.
+     */
+    var POW_BITS = 16;
+
+    /** How long a computed solution stays usable, in seconds. */
+    var POW_STALE = 240;
+
+    /** Hashes per slice, so a slow device never freezes while solving. */
+    var POW_BATCH = 4096;
+
+    var SHA256_K = [
+        0x428a2f98, 0x71374491, 0xb5c0fbcf, 0xe9b5dba5, 0x3956c25b, 0x59f111f1, 0x923f82a4, 0xab1c5ed5,
+        0xd807aa98, 0x12835b01, 0x243185be, 0x550c7dc3, 0x72be5d74, 0x80deb1fe, 0x9bdc06a7, 0xc19bf174,
+        0xe49b69c1, 0xefbe4786, 0x0fc19dc6, 0x240ca1cc, 0x2de92c6f, 0x4a7484aa, 0x5cb0a9dc, 0x76f988da,
+        0x983e5152, 0xa831c66d, 0xb00327c8, 0xbf597fc7, 0xc6e00bf3, 0xd5a79147, 0x06ca6351, 0x14292967,
+        0x27b70a85, 0x2e1b2138, 0x4d2c6dfc, 0x53380d13, 0x650a7354, 0x766a0abb, 0x81c2c92e, 0x92722c85,
+        0xa2bfe8a1, 0xa81a664b, 0xc24b8b70, 0xc76c51a3, 0xd192e819, 0xd6990624, 0xf40e3585, 0x106aa070,
+        0x19a4c116, 0x1e376c08, 0x2748774c, 0x34b0bcb5, 0x391c0cb3, 0x4ed8aa4a, 0x5b9cca4f, 0x682e6ff3,
+        0x748f82ee, 0x78a5636f, 0x84c87814, 0x8cc70208, 0x90befffa, 0xa4506ceb, 0xbef9a3f7, 0xc67178f2
+    ];
+
+    /**
+     * SHA-256 of a byte array.
+     *
+     * Written out rather than taken from crypto.subtle, which is asynchronous:
+     * one promise per hash would cost more than the hash does, and the whole
+     * point here is to run tens of thousands of them.
+     */
+    function sha256(bytes) {
+        var h = [0x6a09e667, 0xbb67ae85, 0x3c6ef372, 0xa54ff53a, 0x510e527f, 0x9b05688c, 0x1f83d9ab, 0x5be0cd19];
+        var length = bytes.length;
+        var block = new Uint8Array((((length + 8) >> 6) + 1) << 6);
+
+        block.set(bytes);
+        block[length] = 0x80;
+
+        var bits = length * 8;
+        block[block.length - 4] = (bits >>> 24) & 0xff;
+        block[block.length - 3] = (bits >>> 16) & 0xff;
+        block[block.length - 2] = (bits >>> 8) & 0xff;
+        block[block.length - 1] = bits & 0xff;
+
+        var w = new Int32Array(64);
+        var i;
+
+        for (var offset = 0; offset < block.length; offset += 64) {
+            for (i = 0; i < 16; i++) {
+                var j = offset + i * 4;
+                w[i] = (block[j] << 24) | (block[j + 1] << 16) | (block[j + 2] << 8) | block[j + 3];
+            }
+
+            for (i = 16; i < 64; i++) {
+                var x = w[i - 15];
+                var y = w[i - 2];
+                var s0 = ((x >>> 7) | (x << 25)) ^ ((x >>> 18) | (x << 14)) ^ (x >>> 3);
+                var s1 = ((y >>> 17) | (y << 15)) ^ ((y >>> 19) | (y << 13)) ^ (y >>> 10);
+
+                w[i] = (w[i - 16] + s0 + w[i - 7] + s1) | 0;
+            }
+
+            var a = h[0], b = h[1], c = h[2], d = h[3], e = h[4], f = h[5], g = h[6], hh = h[7];
+
+            for (i = 0; i < 64; i++) {
+                var S1 = ((e >>> 6) | (e << 26)) ^ ((e >>> 11) | (e << 21)) ^ ((e >>> 25) | (e << 7));
+                var ch = (e & f) ^ (~e & g);
+                var t1 = (hh + S1 + ch + SHA256_K[i] + w[i]) | 0;
+                var S0 = ((a >>> 2) | (a << 30)) ^ ((a >>> 13) | (a << 19)) ^ ((a >>> 22) | (a << 10));
+                var maj = (a & b) ^ (a & c) ^ (b & c);
+                var t2 = (S0 + maj) | 0;
+
+                hh = g; g = f; f = e; e = (d + t1) | 0;
+                d = c; c = b; b = a; a = (t1 + t2) | 0;
+            }
+
+            h[0] = (h[0] + a) | 0; h[1] = (h[1] + b) | 0; h[2] = (h[2] + c) | 0; h[3] = (h[3] + d) | 0;
+            h[4] = (h[4] + e) | 0; h[5] = (h[5] + f) | 0; h[6] = (h[6] + g) | 0; h[7] = (h[7] + hh) | 0;
+        }
+
+        var out = new Uint8Array(32);
+
+        for (var k = 0; k < 8; k++) {
+            out[k * 4] = (h[k] >>> 24) & 0xff;
+            out[k * 4 + 1] = (h[k] >>> 16) & 0xff;
+            out[k * 4 + 2] = (h[k] >>> 8) & 0xff;
+            out[k * 4 + 3] = h[k] & 0xff;
+        }
+
+        return out;
+    }
+
+    /**
+     * UTF-8 bytes of a string. The server hashes the same bytes.
+     */
+    function utf8(value) {
+        var out = [];
+
+        for (var i = 0; i < value.length; i++) {
+            var c = value.charCodeAt(i);
+
+            if (c < 0x80) {
+                out.push(c);
+            } else if (c < 0x800) {
+                out.push(0xc0 | (c >> 6), 0x80 | (c & 63));
+            } else if (c < 0xd800 || c >= 0xe000) {
+                out.push(0xe0 | (c >> 12), 0x80 | ((c >> 6) & 63), 0x80 | (c & 63));
+            } else {
+                i++;
+
+                var cp = 0x10000 + (((c & 0x3ff) << 10) | (value.charCodeAt(i) & 0x3ff));
+
+                out.push(0xf0 | (cp >> 18), 0x80 | ((cp >> 12) & 63), 0x80 | ((cp >> 6) & 63), 0x80 | (cp & 63));
+            }
+        }
+
+        return new Uint8Array(out);
+    }
+
+    function hasLeadingZeroBits(hash, bits) {
+        var whole = bits >> 3;
+
+        for (var i = 0; i < whole; i++) {
+            if (hash[i] !== 0) {
+                return false;
+            }
+        }
+
+        var rest = bits & 7;
+
+        return rest === 0 || (hash[whole] >> (8 - rest)) === 0;
+    }
+
+    /**
+     * Finds a number that makes sha256("slug|timestamp|nonce") start with
+     * POW_BITS zero bits.
+     *
+     * Sliced across timers rather than run in one go: the work is short, but on
+     * a slow phone a single loop would still be a visible freeze, and freezing
+     * the page of somebody filling in a contact form is not an acceptable way
+     * to make life harder for a bot.
+     */
+    function solve(integration, done) {
+        var timestamp = Math.floor(Date.now() / 1000);
+        var prefix = integration + '|' + timestamp + '|';
+        var nonce = 0;
+
+        function slice() {
+            var limit = nonce + POW_BATCH;
+
+            for (; nonce < limit; nonce++) {
+                if (hasLeadingZeroBits(sha256(utf8(prefix + nonce)), POW_BITS)) {
+                    done({ timestamp: timestamp, value: timestamp + ':' + nonce });
+
+                    return;
+                }
+            }
+
+            window.setTimeout(slice, 0);
+        }
+
+        slice();
+    }
+
+    /**
+     * Hands over a fresh proof of work, computing one if there is not one ready.
+     *
+     * A solution is normally waiting by the time anyone presses submit, because
+     * solving starts the moment the form is first touched. The submit path only
+     * has to wait when a form was filled in very quickly, or so slowly that the
+     * one computed at the start has aged out.
+     */
+    function withSolution(form, integration, done) {
+        var ready = form[SOLUTION];
+        var now = Math.floor(Date.now() / 1000);
+
+        if (ready && now - ready.timestamp < POW_STALE) {
+            done(ready.value);
+
+            return;
+        }
+
+        solve(integration, function (solution) {
+            form[SOLUTION] = solution;
+            done(solution.value);
+        });
+    }
+
+    /**
+     * Starts solving in the background, once per form.
+     */
+    function prepareSolution(form) {
+        var integration = form.getAttribute('data-jotform-integration') || '';
+
+        if (!integration || form[SOLVING]) {
+            return;
+        }
+
+        form[SOLVING] = true;
+
+        solve(integration, function (solution) {
+            form[SOLUTION] = solution;
+            form[SOLVING] = false;
+        });
+    }
 
     function message(key) {
         var messages = SETTINGS.messages || {};
@@ -228,6 +441,10 @@
 
         if (form && !form[STARTED_AT]) {
             form[STARTED_AT] = Date.now();
+
+            // The visitor has started filling the form in, so there is time to
+            // do the work before they finish. Done here, it costs them nothing.
+            prepareSolution(form);
         }
     }
 
@@ -418,6 +635,16 @@
 
         setBusy(form, true);
 
+        // The proof of work is normally already done; when it is not, the form
+        // stays busy for the fraction of a second it takes.
+        withSolution(form, integration, function (solution) {
+            spam.pow = solution;
+
+            send(form, integration, fields, spam);
+        });
+    }
+
+    function send(form, integration, fields, spam) {
         var status = 0;
 
         window.fetch(endpointFor(form, integration), {
@@ -444,6 +671,7 @@
                     // the navigation the event was given a chance to cancel.
                     form.reset();
                     form[STARTED_AT] = 0;
+                    form[SOLUTION] = null;
                     showSuccess(form, body.message || '');
 
                     var proceed = dispatch(form, 'jotformbridge:success', {
