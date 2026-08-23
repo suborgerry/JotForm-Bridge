@@ -20,14 +20,35 @@ final class IntegrationRepository
     public const OPTION = 'jotform_bridge_integrations';
 
     /**
+     * In-request memo, like the one FormRepository keeps.
+     *
+     * Rendering a page and then submitting from it both ask for the same slug,
+     * and the admin list asks once per row, so the read, the hydration and the
+     * sort were being repeated for an answer that cannot change: this class is
+     * the only thing in the plugin that writes the option, so nothing can move
+     * it under us within one request.
+     *
+     * Sharing the hydrated objects between callers is safe because Integration
+     * is immutable — withSlug(), withActive() and withTimestamps() each return
+     * a new instance and nothing assigns to a field after construction.
+     *
+     * @var array<string, Integration>|null
+     */
+    private ?array $memo = null;
+
+    /**
      * @return array<string, Integration> Slug => integration, ordered by name.
      */
     public function all(): array
     {
+        if ($this->memo !== null) {
+            return $this->memo;
+        }
+
         $stored = get_option(self::OPTION, []);
 
         if (!is_array($stored)) {
-            return [];
+            return $this->memo = [];
         }
 
         $integrations = [];
@@ -52,7 +73,7 @@ final class IntegrationRepository
             static fn(Integration $a, Integration $b): int => strcasecmp($a->name(), $b->name())
         );
 
-        return $integrations;
+        return $this->memo = $integrations;
     }
 
     /**
@@ -118,6 +139,8 @@ final class IntegrationRepository
 
         $stored[$integration->slug()] = $integration->withTimestamps($created, $now)->toArray();
 
+        $this->memo = null;
+
         update_option(self::OPTION, $stored, false);
 
         return [];
@@ -134,11 +157,16 @@ final class IntegrationRepository
 
         unset($stored[$slug]);
 
+        $this->memo = null;
+
         update_option(self::OPTION, $stored, false);
 
         return true;
     }
 
+    /**
+     * Goes through save(), which is what drops the memo.
+     */
     public function setActive(string $slug, bool $active): bool
     {
         $integration = $this->get($slug);

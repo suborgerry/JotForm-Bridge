@@ -57,10 +57,38 @@ final class Settings
     ];
 
     /**
+     * In-request memo. Six methods on this class read the option, and Logger
+     * asks whether debugging is on for every line it writes.
+     *
+     * @var array<string, mixed>|null
+     */
+    private ?array $memo = null;
+
+    /**
+     * Which generation of the option the memo was taken from.
+     */
+    private int $memoGeneration = -1;
+
+    /**
+     * Bumped by every write, including the static one.
+     *
+     * purgeStoredKey() is static, so it can change the option without any
+     * instance knowing. Today that only happens during upgrade, before anything
+     * has read the settings — but relying on that would make correctness a
+     * property of the call order rather than of this class. A counter every
+     * instance checks costs three lines and does not care about ordering.
+     */
+    private static int $generation = 0;
+
+    /**
      * @return array<string, mixed>
      */
     public function all(): array
     {
+        if ($this->memo !== null && $this->memoGeneration === self::$generation) {
+            return $this->memo;
+        }
+
         $stored = get_option(self::OPTION, []);
 
         if (!is_array($stored)) {
@@ -71,7 +99,9 @@ final class Settings
         // carries one until purgeStoredKey() runs; it is never a key source.
         unset($stored['api_key']);
 
-        return array_merge($this->defaults(), $stored);
+        $this->memoGeneration = self::$generation;
+
+        return $this->memo = array_merge($this->defaults(), $stored);
     }
 
     /**
@@ -218,6 +248,8 @@ final class Settings
         $clean['delete_data_on_uninstall'] = !empty($input['delete_data_on_uninstall']);
         $clean['monthly_quota']            = max(0, (int) self::scalar($input, 'monthly_quota'));
 
+        self::$generation++;
+
         update_option(self::OPTION, $clean);
 
         return $clean;
@@ -344,6 +376,8 @@ final class Settings
         }
 
         unset($stored['api_key']);
+
+        self::$generation++;
 
         update_option(self::OPTION, $stored);
     }

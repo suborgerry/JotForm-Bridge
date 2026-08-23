@@ -340,4 +340,93 @@ final class SettingsTest extends TestCase
         $this->assertArrayNotHasKey('api_key', $saved);
         $this->assertSame('constant-key', $settings->apiKey());
     }
+
+    /**
+     * Six methods on Settings read the option, and Logger asks whether
+     * debugging is on for every line it writes.
+     */
+    public function testTheOptionIsReadOncePerRequest(): void
+    {
+        $reads = 0;
+
+        Functions\when('get_option')->alias(
+            function (string $name, $default = false) use (&$reads) {
+                if ($name === Settings::OPTION) {
+                    $reads++;
+                }
+
+                return ['region' => Settings::REGION_EU];
+            }
+        );
+
+        $settings = new Settings();
+
+        $settings->region();
+        $settings->baseUrl();
+        $settings->debugEnabled();
+        $settings->deletesDataOnUninstall();
+        $settings->monthlyQuota();
+
+        $this->assertSame(1, $reads);
+    }
+
+    public function testASaveIsVisibleImmediately(): void
+    {
+        $stored = ['region' => Settings::REGION_STANDARD];
+
+        Functions\when('get_option')->alias(
+            static function (string $name, $default = false) use (&$stored) {
+                return $stored;
+            }
+        );
+        Functions\when('update_option')->alias(
+            function (string $name, $value) use (&$stored): bool {
+                $stored = $value;
+
+                return true;
+            }
+        );
+
+        $settings = new Settings();
+
+        $this->assertSame(Settings::REGION_STANDARD, $settings->region());
+
+        $settings->save(['region' => Settings::REGION_EU]);
+
+        $this->assertSame(Settings::REGION_EU, $settings->region());
+    }
+
+    /**
+     * purgeStoredKey() is static, so it can change the option without any
+     * instance knowing. A live instance must not keep serving what it read
+     * before the purge.
+     */
+    public function testAStaticPurgeIsVisibleToALiveInstance(): void
+    {
+        $stored = ['region' => Settings::REGION_EU, 'api_key' => 'legacy'];
+
+        Functions\when('get_option')->alias(
+            static function (string $name, $default = false) use (&$stored) {
+                return $stored;
+            }
+        );
+        Functions\when('update_option')->alias(
+            function (string $name, $value) use (&$stored): bool {
+                $stored = $value;
+
+                return true;
+            }
+        );
+
+        $settings = new Settings();
+
+        $this->assertSame(Settings::REGION_EU, $settings->region());
+
+        $stored['region'] = Settings::REGION_HIPAA;
+
+        Settings::purgeStoredKey();
+
+        $this->assertSame(Settings::REGION_HIPAA, $settings->region());
+        $this->assertArrayNotHasKey('api_key', $stored);
+    }
 }

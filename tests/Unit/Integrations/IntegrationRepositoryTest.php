@@ -284,4 +284,82 @@ final class IntegrationRepositoryTest extends TestCase
             true
         );
     }
+
+    /**
+     * The read is memoized for the request, so the option must not be touched
+     * a second time for the same answer.
+     */
+    public function testTheOptionIsReadOncePerRequest(): void
+    {
+        $repository = new IntegrationRepository();
+        $reads      = 0;
+
+        Functions\when('get_option')->alias(
+            function (string $name, $default = false) use (&$reads) {
+                if ($name === IntegrationRepository::OPTION) {
+                    $reads++;
+                }
+
+                return $this->options[$name] ?? $default;
+            }
+        );
+
+        $repository->all();
+        $repository->all();
+        $repository->get('contact');
+        $repository->exists('contact');
+
+        $this->assertSame(1, $reads);
+    }
+
+    /**
+     * The bug every memo invites: a write that the next read cannot see.
+     */
+    public function testASaveIsVisibleImmediately(): void
+    {
+        $repository = new IntegrationRepository();
+
+        $repository->all();
+
+        $this->assertSame([], $repository->save($this->integration('newsletter')));
+        $this->assertNotNull($repository->get('newsletter'));
+    }
+
+    public function testADeleteIsVisibleImmediately(): void
+    {
+        $repository = new IntegrationRepository();
+
+        $repository->save($this->integration('newsletter'));
+        $repository->all();
+
+        $this->assertTrue($repository->delete('newsletter'));
+        $this->assertNull($repository->get('newsletter'));
+    }
+
+    public function testAToggleIsVisibleImmediately(): void
+    {
+        $repository = new IntegrationRepository();
+
+        $repository->save($this->integration('newsletter'));
+        $repository->all();
+
+        $this->assertTrue($repository->setActive('newsletter', false));
+        $this->assertFalse($repository->get('newsletter')->isActive());
+    }
+
+    /**
+     * Two callers share one hydrated object. That is only safe because
+     * Integration is immutable, so the assumption is pinned here.
+     */
+    public function testIntegrationObjectsAreImmutable(): void
+    {
+        $repository = new IntegrationRepository();
+
+        $repository->save($this->integration('newsletter'));
+
+        $first = $repository->get('newsletter');
+        $first->withActive(false);
+
+        $this->assertTrue($repository->get('newsletter')->isActive());
+    }
 }
