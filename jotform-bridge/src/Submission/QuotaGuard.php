@@ -28,8 +28,8 @@ if (!defined('ABSPATH')) {
  *
  * Two ceilings, whichever is lower:
  *
- *  - A rate ceiling derived from the site's own recent history: five times the
- *    median of the last seven days, never below a floor. A fivefold jump is not
+ *  - A rate ceiling derived from the site's own recent history: six times the
+ *    median of the last seven days, never below a floor. A sixfold jump is not
  *    a good day, it is an event worth stopping to look at.
  *  - What is left of the monthly allowance, when the site owner has entered
  *    what the allowance is. The spend is read from GET /user/usage, so it
@@ -63,13 +63,19 @@ final class QuotaGuard
 
     /**
      * Lowest daily ceiling, used until there is history to derive one from.
+     *
+     * Set well above what an ordinary contact form sees, because the cost of
+     * the two mistakes is not symmetric: too high and a flood gets a few
+     * hundred submissions further before it is stopped, too low and a genuinely
+     * busy day — a campaign, a mention somewhere — is turned away as an attack.
+     * The first is recoverable, the second is lost customers.
      */
-    public const MIN_DAILY = 50;
+    public const MIN_DAILY = 200;
 
     /**
      * How far above the recent median a day may go before it is stopped.
      */
-    public const BURST_FACTOR = 5;
+    public const BURST_FACTOR = 6;
 
     /** Days of history kept, and the window the median is taken over. */
     private const HISTORY_DAYS = 30;

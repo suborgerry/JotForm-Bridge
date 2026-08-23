@@ -53,15 +53,15 @@ final class QuotaGuardTest extends TestCase
     }
 
     /**
-     * A site that normally takes ten submissions a day is allowed five times
-     * that, and stopped above it.
+     * A busy site earns a ceiling above the floor: one that normally takes a
+     * hundred submissions a day is allowed six times that.
      */
     public function testTheCeilingFollowsTheRecentMedian(): void
     {
-        $this->seedHistory([10, 10, 12, 9, 11, 10, 10]);
+        $this->seedHistory([100, 100, 120, 90, 110, 100, 100]);
 
         $guard    = $this->guard();
-        $expected = QuotaGuard::BURST_FACTOR * 10;
+        $expected = QuotaGuard::BURST_FACTOR * 100;
 
         $this->assertSame($expected, $guard->status()['ceiling']);
 
@@ -70,6 +70,17 @@ final class QuotaGuardTest extends TestCase
         }
 
         $this->assertFalse($guard->allows());
+    }
+
+    /**
+     * A quiet site gets the floor, not six times almost nothing — otherwise the
+     * first busy day it ever has would be read as an attack.
+     */
+    public function testAQuietSiteStillGetsTheFloor(): void
+    {
+        $this->seedHistory([2, 1, 3, 0, 1, 2, 1]);
+
+        $this->assertSame(QuotaGuard::MIN_DAILY, $this->guard()->status()['ceiling']);
     }
 
     /**
@@ -102,7 +113,7 @@ final class QuotaGuardTest extends TestCase
 
         $guard = $this->guard();
 
-        // Seven left, which is far below the floor of fifty.
+        // Seven left, which is far below the daily floor.
         $this->assertSame(7, $guard->status()['remaining']);
         $this->assertSame(7, $guard->status()['ceiling']);
 
