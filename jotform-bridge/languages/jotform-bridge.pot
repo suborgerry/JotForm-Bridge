@@ -9,7 +9,7 @@ msgstr ""
 "MIME-Version: 1.0\n"
 "Content-Type: text/plain; charset=UTF-8\n"
 "Content-Transfer-Encoding: 8bit\n"
-"POT-Creation-Date: 2026-08-23T12:47:12+00:00\n"
+"POT-Creation-Date: 2026-08-23T15:59:06+00:00\n"
 "PO-Revision-Date: YEAR-MO-DA HO:MI+ZONE\n"
 "X-Generator: WP-CLI 2.12.0\n"
 "X-Domain: jotform-bridge\n"
@@ -17,9 +17,9 @@ msgstr ""
 #. Plugin Name of the plugin
 #. Author of the plugin
 #: jotform-bridge.php
-#: src/Admin/IntegrationsPage.php:86
 #: src/Admin/IntegrationsPage.php:87
-#: src/Admin/views/settings-page.php:42
+#: src/Admin/IntegrationsPage.php:88
+#: src/Admin/views/settings-page.php:43
 msgid "Jotform Bridge"
 msgstr ""
 
@@ -57,82 +57,82 @@ msgstr ""
 msgid "Jotform Bridge settings"
 msgstr ""
 
-#: src/Admin/IntegrationsPage.php:97
 #: src/Admin/IntegrationsPage.php:98
+#: src/Admin/IntegrationsPage.php:99
 #: src/Admin/views/integrations-list.php:28
 msgid "Integrations"
 msgstr ""
 
-#: src/Admin/IntegrationsPage.php:108
+#: src/Admin/IntegrationsPage.php:109
 #: src/Admin/SettingsPage.php:79
 msgid "You are not allowed to access this page."
 msgstr ""
 
-#: src/Admin/IntegrationsPage.php:170
-#: src/Admin/IntegrationsPage.php:290
-#: src/Admin/IntegrationsPage.php:373
+#: src/Admin/IntegrationsPage.php:173
+#: src/Admin/IntegrationsPage.php:294
+#: src/Admin/IntegrationsPage.php:377
 msgid "That integration does not exist."
 msgstr ""
 
 #. translators: %s: template slug
-#: src/Admin/IntegrationsPage.php:225
+#: src/Admin/IntegrationsPage.php:229
 #, php-format
 msgid "The template \"%s\" is not in the registry."
 msgstr ""
 
-#: src/Admin/IntegrationsPage.php:231
+#: src/Admin/IntegrationsPage.php:235
 msgid "The selected Jotform form is not in the stored account form list. Refresh the form list on the settings screen."
 msgstr ""
 
-#: src/Admin/IntegrationsPage.php:239
+#: src/Admin/IntegrationsPage.php:243
 msgid "The integration could not be saved."
 msgstr ""
 
-#: src/Admin/IntegrationsPage.php:254
+#: src/Admin/IntegrationsPage.php:258
 msgid "This form has not been synced yet. Press Sync Schema to load its definition from Jotform — the form cannot render until you do."
 msgstr ""
 
-#: src/Admin/IntegrationsPage.php:270
+#: src/Admin/IntegrationsPage.php:274
 msgid "Integration saved."
 msgstr ""
 
-#: src/Admin/IntegrationsPage.php:288
+#: src/Admin/IntegrationsPage.php:292
 msgid "Integration deleted."
 msgstr ""
 
-#: src/Admin/IntegrationsPage.php:309
+#: src/Admin/IntegrationsPage.php:313
 msgid "Integration activated."
 msgstr ""
 
-#: src/Admin/IntegrationsPage.php:310
+#: src/Admin/IntegrationsPage.php:314
 msgid "Integration deactivated."
 msgstr ""
 
-#: src/Admin/IntegrationsPage.php:313
+#: src/Admin/IntegrationsPage.php:317
 msgid "That integration could not be updated."
 msgstr ""
 
 #. translators: %d: number of templates
-#: src/Admin/IntegrationsPage.php:346
+#: src/Admin/IntegrationsPage.php:350
 #, php-format
 msgid "%d template found."
 msgid_plural "%d templates found."
 msgstr[0] ""
 msgstr[1] ""
 
-#: src/Admin/IntegrationsPage.php:378
+#: src/Admin/IntegrationsPage.php:382
 msgid "This integration has no Jotform form selected."
 msgstr ""
 
-#: src/Admin/IntegrationsPage.php:398
+#: src/Admin/IntegrationsPage.php:402
 msgid "The Jotform form has changed since the last sync. Compatibility was re-checked."
 msgstr ""
 
-#: src/Admin/IntegrationsPage.php:399
+#: src/Admin/IntegrationsPage.php:403
 msgid "Schema synced. The Jotform form has not changed."
 msgstr ""
 
-#: src/Admin/IntegrationsPage.php:412
+#: src/Admin/IntegrationsPage.php:416
 #: src/Admin/QuotaNotice.php:75
 #: src/Admin/SettingsPage.php:155
 msgid "You are not allowed to perform this action."
@@ -196,7 +196,7 @@ msgid "Settings"
 msgstr ""
 
 #: src/Admin/SettingsPage.php:114
-#: src/Admin/views/settings-page.php:124
+#: src/Admin/views/settings-page.php:125
 msgid "No API key configured."
 msgstr ""
 
@@ -253,7 +253,7 @@ msgstr ""
 
 #: src/Admin/views/integration-edit.php:75
 #: src/Admin/views/integrations-list.php:49
-#: src/Admin/views/integrations-list.php:252
+#: src/Admin/views/integrations-list.php:256
 msgid "Slug"
 msgstr ""
 
@@ -295,7 +295,7 @@ msgstr ""
 
 #: src/Admin/views/integration-edit.php:150
 #: src/Admin/views/integrations-list.php:52
-#: src/Admin/views/integrations-list.php:251
+#: src/Admin/views/integrations-list.php:255
 msgid "Template"
 msgstr ""
 
@@ -359,8 +359,8 @@ msgid "Save Integration"
 msgstr ""
 
 #: src/Admin/views/integration-edit.php:295
-#: src/Admin/views/integrations-list.php:58
-#: src/Admin/views/settings-page.php:275
+#: src/Admin/views/integrations-list.php:60
+#: src/Admin/views/settings-page.php:278
 msgid "Actions"
 msgstr ""
 
@@ -369,7 +369,7 @@ msgid "Sync Schema"
 msgstr ""
 
 #: src/Admin/views/integration-edit.php:313
-#: src/Admin/views/integrations-list.php:225
+#: src/Admin/views/integrations-list.php:229
 msgid "Rescan Templates"
 msgstr ""
 
@@ -434,7 +434,7 @@ msgid "Submissions are arriving and none of them are reaching Jotform. The table
 msgstr ""
 
 #: src/Admin/views/integration-edit.php:361
-#: src/Admin/views/integrations-list.php:150
+#: src/Admin/views/integrations-list.php:153
 msgid "Almost everything is being refused today."
 msgstr ""
 
@@ -484,7 +484,7 @@ msgid "A field most people trip over is usually a template that does not say wha
 msgstr ""
 
 #: src/Admin/views/integration-edit.php:453
-#: src/Admin/views/integrations-list.php:56
+#: src/Admin/views/integrations-list.php:58
 msgid "Compatibility"
 msgstr ""
 
@@ -493,7 +493,7 @@ msgid "Redirect target status"
 msgstr ""
 
 #: src/Admin/views/integration-edit.php:467
-#: src/Admin/views/integrations-list.php:55
+#: src/Admin/views/integrations-list.php:57
 msgid "Schema"
 msgstr ""
 
@@ -550,12 +550,12 @@ msgid "Template Status"
 msgstr ""
 
 #: src/Admin/views/integration-edit.php:567
-#: src/Admin/views/integrations-list.php:111
+#: src/Admin/views/integrations-list.php:113
 msgid "Yes"
 msgstr ""
 
 #: src/Admin/views/integration-edit.php:568
-#: src/Admin/views/integrations-list.php:112
+#: src/Admin/views/integrations-list.php:114
 msgid "No"
 msgstr ""
 
@@ -567,285 +567,285 @@ msgstr ""
 msgid "An integration is the local name your theme uses. Theme code never needs a Jotform form ID."
 msgstr ""
 
-#: src/Admin/views/integrations-list.php:54
+#: src/Admin/views/integrations-list.php:55
 msgid "Last 7 days"
 msgstr ""
 
-#: src/Admin/views/integrations-list.php:57
+#: src/Admin/views/integrations-list.php:59
 msgid "Redirect target"
 msgstr ""
 
-#: src/Admin/views/integrations-list.php:65
+#: src/Admin/views/integrations-list.php:67
 msgid "No integrations yet. Add one to connect a Jotform form to a template."
 msgstr ""
 
-#: src/Admin/views/integrations-list.php:96
+#: src/Admin/views/integrations-list.php:98
 msgid "Not in the stored form list"
 msgstr ""
 
-#: src/Admin/views/integrations-list.php:121
+#: src/Admin/views/integrations-list.php:124
 msgid "No submissions"
 msgstr ""
 
 #. translators: 1: accepted submissions, 2: submissions that did not get through
-#: src/Admin/views/integrations-list.php:126
+#: src/Admin/views/integrations-list.php:129
 #, php-format
 msgid "%1$d sent, %2$d not delivered"
 msgstr ""
 
 #. translators: %s: human readable time difference
-#: src/Admin/views/integrations-list.php:136
+#: src/Admin/views/integrations-list.php:139
 #, php-format
 msgid "Last one %s ago"
 msgstr ""
 
-#: src/Admin/views/integrations-list.php:146
+#: src/Admin/views/integrations-list.php:149
 msgid "Nothing got through today."
 msgstr ""
 
-#: src/Admin/views/integrations-list.php:157
+#: src/Admin/views/integrations-list.php:161
 msgid "Not synced"
 msgstr ""
 
 #. translators: %s: human readable time difference
-#: src/Admin/views/integrations-list.php:166
+#: src/Admin/views/integrations-list.php:170
 #, php-format
 msgid "Synced %s ago"
 msgstr ""
 
-#: src/Admin/views/integrations-list.php:170
+#: src/Admin/views/integrations-list.php:174
 msgid "Synced"
 msgstr ""
 
-#: src/Admin/views/integrations-list.php:175
+#: src/Admin/views/integrations-list.php:179
 msgid "Synced by an older plugin version."
 msgstr ""
 
-#: src/Admin/views/integrations-list.php:190
+#: src/Admin/views/integrations-list.php:194
 msgid "Edit"
 msgstr ""
 
-#: src/Admin/views/integrations-list.php:197
+#: src/Admin/views/integrations-list.php:201
 msgid "Sync schema"
 msgstr ""
 
-#: src/Admin/views/integrations-list.php:209
+#: src/Admin/views/integrations-list.php:213
 msgid "Deactivate"
 msgstr ""
 
-#: src/Admin/views/integrations-list.php:210
+#: src/Admin/views/integrations-list.php:214
 msgid "Activate"
 msgstr ""
 
-#: src/Admin/views/integrations-list.php:220
+#: src/Admin/views/integrations-list.php:224
 msgid "Templates"
 msgstr ""
 
-#: src/Admin/views/integrations-list.php:237
+#: src/Admin/views/integrations-list.php:241
 msgid "No template directory exists yet. Create a /forms/ directory in your theme."
 msgstr ""
 
 #. translators: %s: list of scanned directories
-#: src/Admin/views/integrations-list.php:241
+#: src/Admin/views/integrations-list.php:245
 #, php-format
 msgid "Scanned directories: %s"
 msgstr ""
 
-#: src/Admin/views/integrations-list.php:253
+#: src/Admin/views/integrations-list.php:257
 msgid "Source"
 msgstr ""
 
-#: src/Admin/views/integrations-list.php:254
+#: src/Admin/views/integrations-list.php:258
 msgid "Fields"
 msgstr ""
 
-#: src/Admin/views/integrations-list.php:255
+#: src/Admin/views/integrations-list.php:259
 msgid "File"
 msgstr ""
 
-#: src/Admin/views/integrations-list.php:262
+#: src/Admin/views/integrations-list.php:266
 msgid "No templates found. Add a PHP file with a Jotform template header to your theme /forms/ directory."
 msgstr ""
 
-#: src/Admin/views/integrations-list.php:274
+#: src/Admin/views/integrations-list.php:278
 msgid "Child theme"
 msgstr ""
 
-#: src/Admin/views/integrations-list.php:275
+#: src/Admin/views/integrations-list.php:279
 msgid "Parent theme"
 msgstr ""
 
-#: src/Admin/views/integrations-list.php:276
+#: src/Admin/views/integrations-list.php:280
 msgid "Theme"
 msgstr ""
 
-#: src/Admin/views/integrations-list.php:277
+#: src/Admin/views/integrations-list.php:281
 msgid "Filter"
 msgstr ""
 
 #. translators: %d: number of dynamic identifiers
-#: src/Admin/views/integrations-list.php:295
+#: src/Admin/views/integrations-list.php:299
 #, php-format
 msgid "+%d dynamic"
 msgid_plural "+%d dynamic"
 msgstr[0] ""
 msgstr[1] ""
 
-#: src/Admin/views/integrations-list.php:314
+#: src/Admin/views/integrations-list.php:318
 msgid "Template diagnostics"
 msgstr ""
 
-#: src/Admin/views/settings-page.php:50
+#: src/Admin/views/settings-page.php:51
 msgid "Connection"
 msgstr ""
 
-#: src/Admin/views/settings-page.php:56
+#: src/Admin/views/settings-page.php:57
 msgid "Not configured."
 msgstr ""
 
-#: src/Admin/views/settings-page.php:57
+#: src/Admin/views/settings-page.php:58
 msgid "Set the JOTFORM_API_KEY constant in wp-config.php; see below."
 msgstr ""
 
-#: src/Admin/views/settings-page.php:62
+#: src/Admin/views/settings-page.php:63
 msgid "Connected."
 msgstr ""
 
 #. translators: %s: Jotform account username
-#: src/Admin/views/settings-page.php:67
+#: src/Admin/views/settings-page.php:68
 #, php-format
 msgid "Jotform account: %s"
 msgstr ""
 
-#: src/Admin/views/settings-page.php:76
+#: src/Admin/views/settings-page.php:77
 msgid "Connection failed."
 msgstr ""
 
-#: src/Admin/views/settings-page.php:82
+#: src/Admin/views/settings-page.php:83
 msgid "Not tested yet."
 msgstr ""
 
-#: src/Admin/views/settings-page.php:83
+#: src/Admin/views/settings-page.php:84
 msgid "Run Test Connection to check the API key."
 msgstr ""
 
 #. translators: %s: human readable time difference, e.g. "5 mins"
-#: src/Admin/views/settings-page.php:93
+#: src/Admin/views/settings-page.php:94
 #, php-format
 msgid "Last checked %s ago."
 msgstr ""
 
-#: src/Admin/views/settings-page.php:106
+#: src/Admin/views/settings-page.php:107
 msgid "API Key"
 msgstr ""
 
 #. translators: %s: JOTFORM_API_KEY
-#: src/Admin/views/settings-page.php:114
+#: src/Admin/views/settings-page.php:115
 #, php-format
 msgid "The key comes from the %s constant in wp-config.php. It is never stored in the database and never sent to the frontend."
 msgstr ""
 
-#: src/Admin/views/settings-page.php:128
+#: src/Admin/views/settings-page.php:129
 msgid "Add this line to wp-config.php, above the \"That's all, stop editing!\" comment, then reload this page:"
 msgstr ""
 
-#: src/Admin/views/settings-page.php:137
+#: src/Admin/views/settings-page.php:138
 msgid "Create the key in your Jotform account under Settings → API. The plugin reads it from the constant only, so it is never stored in the database."
 msgstr ""
 
-#: src/Admin/views/settings-page.php:149
+#: src/Admin/views/settings-page.php:150
 msgid "API Region"
 msgstr ""
 
 #. translators: %s: currently effective API base URL
-#: src/Admin/views/settings-page.php:166
+#: src/Admin/views/settings-page.php:167
 #, php-format
 msgid "Current base URL: %s"
 msgstr ""
 
-#: src/Admin/views/settings-page.php:176
+#: src/Admin/views/settings-page.php:177
 msgid "Custom Base URL"
 msgstr ""
 
-#: src/Admin/views/settings-page.php:189
+#: src/Admin/views/settings-page.php:190
 msgid "Used only when the region is set to \"Custom base URL\". Must be a jotform.com address: the API key travels to whatever is entered here, so other hosts are refused. If you genuinely need one, add it with the jotform_bridge_allowed_api_hosts filter."
 msgstr ""
 
-#: src/Admin/views/settings-page.php:201
+#: src/Admin/views/settings-page.php:203
 msgid "Monthly Submission Allowance"
 msgstr ""
 
-#: src/Admin/views/settings-page.php:216
+#: src/Admin/views/settings-page.php:218
 msgid "How many submissions your Jotform plan allows per month. Jotform reports how much of the allowance has been spent, but not what it is, so it has to be entered here once. Leave it at 0 if you would rather not: the safety ceiling still limits how much can be sent in a day, it just cannot tell how close the account is to having its forms switched off."
 msgstr ""
 
-#: src/Admin/views/settings-page.php:226
+#: src/Admin/views/settings-page.php:229
 msgid "Debug Logging"
 msgstr ""
 
-#: src/Admin/views/settings-page.php:235
+#: src/Admin/views/settings-page.php:238
 msgid "Log Jotform API failures to the PHP error log"
 msgstr ""
 
-#: src/Admin/views/settings-page.php:238
+#: src/Admin/views/settings-page.php:241
 msgid "Technical metadata only. The API key is never logged."
 msgstr ""
 
-#: src/Admin/views/settings-page.php:244
+#: src/Admin/views/settings-page.php:247
 msgid "Uninstall"
 msgstr ""
 
-#: src/Admin/views/settings-page.php:254
+#: src/Admin/views/settings-page.php:257
 msgid "Delete the integrations and the settings when the plugin is deleted"
 msgstr ""
 
-#: src/Admin/views/settings-page.php:262
+#: src/Admin/views/settings-page.php:265
 msgid "Off by default: deleting the plugin removes only the derived data — synced schemas, the form list, the template registry — so deactivating and reinstalling keeps your integrations."
 msgstr ""
 
-#: src/Admin/views/settings-page.php:272
+#: src/Admin/views/settings-page.php:275
 msgid "Save Settings"
 msgstr ""
 
-#: src/Admin/views/settings-page.php:280
+#: src/Admin/views/settings-page.php:283
 msgid "Test Connection"
 msgstr ""
 
-#: src/Admin/views/settings-page.php:285
+#: src/Admin/views/settings-page.php:288
 msgid "Refresh Forms"
 msgstr ""
 
-#: src/Admin/views/settings-page.php:289
+#: src/Admin/views/settings-page.php:292
 msgid "Jotform Forms"
 msgstr ""
 
-#: src/Admin/views/settings-page.php:291
+#: src/Admin/views/settings-page.php:294
 msgid "Forms unavailable: no API key is configured."
 msgstr ""
 
-#: src/Admin/views/settings-page.php:294
+#: src/Admin/views/settings-page.php:297
 msgid "Forms unavailable."
 msgstr ""
 
-#: src/Admin/views/settings-page.php:298
+#: src/Admin/views/settings-page.php:301
 msgid "Form list has not been loaded yet. Use Refresh Forms."
 msgstr ""
 
 #. translators: 1: number of forms, 2: human readable time difference
-#: src/Admin/views/settings-page.php:304
+#: src/Admin/views/settings-page.php:307
 #, php-format
 msgid "%1$d forms stored, loaded %2$s ago."
 msgstr ""
 
-#: src/Admin/views/settings-page.php:313
+#: src/Admin/views/settings-page.php:316
 msgid "Title"
 msgstr ""
 
-#: src/Admin/views/settings-page.php:314
+#: src/Admin/views/settings-page.php:317
 msgid "Form ID"
 msgstr ""
 
-#: src/Admin/views/settings-page.php:315
+#: src/Admin/views/settings-page.php:318
 msgid "Status"
 msgstr ""
 

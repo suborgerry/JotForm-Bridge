@@ -8,6 +8,7 @@ use Brain\Monkey\Functions;
 use JotformBridge\Api\JotformClient;
 use JotformBridge\Settings\Settings;
 use JotformBridge\Submission\QuotaGuard;
+use JotformBridge\Support\Features;
 use JotformBridge\Tests\TestCase;
 
 final class QuotaGuardTest extends TestCase
@@ -76,6 +77,35 @@ final class QuotaGuardTest extends TestCase
      * A quiet site gets the floor, not six times almost nothing — otherwise the
      * first busy day it ever has would be read as an attack.
      */
+    /**
+     * While the allowance half is hidden, nothing about it may influence a
+     * submission: no ceiling from it, no warning, no request to find out.
+     */
+    public function testTheAllowanceIsIgnoredWhileItIsHidden(): void
+    {
+        $this->options[Settings::OPTION]   = ['monthly_quota' => 100];
+        $this->options[QuotaGuard::OPTION] = [
+            'days'              => [],
+            'usage_submissions' => 100,
+            'usage_checked_at'  => time(),
+            'since_check'       => 0,
+        ];
+
+        Functions\when('wp_remote_get')->alias(
+            static function (): void {
+                throw new \RuntimeException('A hidden feature must not make requests.');
+            }
+        );
+
+        $guard = $this->guard();
+
+        $this->assertTrue($guard->allows());
+        $this->assertNull($guard->status()['remaining']);
+        $this->assertSame(QuotaGuard::MIN_DAILY, $guard->status()['ceiling']);
+        $this->assertFalse($guard->isNearQuota());
+        $this->assertNull($guard->refreshUsage(new JotformClient('key', 'https://api.jotform.com')));
+    }
+
     public function testAQuietSiteStillGetsTheFloor(): void
     {
         $this->seedHistory([2, 1, 3, 0, 1, 2, 1]);
@@ -103,6 +133,8 @@ final class QuotaGuardTest extends TestCase
 
     public function testTheRemainingAllowanceCapsTheCeiling(): void
     {
+        $this->enableAccountQuota();
+
         $this->options[Settings::OPTION] = ['monthly_quota' => 100];
         $this->options[QuotaGuard::OPTION] = [
             'days'              => [],
@@ -132,6 +164,8 @@ final class QuotaGuardTest extends TestCase
      */
     public function testSubmissionsSinceTheSnapshotCountTowardsTheAllowance(): void
     {
+        $this->enableAccountQuota();
+
         $this->options[Settings::OPTION]   = ['monthly_quota' => 100];
         $this->options[QuotaGuard::OPTION] = [
             'days'              => [],
@@ -150,6 +184,8 @@ final class QuotaGuardTest extends TestCase
 
     public function testAnExhaustedAllowanceRefusesEverything(): void
     {
+        $this->enableAccountQuota();
+
         $this->options[Settings::OPTION]   = ['monthly_quota' => 100];
         $this->options[QuotaGuard::OPTION] = [
             'days'              => [],
@@ -181,6 +217,8 @@ final class QuotaGuardTest extends TestCase
 
     public function testTheWarningFiresBeforeTheAllowanceIsGone(): void
     {
+        $this->enableAccountQuota();
+
         $this->options[Settings::OPTION]   = ['monthly_quota' => 100];
         $this->options[QuotaGuard::OPTION] = [
             'usage_submissions' => 90,
@@ -261,6 +299,8 @@ final class QuotaGuardTest extends TestCase
 
     public function testAFreshSnapshotIsNotRefetched(): void
     {
+        $this->enableAccountQuota();
+
         $this->options[QuotaGuard::OPTION] = [
             'usage_submissions' => 12,
             'usage_checked_at'  => time(),
@@ -279,6 +319,8 @@ final class QuotaGuardTest extends TestCase
 
     public function testARefreshStoresTheSpendAndClearsTheSinceCounter(): void
     {
+        $this->enableAccountQuota();
+
         $this->options[QuotaGuard::OPTION] = ['since_check' => 9, 'usage_checked_at' => 0];
 
         $response = $this->httpResponse(200, ['responseCode' => 200, 'content' => ['submissions' => 42]]);
@@ -300,6 +342,8 @@ final class QuotaGuardTest extends TestCase
      */
     public function testAFailedRefreshKeepsThePreviousSnapshot(): void
     {
+        $this->enableAccountQuota();
+
         $this->options[QuotaGuard::OPTION] = [
             'usage_submissions' => 42,
             'usage_checked_at'  => 1,
@@ -313,6 +357,23 @@ final class QuotaGuardTest extends TestCase
         $this->assertNotNull($result);
         $this->assertFalse($result->isSuccess());
         $this->assertSame(42, $guard->status()['usage_submissions']);
+    }
+
+    /**
+     * The allowance half of the guard is hidden by default, so a test that is
+     * about it has to switch it on.
+     */
+    private function enableAccountQuota(): void
+    {
+        Functions\when('apply_filters')->alias(
+            static function (string $hook, $value, ...$args) {
+                if ($hook === 'jotform_bridge_feature_enabled' && ($args[0] ?? '') === Features::ACCOUNT_QUOTA) {
+                    return true;
+                }
+
+                return $value;
+            }
+        );
     }
 
     private function guard(): QuotaGuard

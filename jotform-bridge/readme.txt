@@ -68,12 +68,11 @@ Going headless means the form no longer sits behind Jotform's own defences, so
 the plugin brings its own. Three are on from the start and cost a visitor
 nothing: a honeypot field, a minimum time between opening a form and sending it,
 and a rate limit per visitor address. Above them sits a circuit breaker that
-stops sending when a day's traffic is far above the site's normal or the account
-is running out of its monthly allowance — spending that allowance switches off
-every form on the Jotform account, embedded ones included, until it resets.
-
-Every refusal is counted per integration and shown in the admin, because a form
-that turns real people away looks exactly like a form that works.
+stops sending when a day's traffic is far above the site's normal — two hundred
+submissions a day, or six times the recent median once there is one to compare
+against. It also stops if Jotform itself reports the account is out of
+allowance, because spending that allowance switches off every form on the
+account, embedded ones included, until it resets.
 
 Cloudflare Turnstile is optional and is the only layer that stops something
 driving a real browser. Two constants in `wp-config.php` enable it:

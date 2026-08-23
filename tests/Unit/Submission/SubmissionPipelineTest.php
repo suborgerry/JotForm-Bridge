@@ -16,6 +16,7 @@ use JotformBridge\Submission\RateLimiter;
 use JotformBridge\Submission\SubmissionOutcome;
 use JotformBridge\Submission\SubmissionPipeline;
 use JotformBridge\Submission\ValidationResult;
+use JotformBridge\Support\Features;
 use JotformBridge\Support\Logger;
 use JotformBridge\Support\Stats;
 use JotformBridge\Tests\TestCase;
@@ -350,6 +351,8 @@ final class SubmissionPipelineTest extends TestCase
      */
     public function testATrippedQuotaGuardStopsEverySubmission(): void
     {
+        $this->enableAccountQuota();
+
         $this->mockPost(200, ['responseCode' => 200, 'content' => ['submissionID' => '1']]);
 
         $this->options[Settings::OPTION]   = ['monthly_quota' => 10];
@@ -374,6 +377,8 @@ final class SubmissionPipelineTest extends TestCase
 
     public function testTheQuotaGuardAnswersBeforeTheSchemaIsRead(): void
     {
+        $this->enableAccountQuota();
+
         $this->options[Settings::OPTION]   = ['monthly_quota' => 10];
         $this->options[QuotaGuard::OPTION] = [
             'days'              => [],
@@ -856,6 +861,23 @@ final class SubmissionPipelineTest extends TestCase
                 }
 
                 return $honeypot->check($value, (string) $args[0], $args[1], $args[2]);
+            }
+        );
+    }
+
+    /**
+     * The allowance half of the guard is hidden by default, so a test that is
+     * about it has to switch it on.
+     */
+    private function enableAccountQuota(): void
+    {
+        Functions\when('apply_filters')->alias(
+            static function (string $hook, $value, ...$args) {
+                if ($hook === 'jotform_bridge_feature_enabled' && ($args[0] ?? '') === Features::ACCOUNT_QUOTA) {
+                    return true;
+                }
+
+                return $value;
             }
         );
     }

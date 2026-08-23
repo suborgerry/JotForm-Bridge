@@ -7,6 +7,7 @@ namespace JotformBridge\Submission;
 use JotformBridge\Api\ApiResponse;
 use JotformBridge\Api\JotformClient;
 use JotformBridge\Settings\Settings;
+use JotformBridge\Support\Features;
 
 if (!defined('ABSPATH')) {
     exit;
@@ -39,6 +40,13 @@ if (!defined('ABSPATH')) {
  * Nothing here contacts Jotform. The usage snapshot is refreshed from the admin
  * screens, never from a request a visitor is waiting on — the same rule the
  * schema follows.
+ *
+ * The allowance half is currently switched off (Features::ACCOUNT_QUOTA): the
+ * setting is hidden, the spend is not read, and the ceiling it would impose does
+ * not apply. What stays on is the daily rate ceiling, which needs no account
+ * knowledge and makes no requests, and the reaction to Jotform actually
+ * refusing — that is not tracking, it is answering a refusal that has already
+ * happened, and ignoring it would only send the next visitor into the same wall.
  */
 final class QuotaGuard
 {
@@ -231,6 +239,10 @@ final class QuotaGuard
      */
     public function refreshUsage(JotformClient $client, bool $force = false): ?ApiResponse
     {
+        if (!Features::enabled(Features::ACCOUNT_QUOTA)) {
+            return null;
+        }
+
         $state = $this->state();
 
         if (!$force && $state['usage_checked_at'] > time() - self::USAGE_TTL) {
@@ -299,6 +311,10 @@ final class QuotaGuard
      */
     public function isNearQuota(): bool
     {
+        if (!Features::enabled(Features::ACCOUNT_QUOTA)) {
+            return false;
+        }
+
         $state = $this->state();
         $quota = $this->settings->monthlyQuota();
 
@@ -368,6 +384,10 @@ final class QuotaGuard
      */
     private function remainingThisMonth(array $state): ?int
     {
+        if (!Features::enabled(Features::ACCOUNT_QUOTA)) {
+            return null;
+        }
+
         $quota = $this->settings->monthlyQuota();
 
         if ($quota <= 0 || $state['usage_checked_at'] <= 0) {

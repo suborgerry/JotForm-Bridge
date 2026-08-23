@@ -18,6 +18,7 @@ use JotformBridge\Admin\ApiKeyNotice;
 use JotformBridge\Admin\SettingsPage;
 use JotformBridge\Api\ConnectionState;
 use JotformBridge\Settings\Settings;
+use JotformBridge\Support\Features;
 
 if (!defined('ABSPATH')) {
     exit;
@@ -195,6 +196,7 @@ if (!$jfbHasKey) {
                 </td>
             </tr>
 
+            <?php if (Features::enabled(Features::ACCOUNT_QUOTA)) : ?>
             <tr>
                 <th scope="row">
                     <label for="jotform-bridge-monthly-quota">
@@ -221,6 +223,7 @@ if (!$jfbHasKey) {
                     </p>
                 </td>
             </tr>
+            <?php endif; ?>
 
             <tr>
                 <th scope="row"><?php echo esc_html__('Debug Logging', 'jotform-bridge'); ?></th>
