@@ -146,4 +146,66 @@ final class LifecycleTest extends TestCase
             'A theme switch says nothing about the Jotform schema.'
         );
     }
+
+    /**
+     * A network activation fires the hook once, not once per site, so a step
+     * that only touched the current blog would leave every other one carrying
+     * whatever the previous version left behind.
+     */
+    public function testANetworkActivationVisitsEverySite(): void
+    {
+        $visited = [];
+
+        Functions\when('is_multisite')->justReturn(true);
+        Functions\when('get_sites')->justReturn([1, 7, 42]);
+        Functions\when('switch_to_blog')->alias(
+            function (int $siteId) use (&$visited): bool {
+                $visited[] = $siteId;
+
+                return true;
+            }
+        );
+        Functions\when('restore_current_blog')->justReturn(true);
+
+        Plugin::onActivate(true);
+
+        $this->assertSame([1, 7, 42], $visited);
+    }
+
+    /**
+     * A single-site activation must not start switching blogs around.
+     */
+    public function testASingleSiteActivationDoesNotSwitchBlogs(): void
+    {
+        Functions\when('is_multisite')->justReturn(true);
+        Functions\when('switch_to_blog')->alias(
+            static function (): void {
+                throw new \RuntimeException('A per-site activation must not switch blogs.');
+            }
+        );
+
+        Plugin::onActivate(false);
+
+        $this->assertSame(JOTFORM_BRIDGE_VERSION, $this->options[Plugin::VERSION_OPTION]);
+    }
+
+    public function testANetworkDeactivationVisitsEverySite(): void
+    {
+        $visited = [];
+
+        Functions\when('is_multisite')->justReturn(true);
+        Functions\when('get_sites')->justReturn([2, 3]);
+        Functions\when('switch_to_blog')->alias(
+            function (int $siteId) use (&$visited): bool {
+                $visited[] = $siteId;
+
+                return true;
+            }
+        );
+        Functions\when('restore_current_blog')->justReturn(true);
+
+        Plugin::onDeactivate(true);
+
+        $this->assertSame([2, 3], $visited);
+    }
 }

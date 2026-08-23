@@ -298,21 +298,71 @@ final class Plugin
      * filesystem scan, no default integrations. Everything the plugin needs is
      * built on demand, so there is nothing here that could fatal on a site with
      * no API key yet.
+     *
+     * @param bool $networkWide True when the plugin was activated for a whole
+     *                          multisite network, in which case the hook fires
+     *                          once rather than once per site.
      */
-    public static function onActivate(): void
+    public static function onActivate(bool $networkWide = false): void
     {
-        self::flushCaches();
-        Settings::purgeStoredKey();
+        self::eachSite(
+            static function (): void {
+                self::flushCaches();
+                Settings::purgeStoredKey();
 
-        update_option(self::VERSION_OPTION, JOTFORM_BRIDGE_VERSION, false);
+                update_option(self::VERSION_OPTION, JOTFORM_BRIDGE_VERSION, false);
+            },
+            $networkWide
+        );
     }
 
     /**
      * Caches are disposable; configuration is left untouched on deactivation.
      */
-    public static function onDeactivate(): void
+    public static function onDeactivate(bool $networkWide = false): void
     {
-        self::flushCaches();
+        self::eachSite([self::class, 'flushCaches'], $networkWide);
+    }
+
+    /**
+     * Runs one lifecycle step against every site it applies to.
+     *
+     * Options are per site, and the activation hook fires once for a whole
+     * network rather than once per site in it, so a network activation that
+     * only touched the current blog would leave every other one carrying state
+     * from whatever version was there before.
+     *
+     * Only activation and deactivation need this. maybeUpgrade() runs on
+     * `plugins_loaded`, which happens inside one site's context on every
+     * request, so each site upgrades itself the first time it is visited.
+     *
+     * @param callable(): void $step
+     */
+    private static function eachSite(callable $step, bool $networkWide): void
+    {
+        if (!$networkWide || !is_multisite()) {
+            $step();
+
+            return;
+        }
+
+        foreach (self::siteIds() as $siteId) {
+            switch_to_blog($siteId);
+
+            $step();
+
+            restore_current_blog();
+        }
+    }
+
+    /**
+     * @return array<int, int>
+     */
+    private static function siteIds(): array
+    {
+        $sites = get_sites(['fields' => 'ids', 'number' => 0]);
+
+        return is_array($sites) ? array_map('intval', $sites) : [];
     }
 
     /**
