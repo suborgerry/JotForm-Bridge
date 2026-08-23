@@ -10,6 +10,7 @@ use JotformBridge\Integrations\CompatibilityChecker;
 use JotformBridge\Integrations\Integration;
 use JotformBridge\Integrations\IntegrationRepository;
 use JotformBridge\Integrations\RedirectTarget;
+use JotformBridge\Support\Features;
 use JotformBridge\Support\Stats;
 use JotformBridge\Templates\TemplateRegistry;
 
@@ -129,6 +130,7 @@ final class IntegrationsPage
     {
         $integrations = $this->integrations->all();
         $templates    = $this->templates;
+        $showStats    = Features::enabled(Features::STATS_UI);
         $rows         = [];
 
         foreach ($integrations as $integration) {
@@ -144,9 +146,10 @@ final class IntegrationsPage
                     && $this->schemas->isSynced($integration->formId()),
                 'schema_stale'  => $integration->formId() !== ''
                     && $this->schemas->isStale($integration->formId()),
-                'stats'         => $this->stats->summary($integration->slug(), 7),
-                'health'        => $this->stats->health($integration->slug()),
-                'last_ok'       => $this->stats->lastSuccess($integration->slug()),
+                // Counting never stops; only the reading of it is optional.
+                'stats'         => $showStats ? $this->stats->summary($integration->slug(), 7) : null,
+                'health'        => $showStats ? $this->stats->health($integration->slug()) : '',
+                'last_ok'       => $showStats ? $this->stats->lastSuccess($integration->slug()) : 0,
             ];
         }
 
@@ -186,11 +189,12 @@ final class IntegrationsPage
         $schemaStale   = $integration->formId() !== '' && $this->schemas->isStale($integration->formId());
         $forms         = $this->forms->all();
         $templates     = $this->templates->choices();
-        $stats         = $integration->slug() !== '' ? $this->stats->summary($integration->slug(), 7) : null;
-        $statsToday    = $integration->slug() !== '' ? $this->stats->summary($integration->slug(), 1) : null;
-        $statsFields   = $integration->slug() !== '' ? $this->stats->fieldErrors($integration->slug(), 7) : [];
-        $statsHealth   = $integration->slug() !== '' ? $this->stats->health($integration->slug()) : 'idle';
-        $statsLastOk   = $integration->slug() !== '' ? $this->stats->lastSuccess($integration->slug()) : 0;
+        $showStats     = Features::enabled(Features::STATS_UI) && $integration->slug() !== '';
+        $stats         = $showStats ? $this->stats->summary($integration->slug(), 7) : null;
+        $statsToday    = $showStats ? $this->stats->summary($integration->slug(), 1) : null;
+        $statsFields   = $showStats ? $this->stats->fieldErrors($integration->slug(), 7) : [];
+        $statsHealth   = $showStats ? $this->stats->health($integration->slug()) : 'idle';
+        $statsLastOk   = $showStats ? $this->stats->lastSuccess($integration->slug()) : 0;
         $notice        = $flash;
         $page          = self::MENU_SLUG;
 

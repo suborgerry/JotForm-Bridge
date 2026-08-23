@@ -51,7 +51,9 @@ $jfbNewUrl = add_query_arg(['page' => $page, 'view' => 'new'], admin_url('admin.
                 <th scope="col"><?php echo esc_html__('Rendering Mode', 'jotform-bridge'); ?></th>
                 <th scope="col"><?php echo esc_html__('Template', 'jotform-bridge'); ?></th>
                 <th scope="col"><?php echo esc_html__('Active', 'jotform-bridge'); ?></th>
-                <th scope="col"><?php echo esc_html__('Last 7 days', 'jotform-bridge'); ?></th>
+                <?php if ($showStats) : ?>
+                    <th scope="col"><?php echo esc_html__('Last 7 days', 'jotform-bridge'); ?></th>
+                <?php endif; ?>
                 <th scope="col"><?php echo esc_html__('Schema', 'jotform-bridge'); ?></th>
                 <th scope="col"><?php echo esc_html__('Compatibility', 'jotform-bridge'); ?></th>
                 <th scope="col"><?php echo esc_html__('Redirect target', 'jotform-bridge'); ?></th>
@@ -61,7 +63,7 @@ $jfbNewUrl = add_query_arg(['page' => $page, 'view' => 'new'], admin_url('admin.
         <tbody>
             <?php if ($rows === []) : ?>
                 <tr>
-                    <td colspan="11">
+                    <td colspan="<?php echo $showStats ? 11 : 10; ?>">
                         <?php echo esc_html__('No integrations yet. Add one to connect a Jotform form to a template.', 'jotform-bridge'); ?>
                     </td>
                 </tr>
@@ -112,6 +114,7 @@ $jfbNewUrl = add_query_arg(['page' => $page, 'view' => 'new'], admin_url('admin.
                             : esc_html__('No', 'jotform-bridge');
                         ?>
                     </td>
+                    <?php if ($showStats) : ?>
                     <td>
                         <?php
                         $jfbStats  = $jfbRow['stats'];
@@ -151,6 +154,7 @@ $jfbNewUrl = add_query_arg(['page' => $page, 'view' => 'new'], admin_url('admin.
                             </strong></p>
                         <?php endif; ?>
                     </td>
+                    <?php endif; ?>
                     <td>
                         <?php if (!$jfbRow['schema_synced']) : ?>
                             <strong style="color:#b32d2e;">
