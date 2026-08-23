@@ -11,6 +11,14 @@ if (!defined('ABSPATH')) {
 /**
  * Discovers custom form templates by reading — never executing — theme files.
  *
+ * Discovery is split from analysis on purpose, because they cost very different
+ * amounts. discover() reads only the first few kilobytes of each file, enough
+ * for the headers, and is cheap enough to run whenever somebody asks what
+ * templates exist. fields() reads a whole file looking for the identifiers it
+ * declares, and is only needed by the compatibility report on an admin screen.
+ * Doing both at once would have made "list the templates" as expensive as the
+ * heaviest thing anybody wants to know about them.
+ *
  * The scanner is the only component that touches the filesystem. It works
  * exclusively from paths it derives itself (theme directories) or that a
  * developer adds through the `jotform_bridge_template_paths` filter. A path
@@ -63,13 +71,15 @@ final class TemplateScanner
     private const SOURCE_BYTES = 262144;
 
     /**
+     * Lists the templates that exist right now, from headers only.
+     *
      * @return array{
      *     templates: array<string, array<string, mixed>>,
      *     diagnostics: array<int, array<string, string>>,
      *     roots: array<int, array{path:string, source:string}>
      * }
      */
-    public function scan(): array
+    public function discover(): array
     {
         $roots       = $this->roots();
         $templates   = [];
@@ -351,52 +361,15 @@ final class TemplateScanner
             ];
         }
 
-        $discovered = $this->fields($file);
-
-        if ($discovered['dynamic'] > 0) {
-            $diagnostics[] = [
-                'level'   => self::LEVEL_WARNING,
-                'code'    => self::CODE_DYNAMIC_FIELD,
-                'file'    => $file,
-                'slug'    => $slug,
-                'message' => sprintf(
-                    /* translators: 1: number of identifiers, 2: file name */
-                    _n(
-                        '%1$d dynamic field identifier in "%2$s" cannot be statically validated.',
-                        '%1$d dynamic field identifiers in "%2$s" cannot be statically validated.',
-                        $discovered['dynamic'],
-                        'jotform-bridge'
-                    ),
-                    $discovered['dynamic'],
-                    $shortName
-                ),
-            ];
-        }
-
-        if ($discovered['fields'] === [] && $discovered['dynamic'] === 0) {
-            $diagnostics[] = [
-                'level'   => self::LEVEL_WARNING,
-                'code'    => self::CODE_NO_FIELDS,
-                'file'    => $file,
-                'slug'    => $slug,
-                'message' => sprintf(
-                    /* translators: %s: file name */
-                    __('"%s" contains no data-jotform-field identifiers.', 'jotform-bridge'),
-                    $shortName
-                ),
-            ];
-        }
-
         return [
-            'slug'    => $slug,
-            'name'    => $name,
-            'file'    => $file,
-            'source'  => $source,
-            'fields'  => $discovered['fields'],
-            'dynamic' => $discovered['dynamic'],
-            'mtime'   => (int) @filemtime($file),
+            'slug'   => $slug,
+            'name'   => $name,
+            'file'   => $file,
+            'source' => $source,
+            'mtime'  => (int) @filemtime($file),
         ];
     }
+
 
     /**
      * @param array<string, mixed> $kept

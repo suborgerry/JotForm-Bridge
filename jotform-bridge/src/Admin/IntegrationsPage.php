@@ -25,7 +25,7 @@ if (!defined('ABSPATH')) {
  *
  * The screen itself only reads stored state. Jotform is contacted from the
  * explicit per-integration Sync Schema action and from nowhere else, and the
- * filesystem is scanned from the explicit Rescan Templates action. Saving an
+ * filesystem is read whenever the templates are listed. Saving an
  * integration, opening a screen or rendering a form never triggers a fetch.
  */
 final class IntegrationsPage
@@ -36,7 +36,6 @@ final class IntegrationsPage
     public const ACTION_SAVE    = 'jotform_bridge_save_integration';
     public const ACTION_DELETE  = 'jotform_bridge_delete_integration';
     public const ACTION_TOGGLE  = 'jotform_bridge_toggle_integration';
-    public const ACTION_RESCAN  = 'jotform_bridge_rescan_templates';
     public const ACTION_SYNC    = 'jotform_bridge_sync_schema';
     public const ACTION_TEST    = 'jotform_bridge_test_submission';
 
@@ -88,7 +87,6 @@ final class IntegrationsPage
         add_action('admin_post_' . self::ACTION_SAVE, [$this, 'handleSave']);
         add_action('admin_post_' . self::ACTION_DELETE, [$this, 'handleDelete']);
         add_action('admin_post_' . self::ACTION_TOGGLE, [$this, 'handleToggle']);
-        add_action('admin_post_' . self::ACTION_RESCAN, [$this, 'handleRescan']);
         add_action('admin_post_' . self::ACTION_SYNC, [$this, 'handleSyncSchema']);
 
         if ($this->tests !== null) {
@@ -340,42 +338,6 @@ final class IntegrationsPage
         }
 
         $this->redirect([]);
-    }
-
-    public function handleRescan(): void
-    {
-        $this->guard(self::ACTION_RESCAN);
-
-        $registry = $this->templates->rescan();
-        $count    = count($registry['templates']);
-
-        $messages = [];
-
-        foreach ($registry['diagnostics'] as $diagnostic) {
-            $messages[] = (string) $diagnostic['message'];
-        }
-
-        $hasError = false;
-
-        foreach ($registry['diagnostics'] as $diagnostic) {
-            if ((string) $diagnostic['level'] === 'error') {
-                $hasError = true;
-
-                break;
-            }
-        }
-
-        $this->flash(
-            $hasError ? 'warning' : 'success',
-            sprintf(
-                /* translators: %d: number of templates */
-                _n('%d template found.', '%d templates found.', $count, 'jotform-bridge'),
-                $count
-            ),
-            $messages
-        );
-
-        $this->redirect($this->returnArgs());
     }
 
     /**

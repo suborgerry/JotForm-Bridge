@@ -53,19 +53,22 @@ final class TemplateRegistryTest extends TestCase
         parent::tearDown();
     }
 
-    public function testTheFirstReadScansAndCachesTheResult(): void
+    public function testAReadFindsWhatIsOnDiskRightNow(): void
     {
         $this->write('contact.php', 'Contact Form', 'contact', '<input data-jotform-field="email">');
 
         $registry = new TemplateRegistry();
 
         $this->assertSame(['contact'], array_keys($registry->all()));
-        $this->assertArrayHasKey(TemplateRegistry::OPTION, $this->options);
         $this->assertSame(['contact' => 'Contact Form'], $registry->choices());
         $this->assertSame(['email'], $registry->fields('contact'));
     }
 
-    public function testAFilesystemChangeIsIgnoredUntilRescan(): void
+    /**
+     * The behaviour this class exists for: drop a file into the theme and it is
+     * there. No button, no cache to invalidate, nothing to remember.
+     */
+    public function testANewFileIsPickedUpWithoutAnyRefresh(): void
     {
         $this->write('contact.php', 'Contact Form', 'contact', '<input data-jotform-field="email">');
 
@@ -73,11 +76,67 @@ final class TemplateRegistryTest extends TestCase
 
         $this->write('consultation.php', 'Consultation', 'consultation', '');
 
-        // A fresh instance still reads the cache: no scan on an ordinary read.
-        $this->assertSame(['contact'], array_keys((new TemplateRegistry())->all()));
+        $this->assertSame(
+            ['consultation', 'contact'],
+            array_keys((new TemplateRegistry())->all())
+        );
+    }
+
+    /**
+     * An edited template must not keep reporting the fields it used to declare
+     * — that is what made the compatibility report lie under the old cache.
+     */
+    public function testAnEditedTemplateReportsItsNewFields(): void
+    {
+        $this->write('contact.php', 'Contact Form', 'contact', '<input data-jotform-field="email">');
+
+        $this->assertSame(['email'], (new TemplateRegistry())->fields('contact'));
+
+        $this->write(
+            'contact.php',
+            'Contact Form',
+            'contact',
+            '<input data-jotform-field="email"><input data-jotform-field="message">'
+        );
+
+        $this->assertSame(['email', 'message'], (new TemplateRegistry())->fields('contact'));
+    }
+
+    /**
+     * A deleted file disappears from the list, so nothing can be rendered from
+     * a path that no longer exists.
+     */
+    public function testADeletedTemplateDisappears(): void
+    {
+        $this->write('contact.php', 'Contact Form', 'contact', '');
+
+        $this->assertTrue((new TemplateRegistry())->has('contact'));
+
+        unlink($this->root . '/theme/forms/contact.php');
 
         $registry = new TemplateRegistry();
-        $registry->rescan();
+
+        $this->assertFalse($registry->has('contact'));
+        $this->assertNull($registry->file('contact'));
+    }
+
+    /**
+     * Cheap to read repeatedly, but not free: within one request the answer
+     * cannot change, so the directory is walked once.
+     */
+    public function testTheScanIsMemoizedWithinOneRequest(): void
+    {
+        $this->write('contact.php', 'Contact Form', 'contact', '<input data-jotform-field="email">');
+
+        $registry = new TemplateRegistry();
+
+        $registry->all();
+
+        $this->write('consultation.php', 'Consultation', 'consultation', '');
+
+        $this->assertSame(['contact'], array_keys($registry->all()));
+
+        $registry->flush();
 
         $this->assertSame(['consultation', 'contact'], array_keys($registry->all()));
     }
@@ -145,21 +204,10 @@ final class TemplateRegistryTest extends TestCase
 
         unlink($this->root . '/theme/forms/contact.php');
 
-        // The entry is still cached, but the path must not be rendered.
+        // The entry is still memoized for this request, but a path that is gone
+        // must never be handed to the renderer.
         $this->assertTrue($registry->has('contact'));
         $this->assertNull($registry->file('contact'));
-    }
-
-    public function testFlushDropsTheStoredRegistry(): void
-    {
-        $this->write('contact.php', 'Contact Form', 'contact', '');
-
-        $registry = new TemplateRegistry();
-        $registry->all();
-
-        $registry->flush();
-
-        $this->assertArrayNotHasKey(TemplateRegistry::OPTION, $this->options);
     }
 
     private function write(string $file, string $name, string $slug, string $body): void

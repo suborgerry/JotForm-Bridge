@@ -321,14 +321,6 @@ $jfbReport  = $compatibility['report'] instanceof CompatibilityReport ? $compati
             </form>
         <?php endif; ?>
 
-        <form method="post" action="<?php echo esc_url(admin_url('admin-post.php')); ?>" style="display:inline-block;margin-right:8px;">
-            <input type="hidden" name="action" value="<?php echo esc_attr(IntegrationsPage::ACTION_RESCAN); ?>">
-            <input type="hidden" name="return_view" value="<?php echo $isNew ? 'new' : 'edit'; ?>">
-            <input type="hidden" name="return_integration" value="<?php echo esc_attr($integration->slug()); ?>">
-            <?php wp_nonce_field(IntegrationsPage::ACTION_RESCAN); ?>
-            <?php submit_button(__('Rescan Templates', 'jotform-bridge'), 'secondary', 'submit', false); ?>
-        </form>
-
         <?php if (!$isNew) : ?>
             <form
                 method="post"
@@ -474,6 +466,43 @@ $jfbReport  = $compatibility['report'] instanceof CompatibilityReport ? $compati
         <?php endif; ?>
     </p>
 
+    <?php
+    /**
+     * Everything the template and the Jotform form disagree about, named the
+     * way a developer would go looking for it: the field type, then the exact
+     * identifier to put in data-jotform-field.
+     */
+    $jfbReport   = $compatibility['report'];
+    $jfbMismatch = $jfbReport !== null
+        ? ['error' => $jfbReport->errors(), 'warning' => $jfbReport->warnings()]
+        : ['error' => [], 'warning' => []];
+    ?>
+
+    <?php foreach ($jfbMismatch as $jfbLevel => $jfbRows) : ?>
+        <?php if ($jfbRows !== []) : ?>
+            <h3>
+                <?php
+                echo $jfbLevel === 'error'
+                    ? esc_html__('These stop the form from working', 'jotform-bridge')
+                    : esc_html__('Worth a look', 'jotform-bridge');
+                ?>
+            </h3>
+            <ul class="ul-disc">
+                <?php foreach ($jfbRows as $jfbRow) : ?>
+                    <li>
+                        <code>[<?php echo esc_html((string) $jfbRow['type'] !== '' ? (string) $jfbRow['type'] : '—'); ?>]</code>
+                        <code>[<?php echo esc_html((string) $jfbRow['path'] !== '' ? (string) $jfbRow['path'] : '—'); ?>]</code>
+                        —
+                        <?php echo esc_html(CompatibilityReport::label((string) $jfbRow['status'])); ?>
+                        <?php if ((string) $jfbRow['message'] !== '') : ?>
+                            <span class="description"><?php echo esc_html((string) $jfbRow['message']); ?></span>
+                        <?php endif; ?>
+                    </li>
+                <?php endforeach; ?>
+            </ul>
+        <?php endif; ?>
+    <?php endforeach; ?>
+
     <h2><?php echo esc_html__('Redirect target status', 'jotform-bridge'); ?></h2>
     <p <?php echo RedirectTarget::isBroken($redirect) ? 'class="notice notice-warning inline"' : ''; ?>>
         <strong><?php echo esc_html((string) $redirect['label']); ?></strong>
@@ -603,7 +632,7 @@ $jfbReport  = $compatibility['report'] instanceof CompatibilityReport ? $compati
             printf(
                 /* translators: %s: file name to create in the theme */
                 esc_html__(
-                    'Built from the schema above. Save it as %s in your theme, press Rescan Templates, then pick it as this integration\'s template. Restyle it however you like — only the data-jotform-* attributes matter.',
+                    'Built from the schema above. Save it as %s in your theme, then pick it as this integration\'s template — it appears in the select straight away. Restyle it however you like: only the data-jotform-* attributes matter.',
                     'jotform-bridge'
                 ),
                 '<code>' . esc_html('forms/' . $scaffoldFile) . '</code>'

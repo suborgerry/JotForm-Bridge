@@ -8,7 +8,6 @@ use Brain\Monkey\Functions;
 use JotformBridge\Forms\FormRepository;
 use JotformBridge\Forms\SchemaRepository;
 use JotformBridge\Plugin;
-use JotformBridge\Templates\TemplateRegistry;
 use JotformBridge\Tests\TestCase;
 
 /**
@@ -32,7 +31,7 @@ final class LifecycleTest extends TestCase
 
         $this->options = [
             Plugin::VERSION_OPTION            => '0.0.9',
-            TemplateRegistry::OPTION          => ['templates' => [], 'generated_at' => 1],
+            'jotform_bridge_templates'        => ['templates' => [], 'generated_at' => 1],
             SchemaRepository::META_OPTION      => ['240000000000001' => ['fingerprint' => 'abc']],
             SchemaRepository::optionKey('240000000000001') => ['fields' => []],
             FormRepository::META_OPTION        => ['count' => 3],
@@ -72,11 +71,18 @@ final class LifecycleTest extends TestCase
         );
     }
 
-    public function testDeactivationDropsTheTemplateRegistryAndKeepsEverythingElse(): void
+    /**
+     * There is nothing derived left to drop: the template list is read from the
+     * theme on demand and never stored. So deactivation has to leave the site
+     * exactly as it found it.
+     */
+    public function testDeactivationTouchesNothing(): void
     {
+        $before = $this->options;
+
         Plugin::onDeactivate();
 
-        $this->assertArrayNotHasKey(TemplateRegistry::OPTION, $this->options);
+        $this->assertSame($before, $this->options);
 
         $this->assertArrayHasKey(
             SchemaRepository::optionKey('240000000000001'),
@@ -94,13 +100,24 @@ final class LifecycleTest extends TestCase
         $this->assertArrayHasKey('jotform_bridge_integrations', $this->options);
     }
 
-    public function testActivationDropsTheTemplateRegistryAndRecordsTheVersion(): void
+    public function testActivationRecordsTheVersionAndKeepsConfiguration(): void
     {
         Plugin::onActivate();
 
-        $this->assertArrayNotHasKey(TemplateRegistry::OPTION, $this->options);
         $this->assertSame(JOTFORM_BRIDGE_VERSION, $this->options[Plugin::VERSION_OPTION]);
         $this->assertArrayHasKey('jotform_bridge_integrations', $this->options);
+        $this->assertArrayHasKey(SchemaRepository::optionKey('240000000000001'), $this->options);
+    }
+
+    /**
+     * An option written by a version that still cached the template scan is
+     * dead weight, and an upgrade is the moment to take it out.
+     */
+    public function testActivationRemovesTheOldTemplateCache(): void
+    {
+        Plugin::onActivate();
+
+        $this->assertArrayNotHasKey('jotform_bridge_templates', $this->options);
     }
 
     /**
@@ -135,17 +152,6 @@ final class LifecycleTest extends TestCase
      * The registry stores absolute paths inside the theme that was active when it
      * was built, so it cannot outlive a theme switch.
      */
-    public function testATemplateRegistryFlushLeavesTheStoredSchemaAlone(): void
-    {
-        Plugin::flushTemplateRegistry();
-
-        $this->assertArrayNotHasKey(TemplateRegistry::OPTION, $this->options);
-        $this->assertArrayHasKey(
-            SchemaRepository::optionKey('240000000000001'),
-            $this->options,
-            'A theme switch says nothing about the Jotform schema.'
-        );
-    }
 
     /**
      * A network activation fires the hook once, not once per site, so a step
@@ -187,25 +193,5 @@ final class LifecycleTest extends TestCase
         Plugin::onActivate(false);
 
         $this->assertSame(JOTFORM_BRIDGE_VERSION, $this->options[Plugin::VERSION_OPTION]);
-    }
-
-    public function testANetworkDeactivationVisitsEverySite(): void
-    {
-        $visited = [];
-
-        Functions\when('is_multisite')->justReturn(true);
-        Functions\when('get_sites')->justReturn([2, 3]);
-        Functions\when('switch_to_blog')->alias(
-            function (int $siteId) use (&$visited): bool {
-                $visited[] = $siteId;
-
-                return true;
-            }
-        );
-        Functions\when('restore_current_blog')->justReturn(true);
-
-        Plugin::onDeactivate(true);
-
-        $this->assertSame([2, 3], $visited);
     }
 }

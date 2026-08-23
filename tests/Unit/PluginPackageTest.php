@@ -53,7 +53,9 @@ final class PluginPackageTest extends TestCase
 
         $plugin = (string) file_get_contents(self::PLUGIN_DIR . '/src/Plugin.php');
 
-        $this->assertStringContainsString("add_action('switch_theme'", $plugin);
+        // Templates are read from the theme on demand, so no cache has to be
+        // invalidated when the theme changes.
+        $this->assertStringNotContainsString("add_action('switch_theme'", $plugin);
     }
 
     /**

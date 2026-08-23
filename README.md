@@ -34,7 +34,7 @@ theme: templates address fields by readable identifiers such as `email` or
 * [Rendering a form](#rendering-a-form)
 * [Success redirect](#success-redirect)
 * [Compatibility validation](#compatibility-validation)
-* [Sync Schema, Refresh Forms, Rescan Templates](#sync-schema-refresh-forms-rescan-templates)
+* [Sync Schema, Refresh Forms](#sync-schema-refresh-forms)
 * [The REST endpoint](#the-rest-endpoint)
 * [JavaScript events](#javascript-events)
 * [Hooks](#hooks)
@@ -192,7 +192,7 @@ shallow — nested directories are an implementation detail of a template, not
 templates themselves — and it works by **reading** the file header. A template is
 never executed during discovery.
 
-After adding, renaming or removing a template file, press **Rescan Templates**.
+Adding, renaming or removing a template file takes effect immediately: the theme is read whenever the plugin needs the list.
 
 ### Header metadata
 
@@ -311,8 +311,7 @@ from the schema only means the form follows the Jotform form when it changes.
 
 A ready-to-copy template ships with the plugin at
 [`jotform-bridge/examples/contact.php`](jotform-bridge/examples/contact.php).
-Copy it to `your-theme/forms/contact.php` and press **Rescan Templates**. The
-short version:
+Copy it to `your-theme/forms/contact.php`. The short version:
 
 ```php
 <?php
@@ -466,7 +465,7 @@ guessed at — a wrong guess would either hide a real problem or invent one.
 
 ---
 
-## Sync Schema, Refresh Forms, Rescan Templates
+## Sync Schema, Refresh Forms
 
 Every call to Jotform is a button somebody pressed. There is no cron job, no
 background refresh and no expiry anywhere in the plugin.
@@ -476,7 +475,12 @@ background refresh and no expiry anywhere in the plugin.
 | **Sync Schema** | Integrations list (per row) and integration editor | Reloads **one** form's definition, re-normalizes it, stores it and re-checks compatibility |
 | **Test Connection** | Settings | One read-only `GET /user` call; records the result |
 | **Refresh Forms** | Settings | Reloads the account form list from Jotform |
-| **Rescan Templates** | Integrations | Re-reads the theme `forms/` directories |
+| **Send Test Submission** | Integration editor | Sends one real submission built from the stored schema and shows Jotform's answer verbatim |
+
+Templates are not on that list. They are read from the theme whenever the plugin
+needs to know what exists — drop a file into `forms/`, and it is in the select.
+Edit one, and the compatibility check describes the version on disk. There is
+nothing to press.
 
 Sync is per integration on purpose: it moves the contract between one template
 and one Jotform form, and a site with ten integrations should never have nine of
@@ -630,7 +634,11 @@ values.
 | --- | --- | --- | --- |
 | Normalized schema (one per form) | option `jotform_bridge_schema_{id}` | never | **Sync Schema** |
 | Account form list | option `jotform_bridge_forms` | never | **Refresh Forms** |
-| Template registry | option `jotform_bridge_templates` | never | **Rescan Templates**, theme switch, plugin upgrade |
+
+The template list is deliberately absent: it is not stored at all. Only the
+header of each file in `forms/` is read, on demand and once per request, which
+is cheap enough not to need a cache — and a cache is exactly what used to let an
+edited template keep reporting the fields it declared yesterday.
 
 Nothing in this table refreshes itself, and nothing in it expires. A front-end
 request — rendering a form or accepting a submission — reads what is stored and
@@ -646,10 +654,10 @@ rendering the old definition until somebody presses **Sync Schema**.
 If a sync fails, the previously stored schema is kept and the error is shown on
 the integration screen: a Jotform outage does not take your forms down.
 
-Deactivating the plugin drops only the template registry — the schemas stay, so
-reactivating does not leave every form on the site broken. A plugin upgrade keeps
-them too, and marks them as *synced by an older plugin version* so you can
-re-sync at a moment you choose. Uninstalling removes all three.
+Deactivating the plugin changes nothing at all: there is no derived state left
+to drop, so reactivating leaves every form exactly as it was. A plugin upgrade
+keeps the schemas too, and marks them as *synced by an older plugin version* so
+you can re-sync at a moment you choose. Uninstalling removes both.
 
 ---
 
@@ -702,7 +710,7 @@ Common situations:
 | "There is no integration with the slug …" | Typo in the slug, or the integration was renamed |
 | "Schema not synced" | Press Sync Schema on that integration; check the API key and the region |
 | Every API call fails on an EU account | The region is still set to Standard |
-| Template not in the registry | Press Rescan Templates; check the two header lines |
+| No template declares this slug | Check the two header lines in the file, and that it sits directly in `forms/` |
 | Submission answers 503 | The form was never synced, or the synced schema has errors — open the integration editor to see which |
 | A field is missing from Auto rendering | Its Jotform type is not supported; see the diagnostics |
 

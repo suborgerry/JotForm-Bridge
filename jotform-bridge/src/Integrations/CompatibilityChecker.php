@@ -101,7 +101,7 @@ final class CompatibilityChecker
                 __('Template not found', 'jotform-bridge'),
                 sprintf(
                     /* translators: %s: template slug */
-                    __('The template "%s" is not in the registry. Rescan templates or pick another one.', 'jotform-bridge'),
+                    __('No template file in the theme declares the slug "%s". Check its header, or pick another template.', 'jotform-bridge'),
                     $integration->templateSlug()
                 ),
                 $schema->fingerprint()

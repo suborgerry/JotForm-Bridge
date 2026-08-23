@@ -170,7 +170,6 @@ final class CompatibilityCheckerTest extends TestCase
         $this->writeTemplate('contact', '<input data-jotform-field="company">');
 
         $registry = new TemplateRegistry();
-        $registry->rescan();
 
         $result = $this->checker($registry)->check($this->integration());
 

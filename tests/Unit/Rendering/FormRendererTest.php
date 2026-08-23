@@ -264,7 +264,6 @@ final class FormRendererTest extends TestCase
     {
         $client   = new JotformClient('test-api-key', 'https://api.jotform.com');
         $registry = new TemplateRegistry();
-        $registry->rescan();
 
         return new FormRenderer(
             new IntegrationRepository(),

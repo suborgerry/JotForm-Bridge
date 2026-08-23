@@ -9,21 +9,42 @@ if (!defined('ABSPATH')) {
 }
 
 /**
- * The cached result of template discovery, and the allowlist of files the
- * plugin will ever render.
+ * What templates exist right now, and the allowlist of files the plugin will
+ * ever render.
  *
  * A path is renderable only because it is in here, and it is in here only
  * because TemplateScanner found it inside a trusted directory. Nothing else may
  * be treated as a template.
+ *
+ * The list is read from the filesystem on demand and never stored. It used to
+ * be a cached option refreshed by a "Rescan Templates" button, which meant a
+ * developer could drop a file into the theme, not see it in the select, and
+ * have no way of knowing why — and, worse, could edit a template and leave the
+ * compatibility report describing the previous version. Discovery is cheap
+ * enough not to need a cache: only the header of each file is read, and only
+ * when something actually asks.
+ *
+ * Two levels, memoized per request:
+ *
+ *  - the header scan, which answers "what exists" and "which file is this slug";
+ *  - the field analysis, which reads a whole file and is asked for only by the
+ *    compatibility report on an admin screen.
  */
 final class TemplateRegistry
 {
-    public const OPTION = 'jotform_bridge_templates';
-
     private TemplateScanner $scanner;
 
-    /** @var array<string, mixed>|null In-request memoization. */
-    private ?array $loaded = null;
+    /** @var array<string, mixed>|null In-request memo of the header scan. */
+    private ?array $discovered = null;
+
+    /**
+     * In-request memo of the field analysis, by slug. A compatibility check
+     * asks for the identifiers and the dynamic count separately, and reading
+     * the file twice for that would be silly.
+     *
+     * @var array<string, array{fields: array<int, string>, dynamic: int}>
+     */
+    private array $analysed = [];
 
     public function __construct(?TemplateScanner $scanner = null)
     {
@@ -31,18 +52,11 @@ final class TemplateRegistry
     }
 
     /**
-     * Reads the registry, scanning once if nothing has been stored yet.
-     *
-     * A normal page request must never trigger a filesystem scan beyond that
-     * first cold read; changes are picked up through rescan().
-     *
      * @return array<string, array<string, mixed>> Slug => entry.
      */
     public function all(): array
     {
-        $registry = $this->load();
-
-        return $registry['templates'];
+        return $this->load()['templates'];
     }
 
     /**
@@ -80,24 +94,18 @@ final class TemplateRegistry
     }
 
     /**
-     * @return array<int, string> The semantic identifiers found in a template.
+     * The semantic identifiers a template declares, read from the file now.
+     *
+     * @return array<int, string>
      */
     public function fields(string $slug): array
     {
-        $entry = $this->get($slug);
-
-        if ($entry === null || !is_array($entry['fields'])) {
-            return [];
-        }
-
-        return array_values(array_map('strval', $entry['fields']));
+        return $this->analyse($slug)['fields'];
     }
 
     public function dynamicCount(string $slug): int
     {
-        $entry = $this->get($slug);
-
-        return $entry === null ? 0 : (int) $entry['dynamic'];
+        return $this->analyse($slug)['dynamic'];
     }
 
     /**
@@ -130,65 +138,55 @@ final class TemplateRegistry
         return $this->load()['roots'];
     }
 
-    public function generatedAt(): int
-    {
-        return $this->load()['generated_at'];
-    }
-
     public function isEmpty(): bool
     {
         return $this->all() === [];
     }
 
     /**
-     * Drops the cache, scans again and stores the result.
+     * Drops the in-request memos.
      *
-     * @return array<string, mixed> The fresh registry.
+     * Only useful to a long-running process — WP-CLI, a test — that changes
+     * files and then asks again within the same request.
      */
-    public function rescan(): array
-    {
-        $this->flush();
-
-        return $this->load();
-    }
-
     public function flush(): void
     {
-        $this->loaded = null;
+        $this->discovered = null;
+        $this->analysed   = [];
+    }
 
-        delete_option(self::OPTION);
+    /**
+     * @return array{fields: array<int, string>, dynamic: int}
+     */
+    private function analyse(string $slug): array
+    {
+        $slug = sanitize_key($slug);
+
+        if (isset($this->analysed[$slug])) {
+            return $this->analysed[$slug];
+        }
+
+        $file = $this->file($slug);
+
+        return $this->analysed[$slug] = $file === null
+            ? ['fields' => [], 'dynamic' => 0]
+            : $this->scanner->fields($file);
     }
 
     /**
      * @return array{
      *     templates: array<string, array<string, mixed>>,
      *     diagnostics: array<int, array<string, string>>,
-     *     roots: array<int, array{path:string, source:string}>,
-     *     generated_at: int
+     *     roots: array<int, array{path:string, source:string}>
      * }
      */
     private function load(): array
     {
-        if ($this->loaded !== null) {
-            return $this->loaded;
+        if ($this->discovered !== null) {
+            return $this->discovered;
         }
 
-        $stored = get_option(self::OPTION, null);
-
-        if (is_array($stored) && isset($stored['templates'], $stored['generated_at'])) {
-            $this->loaded = $this->normalize($stored);
-
-            return $this->loaded;
-        }
-
-        $scanned                 = $this->scanner->scan();
-        $scanned['generated_at'] = time();
-
-        update_option(self::OPTION, $scanned, false);
-
-        $this->loaded = $this->normalize($scanned);
-
-        return $this->loaded;
+        return $this->discovered = $this->normalize($this->scanner->discover());
     }
 
     /**
@@ -197,8 +195,7 @@ final class TemplateRegistry
      * @return array{
      *     templates: array<string, array<string, mixed>>,
      *     diagnostics: array<int, array<string, string>>,
-     *     roots: array<int, array{path:string, source:string}>,
-     *     generated_at: int
+     *     roots: array<int, array{path:string, source:string}>
      * }
      */
     private function normalize(array $registry): array
@@ -216,8 +213,6 @@ final class TemplateRegistry
                     'name'     => (string) $entry['name'],
                     'file'     => (string) $entry['file'],
                     'source'   => isset($entry['source']) ? (string) $entry['source'] : '',
-                    'fields'   => isset($entry['fields']) && is_array($entry['fields']) ? $entry['fields'] : [],
-                    'dynamic'  => isset($entry['dynamic']) ? (int) $entry['dynamic'] : 0,
                     'mtime'    => isset($entry['mtime']) ? (int) $entry['mtime'] : 0,
                     'priority' => isset($entry['priority']) ? (int) $entry['priority'] : 0,
                 ];
@@ -225,14 +220,13 @@ final class TemplateRegistry
         }
 
         return [
-            'templates'    => $templates,
-            'diagnostics'  => isset($registry['diagnostics']) && is_array($registry['diagnostics'])
+            'templates'   => $templates,
+            'diagnostics' => isset($registry['diagnostics']) && is_array($registry['diagnostics'])
                 ? array_values($registry['diagnostics'])
                 : [],
-            'roots'        => isset($registry['roots']) && is_array($registry['roots'])
+            'roots'       => isset($registry['roots']) && is_array($registry['roots'])
                 ? array_values($registry['roots'])
                 : [],
-            'generated_at' => isset($registry['generated_at']) ? (int) $registry['generated_at'] : 0,
         ];
     }
 }

@@ -103,11 +103,6 @@ final class Plugin
 
         self::maybeUpgrade();
 
-        // Template discovery is theme-scoped: the registry holds absolute paths
-        // in the theme that was active when it was built, so it cannot survive a
-        // theme switch.
-        add_action('switch_theme', [self::class, 'flushTemplateRegistry']);
-
         add_action(
             'init',
             static function (): void {
@@ -335,8 +330,8 @@ final class Plugin
     {
         self::eachSite(
             static function (): void {
-                self::flushCaches();
                 Settings::purgeStoredKey();
+                self::purgeLegacyStorage();
 
                 update_option(self::VERSION_OPTION, JOTFORM_BRIDGE_VERSION, false);
             },
@@ -345,11 +340,11 @@ final class Plugin
     }
 
     /**
-     * Caches are disposable; configuration is left untouched on deactivation.
+     * Nothing to tear down: the plugin keeps no derived state that outlives a
+     * request, and configuration is never touched on deactivation.
      */
     public static function onDeactivate(bool $networkWide = false): void
     {
-        self::eachSite([self::class, 'flushCaches'], $networkWide);
     }
 
     /**
@@ -384,6 +379,24 @@ final class Plugin
     }
 
     /**
+     * Removes storage older versions used and this one does not.
+     *
+     * Runs on activation as well as on the version bump, because "deactivate,
+     * update, activate" is how a lot of people upgrade and it must clean up the
+     * same things.
+     */
+    private static function purgeLegacyStorage(): void
+    {
+        SchemaRepository::purgeLegacyTransients();
+
+        delete_transient(FormRepository::LEGACY_TRANSIENT);
+
+        // Versions up to 0.1.0 cached the template scan. The scan is now read
+        // from the theme on demand, so the option is dead weight.
+        delete_option('jotform_bridge_templates');
+    }
+
+    /**
      * @return array<int, int>
      */
     private static function siteIds(): array
@@ -394,39 +407,13 @@ final class Plugin
     }
 
     /**
-     * Drops the derived state that is cheap to rebuild.
-     *
-     * Synced schemas are deliberately not part of this. They are written only by
-     * an explicit per-integration Sync and nothing rebuilds them on its own, so
-     * dropping them here would take every form on the site down until somebody
-     * noticed and clicked through each integration by hand.
-     *
-     * Static because deactivation and activation have no built services to work
-     * with. Configuration — settings, integrations — is never touched here.
-     */
-    public static function flushCaches(): void
-    {
-        self::flushTemplateRegistry();
-    }
-
-    /**
-     * The template registry is a filesystem cache: it is rebuilt on demand.
-     */
-    public static function flushTemplateRegistry(): void
-    {
-        delete_option(TemplateRegistry::OPTION);
-    }
-
-    /**
      * Discards derived state after an upgrade.
      *
-     * A new version may store a registry entry differently, and a scan written
-     * by the previous version is not worth trusting. Synced schemas survive: a
-     * new version may normalize them differently, but that is reported as
-     * "synced by an older version — re-sync recommended" on the integration
-     * screen rather than acted on behind the site owner's back. The one thing
-     * rewritten here is the settings option: a key stored by a version that
-     * still accepted one has to leave the database.
+     * Synced schemas survive: a new version may normalize them differently, but
+     * that is reported as "synced by an older version — re-sync recommended" on
+     * the integration screen rather than acted on behind the site owner's back.
+     * The one thing rewritten here is the settings option: a key stored by a
+     * version that still accepted one has to leave the database.
      */
     private static function maybeUpgrade(): void
     {
@@ -436,12 +423,8 @@ final class Plugin
             return;
         }
 
-        self::flushCaches();
         Settings::purgeStoredKey();
-
-        // Storage the plugin no longer uses, left behind by an older version.
-        SchemaRepository::purgeLegacyTransients();
-        delete_transient(FormRepository::LEGACY_TRANSIENT);
+        self::purgeLegacyStorage();
 
         update_option(self::VERSION_OPTION, JOTFORM_BRIDGE_VERSION, false);
     }

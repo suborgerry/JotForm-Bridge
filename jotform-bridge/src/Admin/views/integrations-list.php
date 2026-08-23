@@ -223,11 +223,14 @@ $jfbNewUrl = add_query_arg(['page' => $page, 'view' => 'new'], admin_url('admin.
 
     <h2><?php echo esc_html__('Templates', 'jotform-bridge'); ?></h2>
 
-    <form method="post" action="<?php echo esc_url(admin_url('admin-post.php')); ?>">
-        <input type="hidden" name="action" value="<?php echo esc_attr(IntegrationsPage::ACTION_RESCAN); ?>">
-        <?php wp_nonce_field(IntegrationsPage::ACTION_RESCAN); ?>
-        <?php submit_button(__('Rescan Templates', 'jotform-bridge'), 'secondary', 'submit', false); ?>
-    </form>
+    <p class="description">
+        <?php
+        echo esc_html__(
+            'Read from the theme on every page load. Add, rename or edit a file and it is picked up immediately — there is nothing to refresh.',
+            'jotform-bridge'
+        );
+        ?>
+    </p>
 
     <p class="description">
         <?php

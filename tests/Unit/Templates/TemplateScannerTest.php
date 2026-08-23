@@ -40,7 +40,7 @@ final class TemplateScannerTest extends TestCase
             $this->template('Contact Form', 'contact', '<input data-jotform-field="email">')
         );
 
-        $result = (new TemplateScanner())->scan();
+        $result = (new TemplateScanner())->discover();
 
         $this->assertArrayHasKey('contact', $result['templates']);
         $this->assertSame('Contact Form', $result['templates']['contact']['name']);
@@ -55,7 +55,7 @@ final class TemplateScannerTest extends TestCase
     {
         $this->write('child/forms/helper.php', "<?php\n// Just a theme partial.\n");
 
-        $result = (new TemplateScanner())->scan();
+        $result = (new TemplateScanner())->discover();
 
         $this->assertSame([], $result['templates']);
         $this->assertSame([], $result['diagnostics']);
@@ -68,7 +68,7 @@ final class TemplateScannerTest extends TestCase
             "<?php\n/*\nJotform Template Slug: broken\n*/\n"
         );
 
-        $result = (new TemplateScanner())->scan();
+        $result = (new TemplateScanner())->discover();
 
         $this->assertSame([], $result['templates']);
         $this->assertSame(TemplateScanner::CODE_MISSING_NAME, $result['diagnostics'][0]['code']);
@@ -82,7 +82,7 @@ final class TemplateScannerTest extends TestCase
             "<?php\n/*\nJotform Template Name: Broken\n*/\n"
         );
 
-        $result = (new TemplateScanner())->scan();
+        $result = (new TemplateScanner())->discover();
 
         $this->assertSame([], $result['templates']);
         $this->assertSame(TemplateScanner::CODE_MISSING_SLUG, $result['diagnostics'][0]['code']);
@@ -95,7 +95,7 @@ final class TemplateScannerTest extends TestCase
             "<?php\n/*\nJotform Template Name: Broken\nJotform Template Slug: ***\n*/\n"
         );
 
-        $result = (new TemplateScanner())->scan();
+        $result = (new TemplateScanner())->discover();
 
         $this->assertSame([], $result['templates']);
         $this->assertSame(TemplateScanner::CODE_INVALID_SLUG, $result['diagnostics'][0]['code']);
@@ -108,7 +108,7 @@ final class TemplateScannerTest extends TestCase
             "<?php\n/*\nJotform Template Name: Contact\nJotform Template Slug: contact\nJotform Form ID: 240000000000001\n*/\n"
         );
 
-        $result = (new TemplateScanner())->scan();
+        $result = (new TemplateScanner())->discover();
 
         $this->assertSame([], $result['templates'], 'A template must never name a Jotform form.');
         $this->assertSame(TemplateScanner::CODE_FORBIDDEN, $result['diagnostics'][0]['code']);
@@ -119,7 +119,7 @@ final class TemplateScannerTest extends TestCase
         $this->write('child/forms/a-contact.php', $this->template('First', 'contact', ''));
         $this->write('child/forms/b-contact.php', $this->template('Second', 'contact', ''));
 
-        $result = (new TemplateScanner())->scan();
+        $result = (new TemplateScanner())->discover();
 
         $this->assertCount(1, $result['templates']);
         $this->assertSame('First', $result['templates']['contact']['name']);
@@ -140,11 +140,11 @@ final class TemplateScannerTest extends TestCase
             $this->template('Child Contact', 'contact', '<input data-jotform-field="phone">')
         );
 
-        $result = (new TemplateScanner())->scan();
+        $result = (new TemplateScanner())->discover();
 
         $this->assertCount(1, $result['templates']);
         $this->assertSame('Child Contact', $result['templates']['contact']['name']);
-        $this->assertSame(['phone'], $result['templates']['contact']['fields']);
+        $this->assertSame(['phone'], (new TemplateScanner())->fields($result['templates']['contact']['file'])['fields']);
 
         $codes = array_column($result['diagnostics'], 'code');
 
@@ -156,7 +156,7 @@ final class TemplateScannerTest extends TestCase
     {
         $this->write('parent/forms/career.php', $this->template('Career', 'career', ''));
 
-        $result = (new TemplateScanner())->scan();
+        $result = (new TemplateScanner())->discover();
 
         $this->assertArrayHasKey('career', $result['templates']);
         $this->assertSame(TemplateScanner::SOURCE_PARENT_THEME, $result['templates']['career']['source']);
@@ -169,7 +169,7 @@ final class TemplateScannerTest extends TestCase
 
         symlink($this->root . '/untrusted/evil.php', $this->root . '/child/forms/evil.php');
 
-        $result = (new TemplateScanner())->scan();
+        $result = (new TemplateScanner())->discover();
 
         $this->assertSame([], $result['templates']);
         $this->assertSame(TemplateScanner::CODE_OUTSIDE_ROOT, $result['diagnostics'][0]['code']);
@@ -187,7 +187,7 @@ final class TemplateScannerTest extends TestCase
                 ]
             );
 
-        $result = (new TemplateScanner())->scan();
+        $result = (new TemplateScanner())->discover();
 
         $paths = array_column($result['roots'], 'path');
 
@@ -208,7 +208,7 @@ final class TemplateScannerTest extends TestCase
                 fn(array $paths): array => array_merge($paths, [$this->root . '/plugin/forms'])
             );
 
-        $result = (new TemplateScanner())->scan();
+        $result = (new TemplateScanner())->discover();
 
         $this->assertArrayHasKey('extra', $result['templates']);
         $this->assertSame(TemplateScanner::SOURCE_FILTER, $result['templates']['extra']['source']);
@@ -219,7 +219,7 @@ final class TemplateScannerTest extends TestCase
         mkdir($this->root . '/child/forms/partials', 0777, true);
         $this->write('child/forms/partials/field.php', $this->template('Partial', 'partial', ''));
 
-        $result = (new TemplateScanner())->scan();
+        $result = (new TemplateScanner())->discover();
 
         $this->assertSame([], $result['templates']);
     }
@@ -239,13 +239,13 @@ final class TemplateScannerTest extends TestCase
             )
         );
 
-        $result = (new TemplateScanner())->scan();
+        $result = (new TemplateScanner())->discover();
 
         $this->assertSame(
             ['email', 'name.first', 'name.last', 'phone'],
-            $result['templates']['contact']['fields']
+            (new TemplateScanner())->fields($result['templates']['contact']['file'])['fields']
         );
-        $this->assertSame(0, $result['templates']['contact']['dynamic']);
+        $this->assertSame(0, (new TemplateScanner())->fields($result['templates']['contact']['file'])['dynamic']);
     }
 
     public function testDynamicFieldIdentifiersAreCountedButNotGuessed(): void
@@ -260,14 +260,11 @@ final class TemplateScannerTest extends TestCase
             )
         );
 
-        $result = (new TemplateScanner())->scan();
+        $result = (new TemplateScanner())->discover();
 
-        $this->assertSame(['email'], $result['templates']['contact']['fields']);
-        $this->assertSame(1, $result['templates']['contact']['dynamic']);
+        $this->assertSame(['email'], (new TemplateScanner())->fields($result['templates']['contact']['file'])['fields']);
+        $this->assertSame(1, (new TemplateScanner())->fields($result['templates']['contact']['file'])['dynamic']);
 
-        $codes = array_column($result['diagnostics'], 'code');
-
-        $this->assertContains(TemplateScanner::CODE_DYNAMIC_FIELD, $codes);
     }
 
     /**
@@ -293,10 +290,10 @@ final class TemplateScannerTest extends TestCase
             . '<input data-jotform-field="email">'
         );
 
-        $result = (new TemplateScanner())->scan();
+        $result = (new TemplateScanner())->discover();
 
-        $this->assertSame(['email'], $result['templates']['contact']['fields']);
-        $this->assertSame(0, $result['templates']['contact']['dynamic']);
+        $this->assertSame(['email'], (new TemplateScanner())->fields($result['templates']['contact']['file'])['fields']);
+        $this->assertSame(0, (new TemplateScanner())->fields($result['templates']['contact']['file'])['dynamic']);
     }
 
     /**
@@ -315,22 +312,27 @@ final class TemplateScannerTest extends TestCase
             )
         );
 
-        $result = (new TemplateScanner())->scan();
+        $result = (new TemplateScanner())->discover();
 
-        $this->assertSame(['email', 'phone'], $result['templates']['contact']['fields']);
+        $this->assertSame(['email', 'phone'], (new TemplateScanner())->fields($result['templates']['contact']['file'])['fields']);
     }
 
-    public function testTemplateWithoutAnyFieldIsReported(): void
+    /**
+     * Discovery only reads headers, so a template with no fields is still a
+     * template. Whether it declares anything useful is the compatibility
+     * report's question, and it asks by analysing the file.
+     */
+    public function testTemplateWithoutAnyFieldIsStillDiscovered(): void
     {
         $this->write('child/forms/empty.php', $this->template('Empty', 'empty', '<p>Nothing</p>'));
 
-        $result = (new TemplateScanner())->scan();
+        $result = (new TemplateScanner())->discover();
 
         $this->assertArrayHasKey('empty', $result['templates']);
-
-        $codes = array_column($result['diagnostics'], 'code');
-
-        $this->assertContains(TemplateScanner::CODE_NO_FIELDS, $codes);
+        $this->assertSame(
+            ['fields' => [], 'dynamic' => 0],
+            (new TemplateScanner())->fields($result['templates']['empty']['file'])
+        );
     }
 
     public function testTheScannerNeverIncludesATemplate(): void
@@ -341,7 +343,7 @@ final class TemplateScannerTest extends TestCase
             . "define('JFB_TEMPLATE_WAS_EXECUTED', true);\n"
         );
 
-        (new TemplateScanner())->scan();
+        (new TemplateScanner())->discover();
 
         $this->assertFalse(defined('JFB_TEMPLATE_WAS_EXECUTED'));
     }

@@ -33,7 +33,8 @@ in an **integration**, which is a small record in the WordPress admin.
 Two rendering modes are available:
 
 * **Custom template** — a plain PHP file in your theme's `/forms/` directory.
-  This is the main use case.
+  This is the main use case. Templates are read from the theme as you go: add or
+  edit a file and it is picked up immediately, with nothing to refresh.
 * **Auto** — markup generated from the Jotform form definition, so an
   integration can go live before anybody has written a template.
 

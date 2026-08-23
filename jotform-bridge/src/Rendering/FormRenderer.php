@@ -115,7 +115,7 @@ final class FormRenderer
                 $slug,
                 sprintf(
                     /* translators: %s: template slug */
-                    __('The template "%s" is not registered. Rescan the templates.', 'jotform-bridge'),
+                    __('No template file in the theme declares the slug "%s".', 'jotform-bridge'),
                     $integration->templateSlug()
                 )
             );
