@@ -6,6 +6,12 @@
  * declared through `data-jotform-field`, posts them as JSON to the plugin REST
  * endpoint and reports the server's answer back into the markup.
  *
+ * Beside the semantic fields it carries a second, separate channel: any element
+ * marked with `data-jotform-spam` is collected into `spam`, which never passes
+ * through the field validator. That is what an anti-abuse provider — a honeypot,
+ * a challenge token — travels in, because a value that is not part of the
+ * Jotform form must not be sent as if it were.
+ *
  * The theme stays in charge of the UX. This script imposes no popup and no
  * animation; it only toggles state attributes and dispatches events the theme
  * can listen to:
@@ -27,6 +33,7 @@
     var SETTINGS = window.jotformBridgeSettings || {};
     var FORM_SELECTOR = 'form[data-jotform-bridge]';
     var FIELD_SELECTOR = '[data-jotform-field]';
+    var SPAM_SELECTOR = '[data-jotform-spam]';
     var ERROR_CONTAINER = '[data-jotform-errors]';
     var BUSY_ATTRIBUTE = 'data-jotform-busy';
 
@@ -113,6 +120,45 @@
         }
 
         return fields;
+    }
+
+    /**
+     * Collects the anti-abuse values of one form.
+     *
+     * These are deliberately kept out of `fields`: the server validates every
+     * semantic path against the Jotform schema and rejects the ones it does not
+     * know, so a honeypot or a challenge token sent as a field would fail every
+     * submission. They travel in their own container instead, which only the
+     * spam extension point ever reads.
+     *
+     * A checkbox contributes whether it is checked; everything else contributes
+     * its value. Nothing here is ever shown to the visitor, so there is no
+     * per-type handling beyond that.
+     */
+    function collectSpam(form) {
+        var spam = {};
+        var elements = form.querySelectorAll(SPAM_SELECTOR);
+
+        for (var i = 0; i < elements.length; i++) {
+            var element = elements[i];
+            var key = element.getAttribute('data-jotform-spam');
+
+            if (!key) {
+                continue;
+            }
+
+            var type = (element.getAttribute('type') || '').toLowerCase();
+
+            if (type === 'checkbox' || type === 'radio') {
+                spam[key] = element.checked ? element.value : '';
+
+                continue;
+            }
+
+            spam[key] = typeof element.value === 'string' ? element.value : '';
+        }
+
+        return spam;
     }
 
     /**
@@ -291,6 +337,7 @@
         }
 
         var fields = serialize(form);
+        var spam = collectSpam(form);
 
         clearErrors(form);
         showSuccess(form, '');
@@ -310,7 +357,7 @@
                 'Content-Type': 'application/json',
                 Accept: 'application/json'
             },
-            body: JSON.stringify({ fields: fields })
+            body: JSON.stringify({ fields: fields, spam: spam })
         })
             .then(function (response) {
                 status = response.status;
