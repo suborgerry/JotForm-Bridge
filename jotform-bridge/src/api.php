@@ -41,6 +41,26 @@ if (!function_exists('jotform_form')) {
     }
 }
 
+if (!function_exists('jotform_bridge_honeypot')) {
+    /**
+     * The honeypot markup for a custom template.
+     *
+     * Templates rendered through the plugin already receive the same string as
+     * `$honeypot`; this function exists for markup built outside that context.
+     * The output is escaped and safe to print:
+     *
+     *     <?php echo jotform_bridge_honeypot(); ?>
+     */
+    function jotform_bridge_honeypot(string $slug = ''): string
+    {
+        $slug = sanitize_key($slug);
+
+        return \JotformBridge\Submission\Guards\Honeypot::markup(
+            $slug !== '' ? 'jfb-' . $slug : 'jfb'
+        );
+    }
+}
+
 if (!function_exists('jotform_bridge_endpoint')) {
     /**
      * The REST endpoint an integration submits to.

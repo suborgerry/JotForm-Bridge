@@ -19,6 +19,7 @@ use JotformBridge\Rendering\CustomTemplateRenderer;
 use JotformBridge\Rendering\FormRenderer;
 use JotformBridge\Rest\SubmissionController;
 use JotformBridge\Settings\Settings;
+use JotformBridge\Submission\Guards\Honeypot;
 use JotformBridge\Submission\SubmissionPipeline;
 use JotformBridge\Support\Logger;
 use JotformBridge\Templates\TemplateRegistry;
@@ -111,6 +112,11 @@ final class Plugin
         add_action('wp_enqueue_scripts', [$this->assets(), 'register']);
 
         add_shortcode('jotform_form', [$this->renderer(), 'shortcode']);
+
+        // The shipped anti-abuse providers register themselves on the spam
+        // extension point, exactly like a third-party one would. Registering is
+        // free: a form without the matching markup never triggers them.
+        (new Honeypot())->register();
 
         (new SubmissionController($this->pipeline()))->register();
 

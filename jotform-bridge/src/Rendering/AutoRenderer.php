@@ -7,6 +7,7 @@ namespace JotformBridge\Rendering;
 use JotformBridge\Forms\FieldNormalizer;
 use JotformBridge\Forms\FormSchema;
 use JotformBridge\Integrations\Integration;
+use JotformBridge\Submission\Guards\Honeypot;
 
 if (!defined('ABSPATH')) {
     exit;
@@ -125,11 +126,15 @@ final class AutoRenderer
             . '<p class="jfb-success" data-jotform-success role="status" aria-live="polite"></p>'
             . '<div class="jfb-error jfb-error--form" data-jotform-errors role="alert" aria-live="assertive"></div>'
             . '%3$s'
-            . '<div class="jfb-actions"><button type="submit" class="jfb-submit">%4$s</button></div>'
+            . '%4$s'
+            . '<div class="jfb-actions"><button type="submit" class="jfb-submit">%5$s</button></div>'
             . '</form>',
             esc_url($endpoint),
             esc_attr($slug),
             implode('', $parts),
+            // Every automatically rendered form carries the decoy. A custom
+            // template decides for itself, through $honeypot in its context.
+            Honeypot::markup($prefix),
             esc_html__('Submit', 'jotform-bridge')
         );
     }

@@ -10,6 +10,7 @@ use JotformBridge\Forms\SchemaBuilder;
 use JotformBridge\Forms\SchemaRepository;
 use JotformBridge\Integrations\IntegrationRepository;
 use JotformBridge\Settings\Settings;
+use JotformBridge\Submission\Guards\Honeypot;
 use JotformBridge\Submission\SubmissionOutcome;
 use JotformBridge\Submission\SubmissionPipeline;
 use JotformBridge\Submission\ValidationResult;
@@ -205,6 +206,45 @@ final class SubmissionPipelineTest extends TestCase
         $this->assertSame(403, $outcome->status());
         $this->assertSame('Please solve the challenge.', $outcome->body()['message']);
         $this->assertSame([], $this->requests, 'A rejected submission must not reach Jotform.');
+    }
+
+    /**
+     * The wiring the honeypot depends on: a value that arrives in the request's
+     * `spam` container has to reach the extension point untouched, and a
+     * rejection there has to stop the submission before Jotform is called.
+     */
+    public function testAFilledHoneypotStopsTheSubmissionBeforeJotform(): void
+    {
+        $this->mockPost(200, ['responseCode' => 200, 'content' => ['submissionID' => '1']]);
+        $this->routeSpamFilterThroughHoneypot();
+
+        $outcome = $this->pipeline()->submit(
+            'contact',
+            $this->valid(),
+            ['ip' => '203.0.113.7', 'spam' => [Honeypot::KEY => 'https://spam.example']]
+        );
+
+        $this->assertSame(403, $outcome->status());
+        $this->assertSame([], $this->requests, 'A trapped bot must not reach Jotform.');
+
+        // The answer must not name the trap.
+        $this->assertStringNotContainsString('honeypot', strtolower((string) $outcome->body()['message']));
+        $this->assertStringNotContainsString(Honeypot::FIELD_NAME, (string) json_encode($outcome->body()));
+    }
+
+    public function testAnEmptyHoneypotLetsTheSubmissionThrough(): void
+    {
+        $this->mockPost(200, ['responseCode' => 200, 'content' => ['submissionID' => '1']]);
+        $this->routeSpamFilterThroughHoneypot();
+
+        $outcome = $this->pipeline()->submit(
+            'contact',
+            $this->valid(),
+            ['ip' => '203.0.113.7', 'spam' => [Honeypot::KEY => '']]
+        );
+
+        $this->assertSame(200, $outcome->status());
+        $this->assertCount(1, $this->requests);
     }
 
     public function testTheOutcomeNeverLeaksTheApiKey(): void
@@ -462,6 +502,26 @@ final class SubmissionPipelineTest extends TestCase
         $this->assertSame(422, $outcome->status());
         $this->assertArrayHasKey(ValidationResult::FORM_KEY, $outcome->errors());
         $this->assertSame([], $this->requests);
+    }
+
+    /**
+     * Brain Monkey leaves apply_filters() as a pass-through, so the shipped
+     * provider is attached by hand — the pipeline is what is under test here,
+     * not WordPress's hook system.
+     */
+    private function routeSpamFilterThroughHoneypot(): void
+    {
+        $honeypot = new Honeypot();
+
+        Functions\when('apply_filters')->alias(
+            static function (string $hook, $value, ...$args) use ($honeypot) {
+                if ($hook !== 'jotform_bridge_spam_check') {
+                    return $value;
+                }
+
+                return $honeypot->check($value, (string) $args[0], $args[1], $args[2]);
+            }
+        );
     }
 
     private function pipeline(): SubmissionPipeline

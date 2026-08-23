@@ -6,6 +6,7 @@ namespace JotformBridge\Rendering;
 
 use JotformBridge\Forms\FormSchema;
 use JotformBridge\Integrations\Integration;
+use JotformBridge\Submission\Guards\Honeypot;
 
 if (!defined('ABSPATH')) {
     exit;
@@ -25,7 +26,8 @@ final class TemplateContext
      * @return array{
      *     integration: array<string, string>,
      *     schema: array<string, mixed>,
-     *     endpoint: string
+     *     endpoint: string,
+     *     honeypot: string
      * }
      */
     public static function build(Integration $integration, FormSchema $schema, string $endpoint): array
@@ -41,6 +43,10 @@ final class TemplateContext
                 'required' => $schema->requiredPaths(),
             ],
             'endpoint'    => $endpoint,
+            // Ready-to-print markup rather than a flag: a template that simply
+            // echoes it gets the decoy right, and one that forgets is no worse
+            // off than before.
+            'honeypot'    => Honeypot::markup('jfb-' . $integration->slug()),
         ];
     }
 
