@@ -21,8 +21,10 @@ if (!defined('ABSPATH')) {
  * The REST controller owns none of this: it unwraps the HTTP request, calls
  * submit() and serializes the outcome. That keeps the pipeline testable without
  * WordPress and makes the security-relevant order explicit in one place —
- * lookup, activity, rate limit, quota guard, schema, validation, duplicate
- * check, spam check, mapping, upstream call.
+ * site-wide rate limit, lookup, activity, per-integration rate limit, quota
+ * guard, schema, validation, duplicate check, spam check, mapping, upstream
+ * call. Each step is cheaper than the one after it, so the requests worth
+ * refusing are refused before the expensive work happens.
  *
  * The visitor never influences which Jotform form is used: the slug is a lookup
  * key and nothing more.
@@ -91,7 +93,18 @@ final class SubmissionPipeline
      */
     public function submit(string $slug, $fields, array $context = []): SubmissionOutcome
     {
-        $slug        = sanitize_key($slug);
+        $slug = sanitize_key($slug);
+        $ip   = $this->ip($context);
+
+        // Before anything is looked up. An unknown slug answers 404 cheaply, so
+        // without this the whole rate limit could be sidestepped by probing for
+        // slugs instead of naming a real one.
+        $wait = $this->limiter->checkGlobal($ip);
+
+        if ($wait > 0) {
+            return $this->throttled($slug, $wait);
+        }
+
         $integration = $slug === '' ? null : $this->integrations->get($slug);
 
         if ($integration === null) {
@@ -102,23 +115,13 @@ final class SubmissionPipeline
             return SubmissionOutcome::error(403, __('This form is not accepting submissions.', 'jotform-bridge'));
         }
 
-        // Deliberately the first thing checked after the integration exists and
-        // is open. It needs neither the schema nor the values, so an address
-        // that is flooding the endpoint is turned away before the request costs
-        // a schema read or a pass through the validator.
-        $wait = $this->limiter->check($slug, $this->ip($context));
+        // The tighter, per-integration budget. Like the site-wide one it needs
+        // neither the schema nor the values, so a flood is turned away before
+        // the request costs a schema read or a pass through the validator.
+        $wait = $this->limiter->check($slug, $ip);
 
         if ($wait > 0) {
-            $this->note('Submission refused by the rate limit.', [
-                'integration' => $slug,
-                'retry_after' => $wait,
-            ]);
-
-            return SubmissionOutcome::error(
-                429,
-                __('Too many submissions from this device. Please wait a moment and try again.', 'jotform-bridge'),
-                ['Retry-After' => (string) $wait]
-            );
+            return $this->throttled($slug, $wait);
         }
 
         // The account-wide circuit breaker. It answers before the schema is
@@ -186,7 +189,7 @@ final class SubmissionPipeline
         }
 
         $window      = $this->duplicateWindow();
-        $fingerprint = $window > 0 ? $this->fingerprint($slug, $values, $context) : '';
+        $fingerprint = $window > 0 ? $this->fingerprint($slug, $values, $ip) : '';
 
         if ($fingerprint !== '' && get_transient($fingerprint) !== false) {
             return SubmissionOutcome::error(
@@ -262,6 +265,23 @@ final class SubmissionPipeline
     }
 
     /**
+     * The answer to an address that is sending too much.
+     */
+    private function throttled(string $slug, int $wait): SubmissionOutcome
+    {
+        $this->note('Submission refused by the rate limit.', [
+            'integration' => $slug,
+            'retry_after' => $wait,
+        ]);
+
+        return SubmissionOutcome::error(
+            429,
+            __('Too many submissions from this device. Please wait a moment and try again.', 'jotform-bridge'),
+            ['Retry-After' => (string) $wait]
+        );
+    }
+
+    /**
      * The redirect for an accepted submission, resolved at answer time.
      *
      * A broken target is a configuration problem, not a submission problem: the
@@ -312,10 +332,10 @@ final class SubmissionPipeline
      * @param array<string, string|array<int, string>> $values
      * @param array<string, mixed>                     $context
      */
-    private function fingerprint(string $slug, array $values, array $context): string
+    private function fingerprint(string $slug, array $values, string $ip): string
     {
         return self::DUPLICATE_TRANSIENT_PREFIX
-            . md5($slug . '|' . $this->ip($context) . '|' . (string) wp_json_encode($values));
+            . md5($slug . '|' . $ip . '|' . (string) wp_json_encode($values));
     }
 
     /**

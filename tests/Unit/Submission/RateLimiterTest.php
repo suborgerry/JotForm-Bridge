@@ -174,6 +174,50 @@ final class RateLimiterTest extends TestCase
         }
     }
 
+    public function testTheGlobalScopeIsSeparateFromTheIntegrationScope(): void
+    {
+        $limiter = new RateLimiter();
+
+        for ($i = 0; $i < RateLimiter::DEFAULT_PER_MINUTE + 1; $i++) {
+            $limiter->check('contact', '203.0.113.7');
+        }
+
+        // The per-integration budget is spent; the site-wide one is not.
+        $this->assertSame(0, $limiter->checkGlobal('203.0.113.7'));
+    }
+
+    /**
+     * Probing for slugs never reaches the per-integration bucket, so the
+     * site-wide one is what has to stop it.
+     */
+    public function testTheGlobalScopeCapsProbingAcrossIntegrations(): void
+    {
+        $limiter = new RateLimiter();
+
+        for ($i = 0; $i < RateLimiter::DEFAULT_GLOBAL_PER_MINUTE; $i++) {
+            $this->assertSame(0, $limiter->checkGlobal('203.0.113.7'));
+        }
+
+        $this->assertGreaterThan(0, $limiter->checkGlobal('203.0.113.7'));
+    }
+
+    public function testTheGlobalLimitsAreFilterable(): void
+    {
+        Functions\when('apply_filters')->alias(
+            static function (string $hook, $value) {
+                return $hook === 'jotform_bridge_global_rate_limits'
+                    ? ['per_minute' => 2, 'per_hour' => 2]
+                    : $value;
+            }
+        );
+
+        $limiter = new RateLimiter();
+
+        $this->assertSame(0, $limiter->checkGlobal('203.0.113.7'));
+        $this->assertSame(0, $limiter->checkGlobal('203.0.113.7'));
+        $this->assertGreaterThan(0, $limiter->checkGlobal('203.0.113.7'));
+    }
+
     /**
      * No address may end up readable in storage.
      */

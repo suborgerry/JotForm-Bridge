@@ -43,10 +43,16 @@
  *   [data-jotform-field-error="key"]          where that field's error goes
  *   [data-jotform-errors]                     where form-level errors go
  *   [data-jotform-success]                    where the success message goes
+ *   [data-jotform-spam="key"]                 an anti-abuse value, not a field
  *
  * A checkbox group shares one `data-jotform-field` across its inputs; so does a
- * radio group. Everything not carrying `data-jotform-field` is ignored, which is
- * how a honeypot or a layout helper stays out of the payload.
+ * radio group. Everything carrying neither attribute is ignored, which is how a
+ * layout helper stays out of the payload.
+ *
+ * The two attributes are separate on purpose: `data-jotform-field` values are
+ * checked against the Jotform schema and an unknown one fails the submission,
+ * so a honeypot marked that way would break every send. `$honeypot` below is
+ * ready-made markup that uses the right one.
  *
  * Nothing here is required to be dynamic: hard-coding the labels and the options
  * is perfectly fine. Reading them from `$schema` only means the form follows the
@@ -90,6 +96,9 @@ $required = static function (string $key) use ($fields): bool {
 >
     <p class="contact-form__success" data-jotform-success role="status" aria-live="polite"></p>
     <div class="contact-form__errors" data-jotform-errors role="alert" aria-live="assertive"></div>
+
+    <?php // Escaped by the plugin; print it as it is, anywhere inside the form. ?>
+    <?php echo $honeypot; // phpcs:ignore WordPress.Security.EscapeOutput.OutputNotEscaped ?>
 
     <?php if ($hasField('full_name.first')) : ?>
         <div class="contact-form__row">
@@ -210,12 +219,6 @@ $required = static function (string $key) use ($fields): bool {
             <?php echo $required('message') ? 'required' : ''; ?>
         ></textarea>
         <span class="contact-form__error" id="cf-message-error" data-jotform-field-error="message"></span>
-    </p>
-
-    <?php // Not a Jotform field, so it carries no data-jotform-field and is never sent. ?>
-    <p class="contact-form__honeypot" aria-hidden="true" style="position:absolute;left:-9999px;">
-        <label for="cf-website">Leave this empty</label>
-        <input type="text" id="cf-website" name="cf_website" tabindex="-1" autocomplete="off">
     </p>
 
     <p class="contact-form__actions">

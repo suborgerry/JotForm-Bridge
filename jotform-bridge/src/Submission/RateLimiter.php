@@ -9,7 +9,7 @@ if (!defined('ABSPATH')) {
 }
 
 /**
- * Caps how often one address may submit one integration.
+ * Caps how often one address may post to the submission endpoint.
  *
  * This protects the site, not the Jotform account: it stops a single source
  * from spending the server's time on validation and the account's quota on
@@ -19,6 +19,12 @@ if (!defined('ABSPATH')) {
  * Every attempt is counted, including the ones that go on to fail validation.
  * Counting only successes would make probing the form free, which is precisely
  * the activity worth making expensive.
+ *
+ * There are two scopes. The site-wide one is charged before the integration is
+ * even looked up, so that probing the endpoint for valid slugs costs the same
+ * as submitting: without it, an unknown slug answers 404 for free and the whole
+ * guard can be sidestepped by never naming a real form. The per-integration one
+ * is charged after, and is the tighter of the two.
  *
  * Fixed windows on transients, not a sliding log: the storage is one integer per
  * window per address, it expires on its own, and the worst case — a burst
@@ -36,11 +42,41 @@ final class RateLimiter
     /** Submissions allowed from one address per hour. */
     public const DEFAULT_PER_HOUR = 30;
 
+    /**
+     * Requests allowed from one address per minute across every integration.
+     *
+     * Looser than the per-integration budget, because a site may legitimately
+     * have several forms on one page, and tighter than the sum of them, because
+     * nobody fills in six different forms in a minute.
+     */
+    public const DEFAULT_GLOBAL_PER_MINUTE = 15;
+
+    /** Requests allowed from one address per hour across every integration. */
+    public const DEFAULT_GLOBAL_PER_HOUR = 60;
+
+    /**
+     * Bucket name for the site-wide scope. Not a valid slug, so it can never
+     * collide with a per-integration bucket.
+     */
+    private const GLOBAL_SCOPE = '*';
+
     private const MINUTE = 60;
     private const HOUR   = 3600;
 
     /**
-     * Decides whether one attempt may proceed, and records it when it may.
+     * The site-wide budget, charged before the integration is resolved.
+     *
+     * @param string $ip Visitor address; an empty string disables the check.
+     *
+     * @return int Seconds to wait, or 0 when the attempt is allowed.
+     */
+    public function checkGlobal(string $ip): int
+    {
+        return $this->consume(self::GLOBAL_SCOPE, $ip, $this->globalLimits());
+    }
+
+    /**
+     * The per-integration budget.
      *
      * @param string $ip Visitor address; an empty string disables the check.
      *
@@ -48,14 +84,22 @@ final class RateLimiter
      */
     public function check(string $slug, string $ip): int
     {
+        return $this->consume($slug, $ip, $this->limits($slug));
+    }
+
+    /**
+     * Decides whether one attempt may proceed, and records it when it may.
+     *
+     * @param array{per_minute:int, per_hour:int} $limits
+     */
+    private function consume(string $scope, string $ip, array $limits): int
+    {
         if ($ip === '') {
             // Without an address every visitor would share one bucket, and the
             // guard would turn into a site-wide outage the first time a burst
             // arrived. Refusing to guess is the safer failure.
             return 0;
         }
-
-        $limits = $this->limits($slug);
 
         $windows = [
             [self::MINUTE, (int) $limits['per_minute']],
@@ -70,7 +114,7 @@ final class RateLimiter
                 continue;
             }
 
-            $key   = $this->key($slug, $ip, $window);
+            $key   = $this->key($scope, $ip, $window);
             $count = (int) get_transient($key);
 
             if ($count >= $limit) {
@@ -99,6 +143,27 @@ final class RateLimiter
     /**
      * @return array{per_minute:int, per_hour:int}
      */
+    public function globalLimits(): array
+    {
+        $defaults = [
+            'per_minute' => self::DEFAULT_GLOBAL_PER_MINUTE,
+            'per_hour'   => self::DEFAULT_GLOBAL_PER_HOUR,
+        ];
+
+        /**
+         * Filters how many submission requests one address may send to the
+         * plugin as a whole, whichever integration they name.
+         *
+         * Set either value to 0 to disable that window.
+         *
+         * @param array{per_minute:int, per_hour:int} $limits Current limits.
+         */
+        return $this->normalize(apply_filters('jotform_bridge_global_rate_limits', $defaults), $defaults);
+    }
+
+    /**
+     * @return array{per_minute:int, per_hour:int}
+     */
     public function limits(string $slug): array
     {
         $defaults = [
@@ -114,27 +179,40 @@ final class RateLimiter
          * @param array{per_minute:int, per_hour:int} $limits Current limits.
          * @param string                              $slug   Integration slug.
          */
-        $filtered = apply_filters('jotform_bridge_rate_limits', $defaults, $slug);
+        return $this->normalize(apply_filters('jotform_bridge_rate_limits', $defaults, $slug), $defaults);
+    }
 
+    /**
+     * @param mixed                               $filtered
+     * @param array{per_minute:int, per_hour:int} $defaults
+     *
+     * @return array{per_minute:int, per_hour:int}
+     */
+    private function normalize($filtered, array $defaults): array
+    {
         if (!is_array($filtered)) {
             return $defaults;
         }
 
         return [
-            'per_minute' => isset($filtered['per_minute']) ? max(0, (int) $filtered['per_minute']) : $defaults['per_minute'],
-            'per_hour'   => isset($filtered['per_hour']) ? max(0, (int) $filtered['per_hour']) : $defaults['per_hour'],
+            'per_minute' => isset($filtered['per_minute'])
+                ? max(0, (int) $filtered['per_minute'])
+                : $defaults['per_minute'],
+            'per_hour'   => isset($filtered['per_hour'])
+                ? max(0, (int) $filtered['per_hour'])
+                : $defaults['per_hour'],
         ];
     }
 
     /**
-     * The bucket key: integration, address and window, hashed.
+     * The bucket key: scope, address and window, hashed.
      *
      * Only a hash is stored, so no address ever ends up in the options table —
      * the same rule the duplicate guard already follows.
      */
-    private function key(string $slug, string $ip, int $window): string
+    private function key(string $scope, string $ip, int $window): string
     {
-        return self::TRANSIENT_PREFIX . md5($slug . '|' . $ip . '|' . $window . '|' . $this->windowStart($window));
+        return self::TRANSIENT_PREFIX . md5($scope . '|' . $ip . '|' . $window . '|' . $this->windowStart($window));
     }
 
     private function windowStart(int $window): int

@@ -389,6 +389,43 @@ final class SubmissionPipelineTest extends TestCase
         $this->assertSame(0, (new QuotaGuard(new Settings()))->status()['since_check']);
     }
 
+    /**
+     * An unknown slug is the cheapest answer the endpoint has, which is exactly
+     * why probing for one must still be charged.
+     */
+    public function testProbingForSlugsIsRateLimitedToo(): void
+    {
+        for ($i = 0; $i < RateLimiter::DEFAULT_GLOBAL_PER_MINUTE; $i++) {
+            $this->assertSame(
+                404,
+                $this->pipeline()->submit('guess-' . $i, $this->valid(), ['ip' => '203.0.113.7'])->status()
+            );
+        }
+
+        $outcome = $this->pipeline()->submit('guess-again', $this->valid(), ['ip' => '203.0.113.7']);
+
+        $this->assertSame(429, $outcome->status());
+        $this->assertArrayHasKey('Retry-After', $outcome->headers());
+    }
+
+    /**
+     * Having spent the site-wide budget on probing, the attacker must not then
+     * find the real integration open.
+     */
+    public function testASpentGlobalBudgetAlsoClosesTheRealIntegration(): void
+    {
+        $this->mockPost(200, ['responseCode' => 200, 'content' => ['submissionID' => '1']]);
+
+        for ($i = 0; $i < RateLimiter::DEFAULT_GLOBAL_PER_MINUTE; $i++) {
+            $this->pipeline()->submit('guess-' . $i, $this->valid(), ['ip' => '203.0.113.7']);
+        }
+
+        $outcome = $this->pipeline()->submit('contact', $this->valid(), ['ip' => '203.0.113.7']);
+
+        $this->assertSame(429, $outcome->status());
+        $this->assertSame([], $this->requests);
+    }
+
     public function testTheOutcomeNeverLeaksTheApiKey(): void
     {
         $this->mockPost(500, ['responseCode' => 500, 'message' => 'boom']);
