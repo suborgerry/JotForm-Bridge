@@ -27,6 +27,7 @@ use JotformBridge\Submission\Guards\ProofOfWork;
 use JotformBridge\Submission\Guards\Turnstile;
 use JotformBridge\Submission\QuotaGuard;
 use JotformBridge\Submission\SubmissionPipeline;
+use JotformBridge\Submission\TestSubmission;
 use JotformBridge\Support\Logger;
 use JotformBridge\Support\Stats;
 use JotformBridge\Templates\TemplateRegistry;
@@ -170,7 +171,8 @@ final class Plugin
                 $this->templates(),
                 $this->compatibility(),
                 null,
-                $this->stats()
+                $this->stats(),
+                new TestSubmission($this->schemas(), $this->client(), null, null, $this->quota())
             ))->register();
 
             (new SettingsPage(

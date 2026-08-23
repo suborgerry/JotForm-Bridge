@@ -10,6 +10,7 @@ use JotformBridge\Integrations\CompatibilityChecker;
 use JotformBridge\Integrations\Integration;
 use JotformBridge\Integrations\IntegrationRepository;
 use JotformBridge\Integrations\RedirectTarget;
+use JotformBridge\Submission\TestSubmission;
 use JotformBridge\Support\Features;
 use JotformBridge\Support\Stats;
 use JotformBridge\Templates\TemplateRegistry;
@@ -36,6 +37,7 @@ final class IntegrationsPage
     public const ACTION_TOGGLE  = 'jotform_bridge_toggle_integration';
     public const ACTION_RESCAN  = 'jotform_bridge_rescan_templates';
     public const ACTION_SYNC    = 'jotform_bridge_sync_schema';
+    public const ACTION_TEST    = 'jotform_bridge_test_submission';
 
     private const FLASH_PREFIX = 'jotform_bridge_notice_';
 
@@ -53,6 +55,12 @@ final class IntegrationsPage
 
     private Stats $stats;
 
+    /**
+     * Null when the page was built without a Jotform client to send with, in
+     * which case the action is not registered and the button is not offered.
+     */
+    private ?TestSubmission $tests;
+
     public function __construct(
         IntegrationRepository $integrations,
         FormRepository $forms,
@@ -60,7 +68,8 @@ final class IntegrationsPage
         TemplateRegistry $templates,
         CompatibilityChecker $compatibility,
         ?RedirectTarget $redirects = null,
-        ?Stats $stats = null
+        ?Stats $stats = null,
+        ?TestSubmission $tests = null
     ) {
         $this->integrations  = $integrations;
         $this->forms         = $forms;
@@ -69,6 +78,7 @@ final class IntegrationsPage
         $this->compatibility = $compatibility;
         $this->redirects     = $redirects ?? new RedirectTarget();
         $this->stats         = $stats ?? new Stats();
+        $this->tests         = $tests;
     }
 
     public function register(): void
@@ -79,6 +89,10 @@ final class IntegrationsPage
         add_action('admin_post_' . self::ACTION_TOGGLE, [$this, 'handleToggle']);
         add_action('admin_post_' . self::ACTION_RESCAN, [$this, 'handleRescan']);
         add_action('admin_post_' . self::ACTION_SYNC, [$this, 'handleSyncSchema']);
+
+        if ($this->tests !== null) {
+            add_action('admin_post_' . self::ACTION_TEST, [$this, 'handleTestSubmission']);
+        }
     }
 
     public function registerMenu(): void
@@ -189,6 +203,7 @@ final class IntegrationsPage
         $schemaStale   = $integration->formId() !== '' && $this->schemas->isStale($integration->formId());
         $forms         = $this->forms->all();
         $templates     = $this->templates->choices();
+        $canTest       = $this->tests !== null;
         $showStats     = Features::enabled(Features::STATS_UI) && $integration->slug() !== '';
         $stats         = $showStats ? $this->stats->summary($integration->slug(), 7) : null;
         $statsToday    = $showStats ? $this->stats->summary($integration->slug(), 1) : null;
@@ -402,6 +417,67 @@ final class IntegrationsPage
                 ? __('The Jotform form has changed since the last sync. Compatibility was re-checked.', 'jotform-bridge')
                 : __('Schema synced. The Jotform form has not changed.', 'jotform-bridge'),
             $report['report'] !== null ? $report['report']->messages() : []
+        );
+
+        $this->redirect($return);
+    }
+
+    /**
+     * Sends one real submission to Jotform and reports exactly what came back.
+     *
+     * The only action in the plugin that writes to the account. It is not a
+     * simulation on purpose: the failures worth catching — a form ID pointing
+     * elsewhere, a key without write access, a field Jotform has since made
+     * required — are invisible until something is actually sent.
+     */
+    public function handleTestSubmission(): void
+    {
+        $this->guard(self::ACTION_TEST);
+
+        // phpcs:ignore WordPress.Security.NonceVerification.Missing -- verified in guard().
+        $slug        = isset($_POST['integration']) ? sanitize_key((string) wp_unslash($_POST['integration'])) : '';
+        $integration = $this->integrations->get($slug);
+        $return      = $this->returnArgs();
+
+        if ($integration === null || $this->tests === null) {
+            $this->flash('error', __('That integration does not exist.', 'jotform-bridge'));
+            $this->redirect([]);
+        }
+
+        if ($integration->formId() === '') {
+            $this->flash('error', __('This integration has no Jotform form selected.', 'jotform-bridge'));
+            $this->redirect($return);
+        }
+
+        $response = $this->tests->send($integration);
+
+        if (!$response->isSuccess()) {
+            // The upstream message goes straight through: reading it is the
+            // entire reason for pressing the button.
+            $this->flash(
+                'error',
+                __('The test submission was not accepted.', 'jotform-bridge'),
+                [$response->errorMessage()]
+            );
+
+            $this->redirect($return);
+        }
+
+        $submissionId = (string) ($response->data()['submission_id'] ?? '');
+
+        $this->flash(
+            'success',
+            __('The test submission reached Jotform.', 'jotform-bridge'),
+            [
+                $submissionId !== ''
+                    ? sprintf(
+                        /* translators: %s: Jotform submission ID */
+                        __('Jotform submission ID: %s', 'jotform-bridge'),
+                        $submissionId
+                    )
+                    : __('Jotform accepted it but returned no submission ID.', 'jotform-bridge'),
+                __('It is a real submission: it is in your Jotform inbox, it triggered whatever notifications the form has, and it counts towards this month\'s allowance. Delete it in Jotform if you do not want it there.', 'jotform-bridge'),
+            ]
         );
 
         $this->redirect($return);

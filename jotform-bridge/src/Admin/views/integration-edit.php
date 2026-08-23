@@ -305,6 +305,22 @@ $jfbReport  = $compatibility['report'] instanceof CompatibilityReport ? $compati
             </form>
         <?php endif; ?>
 
+        <?php if (!$isNew && $canTest && $schema !== null) : ?>
+            <form
+                method="post"
+                action="<?php echo esc_url(admin_url('admin-post.php')); ?>"
+                style="display:inline-block;margin-right:8px;"
+                onsubmit="return confirm('<?php echo esc_js(__('This sends a real submission to Jotform. It will appear in your inbox, trigger the form\'s notifications and count towards your monthly allowance. Continue?', 'jotform-bridge')); ?>');"
+            >
+                <input type="hidden" name="action" value="<?php echo esc_attr(IntegrationsPage::ACTION_TEST); ?>">
+                <input type="hidden" name="integration" value="<?php echo esc_attr($integration->slug()); ?>">
+                <input type="hidden" name="return_view" value="edit">
+                <input type="hidden" name="return_integration" value="<?php echo esc_attr($integration->slug()); ?>">
+                <?php wp_nonce_field(IntegrationsPage::ACTION_TEST); ?>
+                <?php submit_button(__('Send Test Submission', 'jotform-bridge'), 'secondary', 'submit', false); ?>
+            </form>
+        <?php endif; ?>
+
         <form method="post" action="<?php echo esc_url(admin_url('admin-post.php')); ?>" style="display:inline-block;margin-right:8px;">
             <input type="hidden" name="action" value="<?php echo esc_attr(IntegrationsPage::ACTION_RESCAN); ?>">
             <input type="hidden" name="return_view" value="<?php echo $isNew ? 'new' : 'edit'; ?>">
