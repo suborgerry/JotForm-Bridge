@@ -181,3 +181,59 @@ classes without complaint. That leaves only the scenario above, and until
 somebody actually wants configuration in code, an interface with a single
 implementation is an extra file and a false promise of flexibility. Worth doing
 properly when the need is real; not worth doing speculatively.
+
+---
+
+## 5. No way to update the plugin
+
+**Problem.** The plugin is not on wordpress.org, carries no `Update URI` header
+and ships no updater. Every install is a manual ZIP upload. On one site that is
+an annoyance; across a portfolio of client sites it means the fleet drifts and
+security fixes do not land.
+
+**Why it is sharper than it looks.** The proof of work made version discipline a
+correctness requirement, not hygiene. `frontend.js` is enqueued with the plugin
+version in its URL, and a browser holding the previous file will keep using it
+if the URL has not changed — a stale script computes no proof, and the guard
+refuses the submission. Shipping a release without bumping the version turns
+into refused submissions for a slice of real visitors.
+
+**Shape.** `Update URI` plus a small update server, or `plugin-update-checker`
+against GitHub Releases. Whichever it is, a release checklist that fails the
+build when the three version strings — plugin header,
+`JOTFORM_BRIDGE_VERSION`, `Stable tag` — disagree.
+
+---
+
+## 6. Running many sites off one Jotform account
+
+**Problem.** The monthly submission allowance and the daily API call limit
+belong to the Jotform **account**, not to a site. Ten sites pointing at one
+account share one budget, while each site's QuotaGuard sees only its own
+traffic and knows nothing about its neighbours. One site under a spam wave can
+burn the allowance for all ten, and every one of them switches off.
+
+**Shape.** No code fixes this on its own — it is mostly an operational
+decision, one account per client or ceilings set against the shared budget. What
+the plugin could add is honesty about it: read the account-wide spend, compare
+it with what this site believes it sent, and say plainly when the two do not
+match because somebody else is spending from the same pot.
+
+**Depends on.** The account allowance tracking currently switched off behind
+`Features::ACCOUNT_QUOTA`.
+
+---
+
+## 7. No audit trail, no configuration backup
+
+**Problem.** Integrations and settings can be changed or deleted by any
+administrator, and nothing records who did it or what the previous value was.
+There is also no export or import: rebuilding a site's configuration means
+retyping it from memory.
+
+**Why it is parked.** On a single site with one administrator this is noise. It
+starts to matter at the point where several people share an admin, or where the
+same configuration has to exist on staging and production — and at that point
+the file-backed configuration in item 4 above solves most of it, because git
+becomes the audit trail and the backup. Worth revisiting together with that
+rather than building a second mechanism.
