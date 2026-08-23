@@ -28,6 +28,49 @@ final class JotformClient
     public const ERROR_API          = 'api_error';
     public const ERROR_UNEXPECTED   = 'unexpected_response';
 
+    /**
+     * The account has spent its daily API call allowance.
+     *
+     * Separated from ERROR_API because it is the one upstream failure that does
+     * not resolve on its own within the request's lifetime: it lasts until
+     * midnight EST, and hammering the API until then only wastes the visitor's
+     * time. The site owner has to be told, not the log.
+     */
+    public const ERROR_API_LIMIT = 'api_limit_exceeded';
+
+    /**
+     * The account has spent its monthly submission allowance.
+     *
+     * Worse than the previous one: every form on the account is switched off
+     * until the billing cycle rolls over, embedded ones included.
+     */
+    public const ERROR_FORM_QUOTA = 'form_over_quota';
+
+    /**
+     * Fragments Jotform uses to say the account is out of allowance.
+     *
+     * Matched against the envelope message because the API reports both
+     * conditions through the ordinary error shape rather than a machine-readable
+     * code. Deliberately narrow: a false positive here stops the form, so
+     * anything that does not clearly say "limit" or "quota" stays a generic
+     * error.
+     */
+    private const API_LIMIT_MARKERS = [
+        'api-limit',
+        'api limit',
+        'limit exceeded',
+        'exceeded your daily',
+        'too many requests',
+    ];
+
+    private const QUOTA_MARKERS = [
+        'over quota',
+        'submission limit',
+        'monthly submission',
+        'account is over',
+        'upgrade your account',
+    ];
+
     private const DEFAULT_TIMEOUT   = 15;
     private const FORMS_PAGE_LIMIT  = 1000;
 
@@ -71,7 +114,8 @@ final class JotformClient
                 'email'    => isset($content['email']) ? (string) $content['email'] : '',
                 'status'   => isset($content['status']) ? (string) $content['status'] : '',
             ],
-            $response->status()
+            $response->status(),
+            $response->meta()
         );
     }
 
@@ -99,7 +143,8 @@ final class JotformClient
             [
                 'submissions' => isset($content['submissions']) ? (int) $content['submissions'] : 0,
             ],
-            $response->status()
+            $response->status(),
+            $response->meta()
         );
     }
 
@@ -136,7 +181,7 @@ final class JotformClient
             ];
         }
 
-        return ApiResponse::success($forms, $response->status());
+        return ApiResponse::success($forms, $response->status(), $response->meta());
     }
 
     /**
@@ -195,7 +240,7 @@ final class JotformClient
             }
         );
 
-        return ApiResponse::success($questions, $response->status());
+        return ApiResponse::success($questions, $response->status(), $response->meta());
     }
 
     /**
@@ -241,7 +286,8 @@ final class JotformClient
             [
                 'submission_id' => isset($content['submissionID']) ? (string) $content['submissionID'] : '',
             ],
-            $response->status()
+            $response->status(),
+            $response->meta()
         );
     }
 
@@ -353,6 +399,11 @@ final class JotformClient
         $body   = (string) wp_remote_retrieve_body($response);
         $parsed = json_decode($body, true);
 
+        // Jotform reports the remaining daily call allowance on every answer.
+        // It costs nothing to carry it along, and it is the only warning a site
+        // gets before the API stops answering.
+        $meta = is_array($parsed) ? self::extractMeta($parsed) : [];
+
         if (!is_array($parsed)) {
             $this->log('Jotform returned a body that is not valid JSON.', [
                 'path'   => $path,
@@ -373,9 +424,10 @@ final class JotformClient
             ]);
 
             return ApiResponse::failure(
-                self::ERROR_HTTP_STATUS,
+                self::classify($parsed, $status, self::ERROR_HTTP_STATUS),
                 $this->envelopeMessage($parsed, $status),
-                $status
+                $status,
+                $meta
             );
         }
 
@@ -388,9 +440,10 @@ final class JotformClient
             ]);
 
             return ApiResponse::failure(
-                self::ERROR_API,
+                self::classify($parsed, (int) $parsed['responseCode'], self::ERROR_API),
                 $this->envelopeMessage($parsed, (int) $parsed['responseCode']),
-                (int) $parsed['responseCode']
+                (int) $parsed['responseCode'],
+                $meta
             );
         }
 
@@ -403,11 +456,55 @@ final class JotformClient
             return ApiResponse::failure(
                 self::ERROR_UNEXPECTED,
                 __('The Jotform API response did not contain the expected data.', 'jotform-bridge'),
-                $status
+                $status,
+                $meta
             );
         }
 
-        return ApiResponse::success($parsed['content'], $status);
+        return ApiResponse::success($parsed['content'], $status, $meta);
+    }
+
+    /**
+     * Tells the two allowance failures apart from an ordinary error.
+     *
+     * @param array<mixed> $parsed
+     */
+    private static function classify(array $parsed, int $status, string $fallback): string
+    {
+        $haystack = strtolower(
+            (isset($parsed['message']) && is_string($parsed['message']) ? $parsed['message'] : '')
+            . ' '
+            . (isset($parsed['info']) && is_string($parsed['info']) ? $parsed['info'] : '')
+        );
+
+        foreach (self::QUOTA_MARKERS as $marker) {
+            if (strpos($haystack, $marker) !== false) {
+                return self::ERROR_FORM_QUOTA;
+            }
+        }
+
+        foreach (self::API_LIMIT_MARKERS as $marker) {
+            if (strpos($haystack, $marker) !== false) {
+                return self::ERROR_API_LIMIT;
+            }
+        }
+
+        // 429 means the same thing whatever the prose says.
+        return $status === 429 ? self::ERROR_API_LIMIT : $fallback;
+    }
+
+    /**
+     * @param array<mixed> $parsed
+     *
+     * @return array<string, mixed>
+     */
+    private static function extractMeta(array $parsed): array
+    {
+        if (!isset($parsed['limit-left']) || !is_numeric($parsed['limit-left'])) {
+            return [];
+        }
+
+        return ['limit_left' => max(0, (int) $parsed['limit-left'])];
     }
 
     /**

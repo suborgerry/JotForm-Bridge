@@ -63,9 +63,7 @@ final class QuotaNotice
             return;
         }
 
-        if ($this->quota->isNearQuota()) {
-            $this->renderWarning();
-        }
+        $this->renderWarning();
     }
 
     /**
@@ -95,12 +93,23 @@ final class QuotaNotice
     {
         $status = $this->quota->status();
 
-        $reason = $status['reason'] === QuotaGuard::REASON_QUOTA
-            ? __(
+        if ($status['reason'] === QuotaGuard::REASON_UPSTREAM_QUOTA) {
+            $reason = __(
+                'Jotform has refused a submission because the account is over its monthly allowance. Every form on the account — including any embedded elsewhere — stays switched off until the allowance resets. Upgrading the plan or waiting for the new cycle are the only two ways out.',
+                'jotform-bridge'
+            );
+        } elseif ($status['reason'] === QuotaGuard::REASON_UPSTREAM_API_LIMIT) {
+            $reason = __(
+                'Jotform has refused a request because the account is out of API calls for today. The allowance resets at midnight Eastern time; until then no submission can be forwarded.',
+                'jotform-bridge'
+            );
+        } elseif ($status['reason'] === QuotaGuard::REASON_QUOTA) {
+            $reason = __(
                 'The Jotform account is at or near its monthly submission allowance. Sending more would risk switching every form on the account off until the allowance resets.',
                 'jotform-bridge'
-            )
-            : sprintf(
+            );
+        } else {
+            $reason = sprintf(
                 /* translators: 1: submissions sent today, 2: the ceiling that was reached */
                 __(
                     'This site has sent %1$d submissions today, which reached the safety ceiling of %2$d. That is far above its recent normal, so sending was stopped.',
@@ -109,22 +118,60 @@ final class QuotaNotice
                 (int) $status['today'],
                 (int) $status['ceiling']
             );
+        }
+
+        // Clearing a ceiling the site set for itself is a judgement call about
+        // traffic. Clearing one Jotform imposed only makes sense once the
+        // account side has actually changed, so the advice differs.
+        $advice = $this->fromUpstream($status['reason'])
+            ? __(
+                'Visitors are seeing the generic "please try again later" message. Clearing this only helps once the account itself has room again — otherwise Jotform will simply refuse the next one too.',
+                'jotform-bridge'
+            )
+            : __(
+                'Visitors are seeing the generic "please try again later" message. Check what caused the spike before clearing this — if it was real traffic, clearing it is the right answer.',
+                'jotform-bridge'
+            );
 
         printf(
             '<div class="notice notice-error"><p><strong>%1$s</strong> %2$s</p><p>%3$s</p><p>%4$s</p></div>',
             esc_html__('Jotform Bridge has stopped sending submissions.', 'jotform-bridge'),
             esc_html($reason),
-            esc_html__(
-                'Visitors are seeing the generic "please try again later" message. Check what caused the spike before clearing this — if it was real traffic, clearing it is the right answer.',
-                'jotform-bridge'
-            ),
+            esc_html($advice),
             $this->resetButton()
         );
+    }
+
+    private function fromUpstream(string $reason): bool
+    {
+        return $reason === QuotaGuard::REASON_UPSTREAM_QUOTA
+            || $reason === QuotaGuard::REASON_UPSTREAM_API_LIMIT;
     }
 
     private function renderWarning(): void
     {
         $status = $this->quota->status();
+
+        if ($status['limit_left'] >= 0 && $status['limit_left'] < 100) {
+            printf(
+                '<div class="notice notice-warning is-dismissible"><p><strong>%1$s</strong> %2$s</p></div>',
+                esc_html__('Jotform Bridge:', 'jotform-bridge'),
+                esc_html(
+                    sprintf(
+                        /* translators: %d: remaining API calls */
+                        __(
+                            'the Jotform account has %d API calls left for today. Syncing a schema, refreshing the form list and every submission each spend one. The allowance resets at midnight Eastern time.',
+                            'jotform-bridge'
+                        ),
+                        (int) $status['limit_left']
+                    )
+                )
+            );
+        }
+
+        if (!$this->quota->isNearQuota()) {
+            return;
+        }
 
         printf(
             '<div class="notice notice-warning is-dismissible"><p><strong>%1$s</strong> %2$s</p></div>',

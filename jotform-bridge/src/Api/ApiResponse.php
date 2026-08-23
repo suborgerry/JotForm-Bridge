@@ -28,33 +28,48 @@ final class ApiResponse
     private ?int $status;
 
     /**
-     * @param array<mixed> $data
+     * Facts about the call itself rather than about its result — currently the
+     * remaining daily API allowance Jotform reports alongside every answer.
+     *
+     * @var array<string, mixed>
+     */
+    private array $meta;
+
+    /**
+     * @param array<mixed>         $data
+     * @param array<string, mixed> $meta
      */
     private function __construct(
         bool $success,
         array $data,
         string $errorCode,
         string $errorMessage,
-        ?int $status
+        ?int $status,
+        array $meta = []
     ) {
         $this->success      = $success;
         $this->data         = $data;
         $this->errorCode    = $errorCode;
         $this->errorMessage = $errorMessage;
         $this->status       = $status;
+        $this->meta         = $meta;
     }
 
     /**
-     * @param array<mixed> $data
+     * @param array<mixed>         $data
+     * @param array<string, mixed> $meta
      */
-    public static function success(array $data, ?int $status = null): self
+    public static function success(array $data, ?int $status = null, array $meta = []): self
     {
-        return new self(true, $data, '', '', $status);
+        return new self(true, $data, '', '', $status, $meta);
     }
 
-    public static function failure(string $code, string $message, ?int $status = null): self
+    /**
+     * @param array<string, mixed> $meta
+     */
+    public static function failure(string $code, string $message, ?int $status = null, array $meta = []): self
     {
-        return new self(false, [], $code, $message, $status);
+        return new self(false, [], $code, $message, $status, $meta);
     }
 
     public function isSuccess(): bool
@@ -83,5 +98,21 @@ final class ApiResponse
     public function status(): ?int
     {
         return $this->status;
+    }
+
+    /**
+     * @return array<string, mixed>
+     */
+    public function meta(): array
+    {
+        return $this->meta;
+    }
+
+    /**
+     * How many API calls the account has left today, when Jotform said so.
+     */
+    public function limitLeft(): ?int
+    {
+        return isset($this->meta['limit_left']) ? (int) $this->meta['limit_left'] : null;
     }
 }

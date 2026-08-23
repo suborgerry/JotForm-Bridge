@@ -257,6 +257,8 @@ final class SubmissionPipeline
 
         $sent = $this->client->createSubmission($integration->formId(), $params);
 
+        $this->quota->noteLimitLeft($sent->limitLeft());
+
         if (!$sent->isSuccess()) {
             // The upstream message can contain internal detail, so it is logged
             // and a generic message is returned instead.
@@ -265,6 +267,20 @@ final class SubmissionPipeline
                 'error'       => $sent->errorCode(),
                 'status'      => $sent->status(),
             ]);
+
+            // Two of these refusals are about the account rather than about
+            // this submission, and neither clears within a request's lifetime:
+            // the daily call allowance lasts until midnight, the monthly one
+            // until the billing cycle rolls over. Sending the next visitor at
+            // the same wall only wastes their time, so the breaker trips on the
+            // upstream's own word and the site owner gets told.
+            $upstreamTrip = $this->upstreamTripReason($sent->errorCode());
+
+            if ($upstreamTrip !== '') {
+                $this->quota->tripFromUpstream($upstreamTrip);
+
+                return $this->count($slug, Stats::QUOTA, SubmissionOutcome::error(503, $this->upstreamMessage()));
+            }
 
             return $this->count($slug, Stats::UPSTREAM, SubmissionOutcome::error(502, $this->upstreamMessage()));
         }
@@ -320,6 +336,23 @@ final class SubmissionPipeline
         $this->stats->record($bucket, $outcome, $fieldErrors);
 
         return $answer;
+    }
+
+    /**
+     * Maps an upstream error code onto a breaker reason, or '' to leave the
+     * breaker alone.
+     */
+    private function upstreamTripReason(string $errorCode): string
+    {
+        if ($errorCode === JotformClient::ERROR_FORM_QUOTA) {
+            return QuotaGuard::REASON_UPSTREAM_QUOTA;
+        }
+
+        if ($errorCode === JotformClient::ERROR_API_LIMIT) {
+            return QuotaGuard::REASON_UPSTREAM_API_LIMIT;
+        }
+
+        return '';
     }
 
     /**

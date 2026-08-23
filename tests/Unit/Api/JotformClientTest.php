@@ -218,4 +218,95 @@ final class JotformClientTest extends TestCase
         $this->assertFalse($result->isSuccess());
         $this->assertSame(JotformClient::ERROR_TRANSPORT, $result->errorCode());
     }
+
+    /**
+     * @dataProvider allowanceFailures
+     */
+    public function testAnAllowanceFailureIsToldApartFromAnOrdinaryError(
+        int $status,
+        array $body,
+        string $expected
+    ): void {
+        $response = $this->httpResponse($status, $body);
+
+        Functions\when('wp_remote_post')->justReturn($response);
+
+        $result = (new JotformClient('key', 'https://api.jotform.com'))
+            ->createSubmission('240000000000001', ['submission[3]' => 'x']);
+
+        $this->assertFalse($result->isSuccess());
+        $this->assertSame($expected, $result->errorCode());
+    }
+
+    /**
+     * @return array<string, array{0:int, 1:array<string, mixed>, 2:string}>
+     */
+    public function allowanceFailures(): array
+    {
+        return [
+            'api limit in the message' => [
+                200,
+                ['responseCode' => 403, 'message' => 'API-Limit exceeded'],
+                JotformClient::ERROR_API_LIMIT,
+            ],
+            'too many requests' => [
+                429,
+                ['responseCode' => 429, 'message' => 'Too Many Requests'],
+                JotformClient::ERROR_API_LIMIT,
+            ],
+            'bare 429' => [
+                429,
+                ['responseCode' => 429, 'message' => 'Slow down'],
+                JotformClient::ERROR_API_LIMIT,
+            ],
+            'form over quota' => [
+                200,
+                ['responseCode' => 403, 'message' => 'Form Over Quota'],
+                JotformClient::ERROR_FORM_QUOTA,
+            ],
+            'monthly submission limit' => [
+                200,
+                ['responseCode' => 403, 'message' => 'You have reached your monthly submission limit'],
+                JotformClient::ERROR_FORM_QUOTA,
+            ],
+            'an ordinary error stays ordinary' => [
+                200,
+                ['responseCode' => 400, 'message' => 'Invalid question id'],
+                JotformClient::ERROR_API,
+            ],
+            'a server error stays ordinary' => [
+                500,
+                ['responseCode' => 500, 'message' => 'boom'],
+                JotformClient::ERROR_HTTP_STATUS,
+            ],
+        ];
+    }
+
+    public function testTheRemainingApiAllowanceIsCarriedAlong(): void
+    {
+        $response = $this->httpResponse(
+            200,
+            ['responseCode' => 200, 'limit-left' => 812, 'content' => ['submissionID' => '1']]
+        );
+
+        Functions\when('wp_remote_post')->justReturn($response);
+
+        $result = (new JotformClient('key', 'https://api.jotform.com'))
+            ->createSubmission('240000000000001', ['submission[3]' => 'x']);
+
+        $this->assertTrue($result->isSuccess());
+        $this->assertSame(812, $result->limitLeft());
+    }
+
+    public function testAResponseWithoutTheAllowanceReportsNothing(): void
+    {
+        $response = $this->httpResponse(200, ['responseCode' => 200, 'content' => ['submissionID' => '1']]);
+
+        Functions\when('wp_remote_post')->justReturn($response);
+
+        $result = (new JotformClient('key', 'https://api.jotform.com'))
+            ->createSubmission('240000000000001', ['submission[3]' => 'x']);
+
+        $this->assertNull($result->limitLeft());
+    }
 }

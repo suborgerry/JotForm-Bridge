@@ -498,6 +498,69 @@ final class SubmissionPipelineTest extends TestCase
         $this->assertArrayHasKey('email', (new Stats())->fieldErrors('contact', 1));
     }
 
+    /**
+     * Jotform saying the account is out of allowance is the most authoritative
+     * signal there is, and neither condition clears within a request's
+     * lifetime. Sending the next visitor at the same wall only wastes time.
+     *
+     * @dataProvider upstreamAllowanceFailures
+     */
+    public function testAnUpstreamAllowanceFailureTripsTheBreaker(string $message, string $reason): void
+    {
+        $this->mockPost(200, ['responseCode' => 403, 'message' => $message]);
+
+        $first = $this->pipeline()->submit('contact', $this->valid(), ['ip' => '203.0.113.7']);
+
+        $this->assertSame(503, $first->status());
+        $this->assertSame($reason, (new QuotaGuard(new Settings()))->status()['reason']);
+
+        // The next one does not even reach the API.
+        $second = $this->valid();
+        $second['message'] = 'A different message.';
+
+        $this->assertSame(
+            503,
+            $this->pipeline()->submit('contact', $second, ['ip' => '203.0.113.7'])->status()
+        );
+        $this->assertCount(1, $this->requests, 'The breaker must stop the next call.');
+    }
+
+    /**
+     * @return array<string, array{0:string, 1:string}>
+     */
+    public function upstreamAllowanceFailures(): array
+    {
+        return [
+            'monthly allowance' => ['Form Over Quota', QuotaGuard::REASON_UPSTREAM_QUOTA],
+            'daily api calls'   => ['API-Limit exceeded', QuotaGuard::REASON_UPSTREAM_API_LIMIT],
+        ];
+    }
+
+    /**
+     * An ordinary upstream failure is transient and must stay retryable.
+     */
+    public function testAnOrdinaryUpstreamFailureDoesNotTripTheBreaker(): void
+    {
+        $this->mockPost(500, ['responseCode' => 500, 'message' => 'boom']);
+
+        $outcome = $this->pipeline()->submit('contact', $this->valid(), ['ip' => '203.0.113.7']);
+
+        $this->assertSame(502, $outcome->status());
+        $this->assertFalse((new QuotaGuard(new Settings()))->isTripped());
+    }
+
+    public function testTheRemainingApiAllowanceIsRemembered(): void
+    {
+        $this->mockPost(
+            200,
+            ['responseCode' => 200, 'limit-left' => 512, 'content' => ['submissionID' => '1']]
+        );
+
+        $this->pipeline()->submit('contact', $this->valid(), ['ip' => '203.0.113.7']);
+
+        $this->assertSame(512, (new QuotaGuard(new Settings()))->status()['limit_left']);
+    }
+
     public function testTheOutcomeNeverLeaksTheApiKey(): void
     {
         $this->mockPost(500, ['responseCode' => 500, 'message' => 'boom']);

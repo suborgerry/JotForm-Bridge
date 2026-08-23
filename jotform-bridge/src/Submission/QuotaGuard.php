@@ -51,6 +51,17 @@ final class QuotaGuard
     public const REASON_QUOTA = 'monthly_quota';
 
     /**
+     * Jotform itself said the monthly submission allowance is gone.
+     *
+     * The most authoritative reason there is: no estimate, no snapshot, the
+     * upstream refusing in as many words.
+     */
+    public const REASON_UPSTREAM_QUOTA = 'upstream_quota';
+
+    /** Jotform itself said the daily API call allowance is gone. */
+    public const REASON_UPSTREAM_API_LIMIT = 'upstream_api_limit';
+
+    /**
      * Lowest daily ceiling, used until there is history to derive one from.
      */
     public const MIN_DAILY = 50;
@@ -147,6 +158,43 @@ final class QuotaGuard
     }
 
     /**
+     * Trips the breaker because Jotform said so.
+     *
+     * This is the one path where the reason is not an estimate. Until now the
+     * guard could only infer that the account was near its allowance from a
+     * snapshot that may be an hour old; an upstream refusal is the account
+     * telling us directly, and there is no point letting the next visitor find
+     * out the same way.
+     */
+    public function tripFromUpstream(string $reason): void
+    {
+        $state = $this->state();
+
+        $state['tripped_at'] = time();
+        $state['day']        = $this->today();
+        $state['reason']     = $reason;
+
+        $this->save($state);
+    }
+
+    /**
+     * Remembers the daily API call allowance Jotform reported.
+     */
+    public function noteLimitLeft(?int $left): void
+    {
+        if ($left === null) {
+            return;
+        }
+
+        $state = $this->state();
+
+        $state['limit_left']    = max(0, $left);
+        $state['limit_seen_at'] = time();
+
+        $this->save($state);
+    }
+
+    /**
      * Clears a trip so the form starts accepting submissions again.
      *
      * Today's count goes with it: leaving it in place would trip the guard again
@@ -162,6 +210,9 @@ final class QuotaGuard
         $state['reason']               = '';
         $state['day']                  = '';
         $state['days'][$this->today()] = 0;
+
+        // An upstream refusal is about the account, not about today's rate, so
+        // clearing it means the site owner has dealt with the account.
 
         $this->save($state);
     }
@@ -192,6 +243,13 @@ final class QuotaGuard
         $state['usage_checked_at']  = time();
         $state['since_check']       = 0;
 
+        $limitLeft = $response->limitLeft();
+
+        if ($limitLeft !== null) {
+            $state['limit_left']    = $limitLeft;
+            $state['limit_seen_at'] = time();
+        }
+
         $this->save($state);
 
         return $response;
@@ -211,6 +269,8 @@ final class QuotaGuard
      *     usage_submissions: int,
      *     usage_checked_at: int,
      *     since_check: int,
+     *     limit_left: int,
+     *     limit_seen_at: int,
      *     monthly_quota: int,
      *     used: int,
      *     remaining: int|null
@@ -393,6 +453,8 @@ final class QuotaGuard
      *     usage_submissions: int,
      *     usage_checked_at: int,
      *     since_check: int,
+     *     limit_left: int,
+     *     limit_seen_at: int,
      *     monthly_quota: int
      * }
      */
@@ -421,6 +483,8 @@ final class QuotaGuard
             'usage_submissions' => isset($stored['usage_submissions']) ? (int) $stored['usage_submissions'] : 0,
             'usage_checked_at'  => isset($stored['usage_checked_at']) ? (int) $stored['usage_checked_at'] : 0,
             'since_check'       => isset($stored['since_check']) ? (int) $stored['since_check'] : 0,
+            'limit_left'        => isset($stored['limit_left']) ? (int) $stored['limit_left'] : -1,
+            'limit_seen_at'     => isset($stored['limit_seen_at']) ? (int) $stored['limit_seen_at'] : 0,
             'monthly_quota'     => $this->settings->monthlyQuota(),
         ];
     }
@@ -440,6 +504,8 @@ final class QuotaGuard
                 'usage_submissions' => (int) $state['usage_submissions'],
                 'usage_checked_at'  => (int) $state['usage_checked_at'],
                 'since_check'       => max(0, (int) $state['since_check']),
+                'limit_left'        => (int) $state['limit_left'],
+                'limit_seen_at'     => (int) $state['limit_seen_at'],
             ],
             false
         );
