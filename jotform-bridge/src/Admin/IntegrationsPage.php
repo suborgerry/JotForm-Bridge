@@ -14,6 +14,7 @@ use JotformBridge\Submission\TestSubmission;
 use JotformBridge\Support\Features;
 use JotformBridge\Support\Stats;
 use JotformBridge\Templates\TemplateRegistry;
+use JotformBridge\Templates\TemplateScaffold;
 
 if (!defined('ABSPATH')) {
     exit;
@@ -204,6 +205,12 @@ final class IntegrationsPage
         $forms         = $this->forms->all();
         $templates     = $this->templates->choices();
         $canTest       = $this->tests !== null;
+
+        // Offered whenever there is a schema to build it from, in either
+        // rendering mode: an auto-rendered integration moving to a template is
+        // exactly when this is most useful.
+        $scaffold     = $schema !== null ? (new TemplateScaffold())->build($integration, $schema) : '';
+        $scaffoldFile = $schema !== null ? (new TemplateScaffold())->fileName($integration) : '';
         $showStats     = Features::enabled(Features::STATS_UI) && $integration->slug() !== '';
         $stats         = $showStats ? $this->stats->summary($integration->slug(), 7) : null;
         $statsToday    = $showStats ? $this->stats->summary($integration->slug(), 1) : null;

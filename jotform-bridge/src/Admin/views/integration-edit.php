@@ -595,4 +595,71 @@ $jfbReport  = $compatibility['report'] instanceof CompatibilityReport ? $compati
             </tbody>
         </table>
     <?php endif; ?>
+
+    <?php if ($scaffold !== '') : ?>
+        <h2><?php echo esc_html__('Starter template', 'jotform-bridge'); ?></h2>
+        <p class="description">
+            <?php
+            printf(
+                /* translators: %s: file name to create in the theme */
+                esc_html__(
+                    'Built from the schema above. Save it as %s in your theme, press Rescan Templates, then pick it as this integration\'s template. Restyle it however you like — only the data-jotform-* attributes matter.',
+                    'jotform-bridge'
+                ),
+                '<code>' . esc_html('forms/' . $scaffoldFile) . '</code>'
+            );
+            ?>
+        </p>
+
+        <p>
+            <button type="button" class="button button-secondary" id="jfb-copy-scaffold">
+                <?php esc_html_e('Copy to clipboard', 'jotform-bridge'); ?>
+            </button>
+            <span id="jfb-copy-scaffold-done" class="description" style="display:none;">
+                <?php esc_html_e('Copied.', 'jotform-bridge'); ?>
+            </span>
+        </p>
+
+        <textarea
+            id="jfb-scaffold"
+            readonly
+            rows="20"
+            class="large-text code"
+            spellcheck="false"
+            aria-label="<?php echo esc_attr__('Starter template source', 'jotform-bridge'); ?>"
+        ><?php echo esc_textarea($scaffold); ?></textarea>
+
+        <script>
+            (function () {
+                var button = document.getElementById('jfb-copy-scaffold');
+                var source = document.getElementById('jfb-scaffold');
+                var done = document.getElementById('jfb-copy-scaffold-done');
+
+                if (!button || !source) {
+                    return;
+                }
+
+                button.addEventListener('click', function () {
+                    source.focus();
+                    source.select();
+
+                    // Selecting is the fallback: where the clipboard API is
+                    // unavailable the text is at least ready to copy by hand.
+                    if (navigator.clipboard && navigator.clipboard.writeText) {
+                        navigator.clipboard.writeText(source.value);
+                    } else {
+                        try {
+                            document.execCommand('copy');
+                        } catch (error) {
+                            return;
+                        }
+                    }
+
+                    if (done) {
+                        done.style.display = 'inline';
+                    }
+                });
+            })();
+        </script>
+    <?php endif; ?>
 </div>
