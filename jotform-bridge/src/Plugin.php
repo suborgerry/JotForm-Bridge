@@ -25,6 +25,7 @@ use JotformBridge\Submission\Guards\MinimumTime;
 use JotformBridge\Submission\QuotaGuard;
 use JotformBridge\Submission\SubmissionPipeline;
 use JotformBridge\Support\Logger;
+use JotformBridge\Support\Stats;
 use JotformBridge\Templates\TemplateRegistry;
 
 if (!defined('ABSPATH')) {
@@ -67,6 +68,8 @@ final class Plugin
     private ConnectionState $connection;
 
     private ?QuotaGuard $quota = null;
+
+    private ?Stats $stats = null;
 
     private bool $booted = false;
 
@@ -139,7 +142,9 @@ final class Plugin
                 $this->forms(),
                 $this->schemas(),
                 $this->templates(),
-                $this->compatibility()
+                $this->compatibility(),
+                null,
+                $this->stats()
             ))->register();
 
             (new SettingsPage(
@@ -254,6 +259,18 @@ final class Plugin
         return $this->quota;
     }
 
+    /**
+     * The per-integration tally of how submissions ended.
+     */
+    public function stats(): Stats
+    {
+        if ($this->stats === null) {
+            $this->stats = new Stats();
+        }
+
+        return $this->stats;
+    }
+
     public function pipeline(): SubmissionPipeline
     {
         return new SubmissionPipeline(
@@ -266,7 +283,8 @@ final class Plugin
             $this->logger,
             null,
             null,
-            $this->quota()
+            $this->quota(),
+            $this->stats()
         );
     }
 

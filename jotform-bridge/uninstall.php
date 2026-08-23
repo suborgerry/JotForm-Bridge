@@ -41,6 +41,7 @@ delete_option('jotform_bridge_schema_meta');
 delete_option('jotform_bridge_templates');
 delete_option('jotform_bridge_connection');
 delete_option('jotform_bridge_quota');
+delete_option('jotform_bridge_stats');
 delete_option('jotform_bridge_version');
 
 $jfbSettings = get_option('jotform_bridge_settings', []);

@@ -17,6 +17,7 @@ use JotformBridge\Submission\SubmissionOutcome;
 use JotformBridge\Submission\SubmissionPipeline;
 use JotformBridge\Submission\ValidationResult;
 use JotformBridge\Support\Logger;
+use JotformBridge\Support\Stats;
 use JotformBridge\Tests\TestCase;
 
 /**
@@ -426,6 +427,77 @@ final class SubmissionPipelineTest extends TestCase
         $this->assertSame([], $this->requests);
     }
 
+    /**
+     * Every exit from the pipeline is counted, so the admin screens describe
+     * what the code did rather than a parallel guess at it.
+     *
+     * @dataProvider countedOutcomes
+     */
+    public function testEveryOutcomeIsCounted(string $expected, callable $arrange): void
+    {
+        $arrange($this);
+
+        $this->pipeline()->submit('contact', $this->valid(), ['ip' => '203.0.113.7']);
+
+        $counts = (new Stats())->summary('contact', 1)['counts'];
+
+        $this->assertSame(1, $counts[$expected] ?? 0, 'Expected one ' . $expected . ' in ' . json_encode($counts));
+    }
+
+    /**
+     * @return array<string, array{0:string, 1:callable}>
+     */
+    public function countedOutcomes(): array
+    {
+        return [
+            'accepted'   => [
+                Stats::OK,
+                static function (self $test): void {
+                    $test->mockPost(200, ['responseCode' => 200, 'content' => ['submissionID' => '1']]);
+                },
+            ],
+            'upstream'   => [
+                Stats::UPSTREAM,
+                static function (self $test): void {
+                    $test->mockPost(500, ['responseCode' => 500, 'message' => 'boom']);
+                },
+            ],
+            'no schema'  => [
+                Stats::NO_SCHEMA,
+                static function (self $test): void {
+                    $test->dropSchema();
+                },
+            ],
+            'disabled'   => [
+                Stats::INACTIVE,
+                static function (self $test): void {
+                    $test->storeIntegration(false);
+                },
+            ],
+        ];
+    }
+
+    public function testAnUnknownSlugIsCountedInTheSharedBucket(): void
+    {
+        $this->pipeline()->submit('nope', $this->valid(), ['ip' => '203.0.113.7']);
+
+        $this->assertSame(
+            1,
+            (new Stats())->summary(Stats::GLOBAL_SCOPE, 1)['counts'][Stats::UNKNOWN] ?? 0
+        );
+        $this->assertSame(0, (new Stats())->summary('nope', 1)['attempts']);
+    }
+
+    public function testAValidationFailureRecordsWhichFieldsFailed(): void
+    {
+        $fields = $this->valid();
+        unset($fields['email']);
+
+        $this->pipeline()->submit('contact', $fields, ['ip' => '203.0.113.7']);
+
+        $this->assertArrayHasKey('email', (new Stats())->fieldErrors('contact', 1));
+    }
+
     public function testTheOutcomeNeverLeaksTheApiKey(): void
     {
         $this->mockPost(500, ['responseCode' => 500, 'message' => 'boom']);
@@ -703,6 +775,11 @@ final class SubmissionPipelineTest extends TestCase
         );
     }
 
+    public function dropSchema(): void
+    {
+        unset($this->options[SchemaRepository::optionKey(self::FORM_ID)]);
+    }
+
     private function pipeline(): SubmissionPipeline
     {
         $client = new JotformClient('test-api-key', 'https://api.jotform.com');
@@ -717,7 +794,7 @@ final class SubmissionPipelineTest extends TestCase
     /**
      * @param array<string, mixed> $body
      */
-    private function mockPost(int $status, array $body): void
+    public function mockPost(int $status, array $body): void
     {
         $response = $this->httpResponse($status, $body);
 
@@ -733,7 +810,7 @@ final class SubmissionPipelineTest extends TestCase
     /**
      * @param array<string, mixed> $extra Redirect settings, when the test needs them.
      */
-    private function storeIntegration(bool $active, array $extra = []): void
+    public function storeIntegration(bool $active, array $extra = []): void
     {
         $this->options[IntegrationRepository::OPTION] = [
             'contact' => array_merge(

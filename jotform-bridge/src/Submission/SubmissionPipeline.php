@@ -10,6 +10,7 @@ use JotformBridge\Integrations\Integration;
 use JotformBridge\Integrations\IntegrationRepository;
 use JotformBridge\Integrations\RedirectTarget;
 use JotformBridge\Support\Logger;
+use JotformBridge\Support\Stats;
 
 if (!defined('ABSPATH')) {
     exit;
@@ -63,6 +64,8 @@ final class SubmissionPipeline
 
     private QuotaGuard $quota;
 
+    private Stats $stats;
+
     public function __construct(
         IntegrationRepository $integrations,
         SchemaRepository $schemas,
@@ -73,11 +76,13 @@ final class SubmissionPipeline
         ?Logger $logger = null,
         ?RedirectTarget $redirects = null,
         ?RateLimiter $limiter = null,
-        ?QuotaGuard $quota = null
+        ?QuotaGuard $quota = null,
+        ?Stats $stats = null
     ) {
         $this->redirects = $redirects ?? new RedirectTarget();
         $this->limiter   = $limiter ?? new RateLimiter();
         $this->quota     = $quota ?? new QuotaGuard();
+        $this->stats     = $stats ?? new Stats();
         $this->integrations = $integrations;
         $this->schemas      = $schemas;
         $this->client       = $client;
@@ -102,17 +107,27 @@ final class SubmissionPipeline
         $wait = $this->limiter->checkGlobal($ip);
 
         if ($wait > 0) {
-            return $this->throttled($slug, $wait);
+            // No integration has been resolved yet, so the slug the request
+            // named is not to be trusted as a bucket name.
+            return $this->throttled(Stats::GLOBAL_SCOPE, $slug, $wait);
         }
 
         $integration = $slug === '' ? null : $this->integrations->get($slug);
 
         if ($integration === null) {
-            return SubmissionOutcome::error(404, __('This form is not available.', 'jotform-bridge'));
+            return $this->count(
+                Stats::GLOBAL_SCOPE,
+                Stats::UNKNOWN,
+                SubmissionOutcome::error(404, __('This form is not available.', 'jotform-bridge'))
+            );
         }
 
         if (!$integration->isActive()) {
-            return SubmissionOutcome::error(403, __('This form is not accepting submissions.', 'jotform-bridge'));
+            return $this->count(
+                $slug,
+                Stats::INACTIVE,
+                SubmissionOutcome::error(403, __('This form is not accepting submissions.', 'jotform-bridge'))
+            );
         }
 
         // The tighter, per-integration budget. Like the site-wide one it needs
@@ -121,7 +136,7 @@ final class SubmissionPipeline
         $wait = $this->limiter->check($slug, $ip);
 
         if ($wait > 0) {
-            return $this->throttled($slug, $wait);
+            return $this->throttled($slug, $slug, $wait);
         }
 
         // The account-wide circuit breaker. It answers before the schema is
@@ -136,13 +151,17 @@ final class SubmissionPipeline
                 'reason'      => $blocked,
             ]);
 
-            return SubmissionOutcome::error(503, $this->upstreamMessage());
+            return $this->count($slug, Stats::QUOTA, SubmissionOutcome::error(503, $this->upstreamMessage()));
         }
 
         if (!is_array($fields)) {
-            return SubmissionOutcome::invalid(
-                __('Validation failed.', 'jotform-bridge'),
-                [ValidationResult::FORM_KEY => __('No form data was submitted.', 'jotform-bridge')]
+            return $this->count(
+                $slug,
+                Stats::EMPTY_BODY,
+                SubmissionOutcome::invalid(
+                    __('Validation failed.', 'jotform-bridge'),
+                    [ValidationResult::FORM_KEY => __('No form data was submitted.', 'jotform-bridge')]
+                )
             );
         }
 
@@ -157,7 +176,7 @@ final class SubmissionPipeline
                 'error'       => $response->errorCode(),
             ]);
 
-            return SubmissionOutcome::error(503, $this->upstreamMessage());
+            return $this->count($slug, Stats::NO_SCHEMA, SubmissionOutcome::error(503, $this->upstreamMessage()));
         }
 
         $schema = $response->data()['schema'];
@@ -167,13 +186,20 @@ final class SubmissionPipeline
                 'integration' => $slug,
             ]);
 
-            return SubmissionOutcome::error(503, $this->upstreamMessage());
+            return $this->count($slug, Stats::NO_SCHEMA, SubmissionOutcome::error(503, $this->upstreamMessage()));
         }
 
         $result = $this->validator->validate($schema, $fields);
 
         if (!$result->isValid()) {
-            return SubmissionOutcome::invalid(__('Validation failed.', 'jotform-bridge'), $result->errors());
+            // The field names go into the tally, so a validator that is
+            // stricter than the form suggests becomes visible.
+            return $this->count(
+                $slug,
+                Stats::INVALID,
+                SubmissionOutcome::invalid(__('Validation failed.', 'jotform-bridge'), $result->errors()),
+                array_keys($result->errors())
+            );
         }
 
         /**
@@ -192,24 +218,32 @@ final class SubmissionPipeline
         $fingerprint = $window > 0 ? $this->fingerprint($slug, $values, $ip) : '';
 
         if ($fingerprint !== '' && get_transient($fingerprint) !== false) {
-            return SubmissionOutcome::error(
-                429,
-                __('This form has already been submitted. Please wait a moment before sending it again.', 'jotform-bridge')
+            return $this->count(
+                $slug,
+                Stats::DUPLICATE,
+                SubmissionOutcome::error(
+                    429,
+                    __('This form has already been submitted. Please wait a moment before sending it again.', 'jotform-bridge')
+                )
             );
         }
 
         $rejection = $this->spam->check($slug, $values, $context);
 
         if ($rejection !== '') {
-            return SubmissionOutcome::error(403, $rejection);
+            return $this->count($slug, Stats::SPAM, SubmissionOutcome::error(403, $rejection));
         }
 
         $params = $this->mapper->map($schema, $values);
 
         if ($params === []) {
-            return SubmissionOutcome::invalid(
-                __('Validation failed.', 'jotform-bridge'),
-                [ValidationResult::FORM_KEY => __('No form data was submitted.', 'jotform-bridge')]
+            return $this->count(
+                $slug,
+                Stats::EMPTY_BODY,
+                SubmissionOutcome::invalid(
+                    __('Validation failed.', 'jotform-bridge'),
+                    [ValidationResult::FORM_KEY => __('No form data was submitted.', 'jotform-bridge')]
+                )
             );
         }
 
@@ -232,7 +266,7 @@ final class SubmissionPipeline
                 'status'      => $sent->status(),
             ]);
 
-            return SubmissionOutcome::error(502, $this->upstreamMessage());
+            return $this->count($slug, Stats::UPSTREAM, SubmissionOutcome::error(502, $this->upstreamMessage()));
         }
 
         // Only an accepted submission is remembered, so an upstream failure can
@@ -258,26 +292,54 @@ final class SubmissionPipeline
             (string) ($sent->data()['submission_id'] ?? '')
         );
 
-        return SubmissionOutcome::success(
-            __('Form submitted successfully.', 'jotform-bridge'),
-            $this->redirect($integration)
+        return $this->count(
+            $slug,
+            Stats::OK,
+            SubmissionOutcome::success(
+                __('Form submitted successfully.', 'jotform-bridge'),
+                $this->redirect($integration)
+            )
         );
+    }
+
+    /**
+     * Records how a submission ended and hands the answer back unchanged.
+     *
+     * Every exit from submit() goes through here, so the tally cannot drift
+     * away from what the pipeline actually does: a new outcome that forgets to
+     * be counted is a new `return` that does not compile into this shape.
+     *
+     * @param array<int, string> $fieldErrors
+     */
+    private function count(
+        string $bucket,
+        string $outcome,
+        SubmissionOutcome $answer,
+        array $fieldErrors = []
+    ): SubmissionOutcome {
+        $this->stats->record($bucket, $outcome, $fieldErrors);
+
+        return $answer;
     }
 
     /**
      * The answer to an address that is sending too much.
      */
-    private function throttled(string $slug, int $wait): SubmissionOutcome
+    private function throttled(string $bucket, string $slug, int $wait): SubmissionOutcome
     {
         $this->note('Submission refused by the rate limit.', [
             'integration' => $slug,
             'retry_after' => $wait,
         ]);
 
-        return SubmissionOutcome::error(
-            429,
-            __('Too many submissions from this device. Please wait a moment and try again.', 'jotform-bridge'),
-            ['Retry-After' => (string) $wait]
+        return $this->count(
+            $bucket,
+            Stats::THROTTLED,
+            SubmissionOutcome::error(
+                429,
+                __('Too many submissions from this device. Please wait a moment and try again.', 'jotform-bridge'),
+                ['Retry-After' => (string) $wait]
+            )
         );
     }
 

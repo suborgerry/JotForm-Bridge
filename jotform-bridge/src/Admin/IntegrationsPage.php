@@ -10,6 +10,7 @@ use JotformBridge\Integrations\CompatibilityChecker;
 use JotformBridge\Integrations\Integration;
 use JotformBridge\Integrations\IntegrationRepository;
 use JotformBridge\Integrations\RedirectTarget;
+use JotformBridge\Support\Stats;
 use JotformBridge\Templates\TemplateRegistry;
 
 if (!defined('ABSPATH')) {
@@ -49,13 +50,16 @@ final class IntegrationsPage
 
     private RedirectTarget $redirects;
 
+    private Stats $stats;
+
     public function __construct(
         IntegrationRepository $integrations,
         FormRepository $forms,
         SchemaRepository $schemas,
         TemplateRegistry $templates,
         CompatibilityChecker $compatibility,
-        ?RedirectTarget $redirects = null
+        ?RedirectTarget $redirects = null,
+        ?Stats $stats = null
     ) {
         $this->integrations  = $integrations;
         $this->forms         = $forms;
@@ -63,6 +67,7 @@ final class IntegrationsPage
         $this->templates     = $templates;
         $this->compatibility = $compatibility;
         $this->redirects     = $redirects ?? new RedirectTarget();
+        $this->stats         = $stats ?? new Stats();
     }
 
     public function register(): void
@@ -139,6 +144,9 @@ final class IntegrationsPage
                     && $this->schemas->isSynced($integration->formId()),
                 'schema_stale'  => $integration->formId() !== ''
                     && $this->schemas->isStale($integration->formId()),
+                'stats'         => $this->stats->summary($integration->slug(), 7),
+                'health'        => $this->stats->health($integration->slug()),
+                'last_ok'       => $this->stats->lastSuccess($integration->slug()),
             ];
         }
 
@@ -178,6 +186,11 @@ final class IntegrationsPage
         $schemaStale   = $integration->formId() !== '' && $this->schemas->isStale($integration->formId());
         $forms         = $this->forms->all();
         $templates     = $this->templates->choices();
+        $stats         = $integration->slug() !== '' ? $this->stats->summary($integration->slug(), 7) : null;
+        $statsToday    = $integration->slug() !== '' ? $this->stats->summary($integration->slug(), 1) : null;
+        $statsFields   = $integration->slug() !== '' ? $this->stats->fieldErrors($integration->slug(), 7) : [];
+        $statsHealth   = $integration->slug() !== '' ? $this->stats->health($integration->slug()) : 'idle';
+        $statsLastOk   = $integration->slug() !== '' ? $this->stats->lastSuccess($integration->slug()) : 0;
         $notice        = $flash;
         $page          = self::MENU_SLUG;
 
@@ -269,6 +282,9 @@ final class IntegrationsPage
         $slug = isset($_POST['integration']) ? sanitize_key((string) wp_unslash($_POST['integration'])) : '';
 
         if ($this->integrations->delete($slug)) {
+            // The tally describes an integration that no longer exists.
+            $this->stats->forget($slug);
+
             $this->flash('success', __('Integration deleted.', 'jotform-bridge'));
         } else {
             $this->flash('error', __('That integration does not exist.', 'jotform-bridge'));

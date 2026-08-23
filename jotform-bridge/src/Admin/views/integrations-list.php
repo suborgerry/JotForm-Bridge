@@ -51,6 +51,7 @@ $jfbNewUrl = add_query_arg(['page' => $page, 'view' => 'new'], admin_url('admin.
                 <th scope="col"><?php echo esc_html__('Rendering Mode', 'jotform-bridge'); ?></th>
                 <th scope="col"><?php echo esc_html__('Template', 'jotform-bridge'); ?></th>
                 <th scope="col"><?php echo esc_html__('Active', 'jotform-bridge'); ?></th>
+                <th scope="col"><?php echo esc_html__('Last 7 days', 'jotform-bridge'); ?></th>
                 <th scope="col"><?php echo esc_html__('Schema', 'jotform-bridge'); ?></th>
                 <th scope="col"><?php echo esc_html__('Compatibility', 'jotform-bridge'); ?></th>
                 <th scope="col"><?php echo esc_html__('Redirect target', 'jotform-bridge'); ?></th>
@@ -60,7 +61,7 @@ $jfbNewUrl = add_query_arg(['page' => $page, 'view' => 'new'], admin_url('admin.
         <tbody>
             <?php if ($rows === []) : ?>
                 <tr>
-                    <td colspan="10">
+                    <td colspan="11">
                         <?php echo esc_html__('No integrations yet. Add one to connect a Jotform form to a template.', 'jotform-bridge'); ?>
                     </td>
                 </tr>
@@ -110,6 +111,45 @@ $jfbNewUrl = add_query_arg(['page' => $page, 'view' => 'new'], admin_url('admin.
                             ? esc_html__('Yes', 'jotform-bridge')
                             : esc_html__('No', 'jotform-bridge');
                         ?>
+                    </td>
+                    <td>
+                        <?php
+                        $jfbStats  = $jfbRow['stats'];
+                        $jfbHealth = (string) $jfbRow['health'];
+                        ?>
+                        <?php if ($jfbStats['attempts'] === 0) : ?>
+                            <span class="description"><?php echo esc_html__('No submissions', 'jotform-bridge'); ?></span>
+                        <?php else : ?>
+                            <?php
+                            printf(
+                                /* translators: 1: accepted submissions, 2: submissions that did not get through */
+                                esc_html__('%1$d sent, %2$d not delivered', 'jotform-bridge'),
+                                (int) $jfbStats['ok'],
+                                (int) $jfbStats['lost']
+                            );
+                            ?>
+                            <?php if ($jfbRow['last_ok'] > 0) : ?>
+                                <p class="description">
+                                    <?php
+                                    printf(
+                                        /* translators: %s: human readable time difference */
+                                        esc_html__('Last one %s ago', 'jotform-bridge'),
+                                        esc_html(human_time_diff((int) $jfbRow['last_ok'], time()))
+                                    );
+                                    ?>
+                                </p>
+                            <?php endif; ?>
+                        <?php endif; ?>
+
+                        <?php if ($jfbHealth === 'broken') : ?>
+                            <p><strong style="color:#b32d2e;">
+                                <?php echo esc_html__('Nothing got through today.', 'jotform-bridge'); ?>
+                            </strong></p>
+                        <?php elseif ($jfbHealth === 'noisy') : ?>
+                            <p><strong style="color:#996800;">
+                                <?php echo esc_html__('Almost everything is being refused today.', 'jotform-bridge'); ?>
+                            </strong></p>
+                        <?php endif; ?>
                     </td>
                     <td>
                         <?php if (!$jfbRow['schema_synced']) : ?>
