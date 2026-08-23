@@ -11,6 +11,7 @@ use JotformBridge\Forms\SchemaRepository;
 use JotformBridge\Integrations\IntegrationRepository;
 use JotformBridge\Settings\Settings;
 use JotformBridge\Submission\Guards\Honeypot;
+use JotformBridge\Submission\QuotaGuard;
 use JotformBridge\Submission\RateLimiter;
 use JotformBridge\Submission\SubmissionOutcome;
 use JotformBridge\Submission\SubmissionPipeline;
@@ -318,6 +319,74 @@ final class SubmissionPipelineTest extends TestCase
             200,
             $this->pipeline()->submit('contact', $this->valid(), ['ip' => '198.51.100.9'])->status()
         );
+    }
+
+    /**
+     * The account-wide breaker: once it has tripped, nothing reaches Jotform,
+     * whichever integration or address the submission comes from.
+     */
+    public function testATrippedQuotaGuardStopsEverySubmission(): void
+    {
+        $this->mockPost(200, ['responseCode' => 200, 'content' => ['submissionID' => '1']]);
+
+        $this->options[Settings::OPTION]   = ['monthly_quota' => 10];
+        $this->options[QuotaGuard::OPTION] = [
+            'days'              => [],
+            'usage_submissions' => 10,
+            'usage_checked_at'  => time(),
+            'since_check'       => 0,
+        ];
+
+        $outcome = $this->pipeline()->submit('contact', $this->valid(), ['ip' => '203.0.113.7']);
+
+        $this->assertSame(503, $outcome->status());
+        $this->assertSame([], $this->requests);
+
+        // The visitor is told nothing about which ceiling was hit.
+        $this->assertSame(
+            'The form could not be submitted right now. Please try again later.',
+            $outcome->body()['message']
+        );
+    }
+
+    public function testTheQuotaGuardAnswersBeforeTheSchemaIsRead(): void
+    {
+        $this->options[Settings::OPTION]   = ['monthly_quota' => 10];
+        $this->options[QuotaGuard::OPTION] = [
+            'days'              => [],
+            'usage_submissions' => 10,
+            'usage_checked_at'  => time(),
+            'since_check'       => 0,
+        ];
+
+        unset($this->options[SchemaRepository::optionKey(self::FORM_ID)]);
+
+        $outcome = $this->pipeline()->submit('contact', ['not-a-field' => 'x'], ['ip' => '203.0.113.7']);
+
+        $this->assertSame(503, $outcome->status());
+        $this->assertArrayNotHasKey('errors', $outcome->body());
+    }
+
+    public function testAnAcceptedSubmissionIsChargedToTheAllowance(): void
+    {
+        $this->mockPost(200, ['responseCode' => 200, 'content' => ['submissionID' => '1']]);
+
+        $this->pipeline()->submit('contact', $this->valid(), ['ip' => '203.0.113.7']);
+
+        $this->assertSame(1, (new QuotaGuard(new Settings()))->status()['since_check']);
+    }
+
+    /**
+     * An upstream failure spent no part of the allowance, and charging it here
+     * would make an outage look like a flood.
+     */
+    public function testAFailedSubmissionIsNotChargedToTheAllowance(): void
+    {
+        $this->mockPost(500, ['responseCode' => 500, 'message' => 'boom']);
+
+        $this->pipeline()->submit('contact', $this->valid(), ['ip' => '203.0.113.7']);
+
+        $this->assertSame(0, (new QuotaGuard(new Settings()))->status()['since_check']);
     }
 
     public function testTheOutcomeNeverLeaksTheApiKey(): void

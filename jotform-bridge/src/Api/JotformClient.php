@@ -76,6 +76,34 @@ final class JotformClient
     }
 
     /**
+     * GET /user/usage — how much of the monthly allowance the account has spent.
+     *
+     * Account-wide, which is the point: the plugin's own counter only knows
+     * about submissions the plugin sent, while the quota that can disable every
+     * form is spent by everything — embedded forms, direct links, other
+     * integrations on the same account.
+     *
+     * @return ApiResponse Data is `['submissions' => int]`.
+     */
+    public function getUsage(): ApiResponse
+    {
+        $response = $this->get('/user/usage');
+
+        if (!$response->isSuccess()) {
+            return $response;
+        }
+
+        $content = $response->data();
+
+        return ApiResponse::success(
+            [
+                'submissions' => isset($content['submissions']) ? (int) $content['submissions'] : 0,
+            ],
+            $response->status()
+        );
+    }
+
+    /**
      * GET /user/forms — the account form list, reduced to the fields we need.
      */
     public function getForms(): ApiResponse

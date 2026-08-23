@@ -6,6 +6,7 @@ namespace JotformBridge;
 
 use JotformBridge\Admin\ApiKeyNotice;
 use JotformBridge\Admin\IntegrationsPage;
+use JotformBridge\Admin\QuotaNotice;
 use JotformBridge\Admin\SettingsPage;
 use JotformBridge\Api\ConnectionState;
 use JotformBridge\Api\JotformClient;
@@ -20,6 +21,7 @@ use JotformBridge\Rendering\FormRenderer;
 use JotformBridge\Rest\SubmissionController;
 use JotformBridge\Settings\Settings;
 use JotformBridge\Submission\Guards\Honeypot;
+use JotformBridge\Submission\QuotaGuard;
 use JotformBridge\Submission\SubmissionPipeline;
 use JotformBridge\Support\Logger;
 use JotformBridge\Templates\TemplateRegistry;
@@ -62,6 +64,8 @@ final class Plugin
     private ?FormRenderer $renderer = null;
 
     private ConnectionState $connection;
+
+    private ?QuotaGuard $quota = null;
 
     private bool $booted = false;
 
@@ -122,6 +126,10 @@ final class Plugin
 
         if (is_admin()) {
             (new ApiKeyNotice($this->settings))->register();
+
+            // A tripped circuit breaker has to be visible and clearable, and
+            // this is also the only place the account-wide spend is refreshed.
+            (new QuotaNotice($this->quota(), $this->settings, $this->client()))->register();
 
             // Registration order decides the submenu order: Integrations first.
             (new IntegrationsPage(
@@ -232,6 +240,18 @@ final class Plugin
         return $this->renderer;
     }
 
+    /**
+     * The account-wide submission circuit breaker.
+     */
+    public function quota(): QuotaGuard
+    {
+        if ($this->quota === null) {
+            $this->quota = new QuotaGuard($this->settings);
+        }
+
+        return $this->quota;
+    }
+
     public function pipeline(): SubmissionPipeline
     {
         return new SubmissionPipeline(
@@ -241,7 +261,10 @@ final class Plugin
             null,
             null,
             null,
-            $this->logger
+            $this->logger,
+            null,
+            null,
+            $this->quota()
         );
     }
 

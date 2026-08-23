@@ -21,8 +21,8 @@ if (!defined('ABSPATH')) {
  * The REST controller owns none of this: it unwraps the HTTP request, calls
  * submit() and serializes the outcome. That keeps the pipeline testable without
  * WordPress and makes the security-relevant order explicit in one place —
- * lookup, activity, rate limit, schema, validation, duplicate check, spam
- * check, mapping, upstream call.
+ * lookup, activity, rate limit, quota guard, schema, validation, duplicate
+ * check, spam check, mapping, upstream call.
  *
  * The visitor never influences which Jotform form is used: the slug is a lookup
  * key and nothing more.
@@ -59,6 +59,8 @@ final class SubmissionPipeline
 
     private RateLimiter $limiter;
 
+    private QuotaGuard $quota;
+
     public function __construct(
         IntegrationRepository $integrations,
         SchemaRepository $schemas,
@@ -68,10 +70,12 @@ final class SubmissionPipeline
         ?SpamGuard $spam = null,
         ?Logger $logger = null,
         ?RedirectTarget $redirects = null,
-        ?RateLimiter $limiter = null
+        ?RateLimiter $limiter = null,
+        ?QuotaGuard $quota = null
     ) {
         $this->redirects = $redirects ?? new RedirectTarget();
         $this->limiter   = $limiter ?? new RateLimiter();
+        $this->quota     = $quota ?? new QuotaGuard();
         $this->integrations = $integrations;
         $this->schemas      = $schemas;
         $this->client       = $client;
@@ -115,6 +119,21 @@ final class SubmissionPipeline
                 __('Too many submissions from this device. Please wait a moment and try again.', 'jotform-bridge'),
                 ['Retry-After' => (string) $wait]
             );
+        }
+
+        // The account-wide circuit breaker. It answers before the schema is
+        // read for the same reason the rate limit does, and it answers with the
+        // ordinary upstream message: which internal ceiling was reached is not
+        // something the endpoint should be willing to tell anyone.
+        $blocked = $this->quota->check();
+
+        if ($blocked !== '') {
+            $this->log('Submission blocked by the quota guard.', [
+                'integration' => $slug,
+                'reason'      => $blocked,
+            ]);
+
+            return SubmissionOutcome::error(503, $this->upstreamMessage());
         }
 
         if (!is_array($fields)) {
@@ -218,6 +237,9 @@ final class SubmissionPipeline
         if ($fingerprint !== '') {
             set_transient($fingerprint, 1, $window);
         }
+
+        // Likewise for the allowance: only what Jotform accepted was spent.
+        $this->quota->record();
 
         /**
          * Fires after a submission was accepted by Jotform.

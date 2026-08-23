@@ -191,6 +191,33 @@ if (!$jfbHasKey) {
             </tr>
 
             <tr>
+                <th scope="row">
+                    <label for="jotform-bridge-monthly-quota">
+                        <?php echo esc_html__('Monthly Submission Allowance', 'jotform-bridge'); ?>
+                    </label>
+                </th>
+                <td>
+                    <input
+                        type="number"
+                        min="0"
+                        step="1"
+                        class="small-text"
+                        id="jotform-bridge-monthly-quota"
+                        name="jotform_bridge[monthly_quota]"
+                        value="<?php echo esc_attr((string) $settings->monthlyQuota()); ?>"
+                    >
+                    <p class="description">
+                        <?php
+                        echo esc_html__(
+                            'How many submissions your Jotform plan allows per month. Jotform reports how much of the allowance has been spent, but not what it is, so it has to be entered here once. Leave it at 0 if you would rather not: the safety ceiling still limits how much can be sent in a day, it just cannot tell how close the account is to having its forms switched off.',
+                            'jotform-bridge'
+                        );
+                        ?>
+                    </p>
+                </td>
+            </tr>
+
+            <tr>
                 <th scope="row"><?php echo esc_html__('Debug Logging', 'jotform-bridge'); ?></th>
                 <td>
                     <label>
