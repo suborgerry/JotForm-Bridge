@@ -27,6 +27,10 @@ if (!defined('ABSPATH')) {
  * call. Each step is cheaper than the one after it, so the requests worth
  * refusing are refused before the expensive work happens.
  *
+ * Every one of those refusals that is not the visitor's own doing answers
+ * identically, so the endpoint cannot be asked which slugs exist. Which of them
+ * it was is recorded — in the tally, in the debug log — for the site owner.
+ *
  * The visitor never influences which Jotform form is used: the slug is a lookup
  * key and nothing more.
  */
@@ -101,9 +105,9 @@ final class SubmissionPipeline
         $slug = sanitize_key($slug);
         $ip   = $this->ip($context);
 
-        // Before anything is looked up. An unknown slug answers 404 cheaply, so
-        // without this the whole rate limit could be sidestepped by probing for
-        // slugs instead of naming a real one.
+        // Before anything is looked up. An unresolved slug is the cheapest
+        // answer the endpoint has, so without this the whole rate limit could be
+        // sidestepped by probing for slugs instead of naming a real one.
         $wait = $this->limiter->checkGlobal($ip);
 
         if ($wait > 0) {
@@ -115,19 +119,19 @@ final class SubmissionPipeline
         $integration = $slug === '' ? null : $this->integrations->get($slug);
 
         if ($integration === null) {
-            return $this->count(
-                Stats::GLOBAL_SCOPE,
-                Stats::UNKNOWN,
-                SubmissionOutcome::error(404, __('This form is not available.', 'jotform-bridge'))
-            );
+            $this->note('A submission named an integration that does not exist.', [
+                'integration' => $slug,
+            ]);
+
+            return $this->count(Stats::GLOBAL_SCOPE, Stats::UNKNOWN, $this->unavailable());
         }
 
         if (!$integration->isActive()) {
-            return $this->count(
-                $slug,
-                Stats::INACTIVE,
-                SubmissionOutcome::error(403, __('This form is not accepting submissions.', 'jotform-bridge'))
-            );
+            $this->note('A submission arrived for a disabled integration.', [
+                'integration' => $slug,
+            ]);
+
+            return $this->count($slug, Stats::INACTIVE, $this->unavailable());
         }
 
         // The tighter, per-integration budget. Like the site-wide one it needs
@@ -151,7 +155,7 @@ final class SubmissionPipeline
                 'reason'      => $blocked,
             ]);
 
-            return $this->count($slug, Stats::QUOTA, SubmissionOutcome::error(503, $this->upstreamMessage()));
+            return $this->count($slug, Stats::QUOTA, $this->unavailable());
         }
 
         if (!is_array($fields)) {
@@ -176,7 +180,7 @@ final class SubmissionPipeline
                 'error'       => $response->errorCode(),
             ]);
 
-            return $this->count($slug, Stats::NO_SCHEMA, SubmissionOutcome::error(503, $this->upstreamMessage()));
+            return $this->count($slug, Stats::NO_SCHEMA, $this->unavailable());
         }
 
         $schema = $response->data()['schema'];
@@ -186,7 +190,7 @@ final class SubmissionPipeline
                 'integration' => $slug,
             ]);
 
-            return $this->count($slug, Stats::NO_SCHEMA, SubmissionOutcome::error(503, $this->upstreamMessage()));
+            return $this->count($slug, Stats::NO_SCHEMA, $this->unavailable());
         }
 
         $result = $this->validator->validate($schema, $fields);
@@ -279,7 +283,7 @@ final class SubmissionPipeline
             if ($upstreamTrip !== '') {
                 $this->quota->tripFromUpstream($upstreamTrip);
 
-                return $this->count($slug, Stats::QUOTA, SubmissionOutcome::error(503, $this->upstreamMessage()));
+                return $this->count($slug, Stats::QUOTA, $this->unavailable());
             }
 
             return $this->count($slug, Stats::UPSTREAM, SubmissionOutcome::error(502, $this->upstreamMessage()));
@@ -439,6 +443,32 @@ final class SubmissionPipeline
     private function ip(array $context): string
     {
         return isset($context['ip']) && is_scalar($context['ip']) ? (string) $context['ip'] : '';
+    }
+
+    /**
+     * The single answer to every reason a form cannot take a submission that is
+     * not the visitor's doing.
+     *
+     * Deliberately one answer rather than several. An unknown slug used to be a
+     * 404, a disabled one a 403 and an unsynced one a 503, which meant the
+     * endpoint would confirm, to anybody who asked, exactly which slugs are real
+     * and what state each is in — a map of the site's forms, free, from the
+     * outside.
+     *
+     * What cannot be hidden is that a working form is a working form: a valid
+     * submission has to be answered differently from an invalid one, so a
+     * request with plausible values still tells a prober it found something.
+     * Closing that would mean closing the form. What this does close is the much
+     * cheaper question — "does this name exist at all" — which needs no valid
+     * values and no knowledge of the schema.
+     *
+     * The real reason is not lost: it goes to the debug log, it is counted per
+     * integration on the admin screens, and an administrator viewing the page
+     * gets it spelled out by the renderer.
+     */
+    private function unavailable(): SubmissionOutcome
+    {
+        return SubmissionOutcome::error(503, $this->upstreamMessage());
     }
 
     private function upstreamMessage(): string

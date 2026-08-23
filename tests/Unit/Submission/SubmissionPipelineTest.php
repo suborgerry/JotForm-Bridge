@@ -73,11 +73,11 @@ final class SubmissionPipelineTest extends TestCase
         $this->cacheSchema();
     }
 
-    public function testAnUnknownIntegrationIsNotFound(): void
+    public function testAnUnknownIntegrationIsRefused(): void
     {
         $outcome = $this->pipeline()->submit('nope', $this->valid());
 
-        $this->assertSame(404, $outcome->status());
+        $this->assertSame(503, $outcome->status());
         $this->assertFalse($outcome->body()['success']);
         $this->assertSame([], $this->requests);
     }
@@ -88,8 +88,30 @@ final class SubmissionPipelineTest extends TestCase
 
         $outcome = $this->pipeline()->submit('contact', $this->valid());
 
-        $this->assertSame(403, $outcome->status());
+        $this->assertSame(503, $outcome->status());
         $this->assertSame([], $this->requests);
+    }
+
+    /**
+     * The endpoint must not be usable as a directory of the site's forms: every
+     * reason a form cannot take a submission — missing, disabled, unsynced,
+     * stopped by the quota guard — has to look the same from outside.
+     */
+    public function testTheEndpointDoesNotRevealWhichSlugsExist(): void
+    {
+        $unknown = $this->pipeline()->submit('nope', $this->valid());
+
+        $this->storeIntegration(false);
+        $disabled = $this->pipeline()->submit('contact', $this->valid());
+
+        $this->storeIntegration(true);
+        $this->dropSchema();
+        $unsynced = $this->pipeline()->submit('contact', $this->valid());
+
+        $this->assertSame($unknown->status(), $disabled->status());
+        $this->assertSame($unknown->status(), $unsynced->status());
+        $this->assertSame($unknown->body(), $disabled->body());
+        $this->assertSame($unknown->body(), $unsynced->body());
     }
 
     public function testAMissingRequiredFieldFailsValidation(): void
@@ -398,7 +420,7 @@ final class SubmissionPipelineTest extends TestCase
     {
         for ($i = 0; $i < RateLimiter::DEFAULT_GLOBAL_PER_MINUTE; $i++) {
             $this->assertSame(
-                404,
+                503,
                 $this->pipeline()->submit('guess-' . $i, $this->valid(), ['ip' => '203.0.113.7'])->status()
             );
         }
