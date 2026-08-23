@@ -9,7 +9,7 @@ msgstr ""
 "MIME-Version: 1.0\n"
 "Content-Type: text/plain; charset=UTF-8\n"
 "Content-Transfer-Encoding: 8bit\n"
-"POT-Creation-Date: 2026-08-19T15:40:42+00:00\n"
+"POT-Creation-Date: 2026-08-23T12:26:33+00:00\n"
 "PO-Revision-Date: YEAR-MO-DA HO:MI+ZONE\n"
 "X-Generator: WP-CLI 2.12.0\n"
 "X-Domain: jotform-bridge\n"
@@ -133,8 +133,42 @@ msgid "Schema synced. The Jotform form has not changed."
 msgstr ""
 
 #: src/Admin/IntegrationsPage.php:396
+#: src/Admin/QuotaNotice.php:77
 #: src/Admin/SettingsPage.php:155
 msgid "You are not allowed to perform this action."
+msgstr ""
+
+#: src/Admin/QuotaNotice.php:99
+msgid "The Jotform account is at or near its monthly submission allowance. Sending more would risk switching every form on the account off until the allowance resets."
+msgstr ""
+
+#. translators: 1: submissions sent today, 2: the ceiling that was reached
+#: src/Admin/QuotaNotice.php:105
+#, php-format
+msgid "This site has sent %1$d submissions today, which reached the safety ceiling of %2$d. That is far above its recent normal, so sending was stopped."
+msgstr ""
+
+#: src/Admin/QuotaNotice.php:115
+msgid "Jotform Bridge has stopped sending submissions."
+msgstr ""
+
+#: src/Admin/QuotaNotice.php:117
+msgid "Visitors are seeing the generic \"please try again later\" message. Check what caused the spike before clearing this — if it was real traffic, clearing it is the right answer."
+msgstr ""
+
+#: src/Admin/QuotaNotice.php:131
+#: src/Rendering/FormRenderer.php:202
+msgid "Jotform Bridge:"
+msgstr ""
+
+#. translators: 1: submissions used, 2: monthly allowance
+#: src/Admin/QuotaNotice.php:135
+#, php-format
+msgid "the Jotform account has used %1$d of its %2$d monthly submissions. When the allowance runs out, every form on the account stops accepting submissions until it resets."
+msgstr ""
+
+#: src/Admin/QuotaNotice.php:157
+msgid "Resume sending submissions"
 msgstr ""
 
 #: src/Admin/SettingsPage.php:68
@@ -307,7 +341,7 @@ msgstr ""
 
 #: src/Admin/views/integration-edit.php:295
 #: src/Admin/views/integrations-list.php:57
-#: src/Admin/views/settings-page.php:243
+#: src/Admin/views/settings-page.php:270
 msgid "Actions"
 msgstr ""
 
@@ -592,111 +626,119 @@ msgstr ""
 msgid "Used only when the region is set to \"Custom base URL\"."
 msgstr ""
 
-#: src/Admin/views/settings-page.php:194
+#: src/Admin/views/settings-page.php:196
+msgid "Monthly Submission Allowance"
+msgstr ""
+
+#: src/Admin/views/settings-page.php:211
+msgid "How many submissions your Jotform plan allows per month. Jotform reports how much of the allowance has been spent, but not what it is, so it has to be entered here once. Leave it at 0 if you would rather not: the safety ceiling still limits how much can be sent in a day, it just cannot tell how close the account is to having its forms switched off."
+msgstr ""
+
+#: src/Admin/views/settings-page.php:221
 msgid "Debug Logging"
 msgstr ""
 
-#: src/Admin/views/settings-page.php:203
+#: src/Admin/views/settings-page.php:230
 msgid "Log Jotform API failures to the PHP error log"
 msgstr ""
 
-#: src/Admin/views/settings-page.php:206
+#: src/Admin/views/settings-page.php:233
 msgid "Technical metadata only. The API key is never logged."
 msgstr ""
 
-#: src/Admin/views/settings-page.php:212
+#: src/Admin/views/settings-page.php:239
 msgid "Uninstall"
 msgstr ""
 
-#: src/Admin/views/settings-page.php:222
+#: src/Admin/views/settings-page.php:249
 msgid "Delete the integrations and the settings when the plugin is deleted"
 msgstr ""
 
-#: src/Admin/views/settings-page.php:230
+#: src/Admin/views/settings-page.php:257
 msgid "Off by default: deleting the plugin removes only the derived data — synced schemas, the form list, the template registry — so deactivating and reinstalling keeps your integrations."
 msgstr ""
 
-#: src/Admin/views/settings-page.php:240
+#: src/Admin/views/settings-page.php:267
 msgid "Save Settings"
 msgstr ""
 
-#: src/Admin/views/settings-page.php:248
+#: src/Admin/views/settings-page.php:275
 msgid "Test Connection"
 msgstr ""
 
-#: src/Admin/views/settings-page.php:253
+#: src/Admin/views/settings-page.php:280
 msgid "Refresh Forms"
 msgstr ""
 
-#: src/Admin/views/settings-page.php:257
+#: src/Admin/views/settings-page.php:284
 msgid "Jotform Forms"
 msgstr ""
 
-#: src/Admin/views/settings-page.php:259
+#: src/Admin/views/settings-page.php:286
 msgid "Forms unavailable: no API key is configured."
 msgstr ""
 
-#: src/Admin/views/settings-page.php:262
+#: src/Admin/views/settings-page.php:289
 msgid "Forms unavailable."
 msgstr ""
 
-#: src/Admin/views/settings-page.php:266
+#: src/Admin/views/settings-page.php:293
 msgid "Form list has not been loaded yet. Use Refresh Forms."
 msgstr ""
 
 #. translators: 1: number of forms, 2: human readable time difference
-#: src/Admin/views/settings-page.php:272
+#: src/Admin/views/settings-page.php:299
 #, php-format
 msgid "%1$d forms stored, loaded %2$s ago."
 msgstr ""
 
-#: src/Admin/views/settings-page.php:281
+#: src/Admin/views/settings-page.php:308
 msgid "Title"
 msgstr ""
 
-#: src/Admin/views/settings-page.php:282
+#: src/Admin/views/settings-page.php:309
 msgid "Form ID"
 msgstr ""
 
-#: src/Admin/views/settings-page.php:283
+#: src/Admin/views/settings-page.php:310
 msgid "Status"
 msgstr ""
 
-#: src/Api/JotformClient.php:131
-#: src/Api/JotformClient.php:193
+#: src/Api/JotformClient.php:159
+#: src/Api/JotformClient.php:221
 #: src/Forms/SchemaRepository.php:123
 msgid "The Jotform form ID is missing or invalid."
 msgstr ""
 
-#: src/Api/JotformClient.php:200
+#: src/Api/JotformClient.php:228
 msgid "The submission contains no values to send."
 msgstr ""
 
-#: src/Api/JotformClient.php:230
-#: src/Api/JotformClient.php:264
+#: src/Api/JotformClient.php:258
+#: src/Api/JotformClient.php:292
 msgid "No Jotform API key is configured."
 msgstr ""
 
-#: src/Api/JotformClient.php:320
+#: src/Api/JotformClient.php:348
 msgid "Could not reach the Jotform API. Check the site network connection and try again."
 msgstr ""
 
-#: src/Api/JotformClient.php:336
+#: src/Api/JotformClient.php:364
 msgid "The Jotform API returned a malformed response."
 msgstr ""
 
-#: src/Api/JotformClient.php:377
+#: src/Api/JotformClient.php:405
 msgid "The Jotform API response did not contain the expected data."
 msgstr ""
 
 #. translators: %d: HTTP or API status code
-#: src/Api/JotformClient.php:405
+#: src/Api/JotformClient.php:433
 #, php-format
 msgid "The Jotform API returned an error (code %d)."
 msgstr ""
 
 #. translators: 1: status code, 2: message returned by Jotform
-#: src/Api/JotformClient.php:412
+#: src/Api/JotformClient.php:440
 #, php-format
 msgid "Jotform error %1$d: %2$s"
 msgstr ""
@@ -895,15 +937,15 @@ msgstr ""
 msgid "The form could not be sent. Check your connection and try again."
 msgstr ""
 
-#: src/Rendering/AutoRenderer.php:133
+#: src/Rendering/AutoRenderer.php:138
 msgid "Submit"
 msgstr ""
 
-#: src/Rendering/AutoRenderer.php:294
+#: src/Rendering/AutoRenderer.php:299
 msgid "— Select —"
 msgstr ""
 
-#: src/Rendering/AutoRenderer.php:336
+#: src/Rendering/AutoRenderer.php:341
 msgid "(required)"
 msgstr ""
 
@@ -935,63 +977,67 @@ msgstr ""
 msgid "This Jotform form has no fields this plugin can render automatically."
 msgstr ""
 
-#: src/Rendering/FormRenderer.php:202
-msgid "Jotform Bridge:"
-msgstr ""
-
-#: src/Rest/SubmissionController.php:96
+#: src/Rest/SubmissionController.php:97
 #: src/Submission/SubmissionValidator.php:135
 msgid "The submission is too large."
 msgstr ""
 
-#: src/Settings/Settings.php:84
+#: src/Settings/Settings.php:85
 msgid "Standard (api.jotform.com)"
 msgstr ""
 
-#: src/Settings/Settings.php:85
+#: src/Settings/Settings.php:86
 msgid "EU (eu-api.jotform.com)"
 msgstr ""
 
-#: src/Settings/Settings.php:86
+#: src/Settings/Settings.php:87
 msgid "HIPAA (hipaa-api.jotform.com)"
 msgstr ""
 
-#: src/Settings/Settings.php:87
+#: src/Settings/Settings.php:88
 msgid "Custom base URL"
+msgstr ""
+
+#: src/Submission/Guards/Honeypot.php:115
+msgid "Leave this field empty."
 msgstr ""
 
 #: src/Submission/SpamGuard.php:57
 msgid "This submission was rejected. Please try again."
 msgstr ""
 
-#: src/Submission/SubmissionPipeline.php:89
+#: src/Submission/SubmissionPipeline.php:111
 msgid "This form is not available."
 msgstr ""
 
-#: src/Submission/SubmissionPipeline.php:93
+#: src/Submission/SubmissionPipeline.php:115
 msgid "This form is not accepting submissions."
 msgstr ""
 
-#: src/Submission/SubmissionPipeline.php:98
-#: src/Submission/SubmissionPipeline.php:130
-#: src/Submission/SubmissionPipeline.php:165
+#: src/Submission/SubmissionPipeline.php:144
+#: src/Submission/SubmissionPipeline.php:176
+#: src/Submission/SubmissionPipeline.php:211
 msgid "Validation failed."
 msgstr ""
 
-#: src/Submission/SubmissionPipeline.php:99
-#: src/Submission/SubmissionPipeline.php:166
+#: src/Submission/SubmissionPipeline.php:145
+#: src/Submission/SubmissionPipeline.php:212
 msgid "No form data was submitted."
 msgstr ""
 
-#: src/Submission/SubmissionPipeline.php:151
+#: src/Submission/SubmissionPipeline.php:197
 msgid "This form has already been submitted. Please wait a moment before sending it again."
 msgstr ""
 
-#: src/Submission/SubmissionPipeline.php:213
+#: src/Submission/SubmissionPipeline.php:262
 msgid "Form submitted successfully."
 msgstr ""
 
-#: src/Submission/SubmissionPipeline.php:278
+#: src/Submission/SubmissionPipeline.php:279
+msgid "Too many submissions from this device. Please wait a moment and try again."
+msgstr ""
+
+#: src/Submission/SubmissionPipeline.php:351
 msgid "The form could not be submitted right now. Please try again later."
 msgstr ""
 
