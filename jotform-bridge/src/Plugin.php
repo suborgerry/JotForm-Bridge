@@ -21,6 +21,7 @@ use JotformBridge\Rendering\FormRenderer;
 use JotformBridge\Rest\SubmissionController;
 use JotformBridge\Settings\Settings;
 use JotformBridge\Submission\Guards\Honeypot;
+use JotformBridge\Submission\Guards\MinimumTime;
 use JotformBridge\Submission\QuotaGuard;
 use JotformBridge\Submission\SubmissionPipeline;
 use JotformBridge\Support\Logger;
@@ -121,6 +122,7 @@ final class Plugin
         // extension point, exactly like a third-party one would. Registering is
         // free: a form without the matching markup never triggers them.
         (new Honeypot())->register();
+        (new MinimumTime())->register();
 
         (new SubmissionController($this->pipeline()))->register();
 

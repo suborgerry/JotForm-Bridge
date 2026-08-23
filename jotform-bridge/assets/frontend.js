@@ -7,8 +7,9 @@
  * endpoint and reports the server's answer back into the markup.
  *
  * Beside the semantic fields it carries a second, separate channel: any element
- * marked with `data-jotform-spam` is collected into `spam`, which never passes
- * through the field validator. That is what an anti-abuse provider — a honeypot,
+ * marked with `data-jotform-spam` is collected into `spam`, together with how
+ * long the visitor has had the form open. None of it passes through the field
+ * validator. That is what an anti-abuse provider — a honeypot,
  * a challenge token — travels in, because a value that is not part of the
  * Jotform form must not be sent as if it were.
  *
@@ -36,6 +37,15 @@
     var SPAM_SELECTOR = '[data-jotform-spam]';
     var ERROR_CONTAINER = '[data-jotform-errors]';
     var BUSY_ATTRIBUTE = 'data-jotform-busy';
+
+    /**
+     * Property the first-interaction timestamp is parked on.
+     *
+     * A property rather than an attribute: it must not be serialized into the
+     * markup, cached with the page, or visible to anything reading the DOM as
+     * text.
+     */
+    var STARTED_AT = '__jotformBridgeStartedAt';
 
     function message(key) {
         var messages = SETTINGS.messages || {};
@@ -158,7 +168,57 @@
             spam[key] = typeof element.value === 'string' ? element.value : '';
         }
 
+        var elapsed = elapsedSeconds(form);
+
+        if (elapsed !== null) {
+            spam.t = elapsed;
+        }
+
         return spam;
+    }
+
+    /**
+     * How long the visitor has had this form open, counted from the moment they
+     * first touched it.
+     *
+     * Measured on the client on purpose. Stamping a server-side timestamp into
+     * the markup would be defeated by full-page caching — every visitor would
+     * receive the same, already-old stamp — and issuing one per page view would
+     * mean an extra request before the form is even used. A client-side number
+     * can be forged, but forging it takes a script that runs the page, and a
+     * script that runs the page is not what this check is aimed at.
+     *
+     * Null when the form was never touched, which the server reads as "not
+     * measured" rather than as "instant".
+     */
+    function elapsedSeconds(form) {
+        var startedAt = form[STARTED_AT];
+
+        if (!startedAt) {
+            return null;
+        }
+
+        return Math.max(0, Math.round((Date.now() - startedAt) / 1000));
+    }
+
+    /**
+     * Marks the moment a form is first interacted with.
+     *
+     * Delegated like the submit handler, so forms added to the page later are
+     * covered too, and only the first interaction counts.
+     */
+    function noteInteraction(event) {
+        var target = event.target;
+
+        if (!target || !target.closest) {
+            return;
+        }
+
+        var form = target.closest(FORM_SELECTOR);
+
+        if (form && !form[STARTED_AT]) {
+            form[STARTED_AT] = Date.now();
+        }
     }
 
     /**
@@ -373,6 +433,7 @@
                     // Order matters: state, then message, then the event, then
                     // the navigation the event was given a chance to cancel.
                     form.reset();
+                    form[STARTED_AT] = 0;
                     showSuccess(form, body.message || '');
 
                     var proceed = dispatch(form, 'jotformbridge:success', {
@@ -422,4 +483,10 @@
 
     // One delegated listener, so forms added to the page later work too.
     document.addEventListener('submit', handle, false);
+
+    // Anything that counts as the visitor starting to fill the form in.
+    document.addEventListener('focusin', noteInteraction, true);
+    document.addEventListener('keydown', noteInteraction, true);
+    document.addEventListener('pointerdown', noteInteraction, true);
+    document.addEventListener('change', noteInteraction, true);
 })();
