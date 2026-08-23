@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace JotformBridge\Rest;
 
 use JotformBridge\Submission\SubmissionPipeline;
+use JotformBridge\Support\ClientIp;
 use WP_REST_Request;
 use WP_REST_Response;
 
@@ -22,7 +23,7 @@ if (!defined('ABSPATH')) {
  * The permission callback is open because the endpoint has to serve anonymous
  * visitors. A nonce would not protect it — it would only break page caching —
  * so the protection is the server-side validation the pipeline performs, plus
- * the spam extension point.
+ * the rate limit, the quota guard and the spam extension point it runs first.
  */
 final class SubmissionController
 {
@@ -106,7 +107,14 @@ final class SubmissionController
             $this->context($request)
         );
 
-        return $this->respond(new WP_REST_Response($outcome->body(), $outcome->status()));
+        $response = new WP_REST_Response($outcome->body(), $outcome->status());
+
+        // Retry-After on a refusal, and whatever a later guard needs to add.
+        foreach ($outcome->headers() as $name => $value) {
+            $response->header((string) $name, (string) $value);
+        }
+
+        return $this->respond($response);
     }
 
     /**
@@ -133,9 +141,9 @@ final class SubmissionController
         $spam = $request->get_param('spam');
 
         return [
-            'ip'         => isset($_SERVER['REMOTE_ADDR'])
-                ? sanitize_text_field(wp_unslash((string) $_SERVER['REMOTE_ADDR']))
-                : '',
+            // Resolved in one place, and only from a source the site owner has
+            // said is trustworthy.
+            'ip'         => ClientIp::resolve(),
             // Client-controlled headers, sanitized and bounded before any
             // extension callback — or a log line — ever sees them.
             'user_agent' => self::header($request, 'user_agent'),

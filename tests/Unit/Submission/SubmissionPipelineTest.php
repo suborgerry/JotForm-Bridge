@@ -11,6 +11,7 @@ use JotformBridge\Forms\SchemaRepository;
 use JotformBridge\Integrations\IntegrationRepository;
 use JotformBridge\Settings\Settings;
 use JotformBridge\Submission\Guards\Honeypot;
+use JotformBridge\Submission\RateLimiter;
 use JotformBridge\Submission\SubmissionOutcome;
 use JotformBridge\Submission\SubmissionPipeline;
 use JotformBridge\Submission\ValidationResult;
@@ -245,6 +246,78 @@ final class SubmissionPipelineTest extends TestCase
 
         $this->assertSame(200, $outcome->status());
         $this->assertCount(1, $this->requests);
+    }
+
+    public function testAFloodFromOneAddressIsRefusedWithRetryAfter(): void
+    {
+        $this->mockPost(200, ['responseCode' => 200, 'content' => ['submissionID' => '1']]);
+
+        for ($i = 0; $i < RateLimiter::DEFAULT_PER_MINUTE; $i++) {
+            $fields            = $this->valid();
+            $fields['message'] = 'Message number ' . $i;
+
+            $this->assertSame(
+                200,
+                $this->pipeline()->submit('contact', $fields, ['ip' => '203.0.113.7'])->status()
+            );
+        }
+
+        $outcome = $this->pipeline()->submit('contact', $this->valid(), ['ip' => '203.0.113.7']);
+
+        $this->assertSame(429, $outcome->status());
+        $this->assertArrayHasKey('Retry-After', $outcome->headers());
+        $this->assertGreaterThan(0, (int) $outcome->headers()['Retry-After']);
+        $this->assertCount(
+            RateLimiter::DEFAULT_PER_MINUTE,
+            $this->requests,
+            'A throttled attempt must not reach Jotform.'
+        );
+    }
+
+    /**
+     * The rate limit is the first thing checked for a reason: a flood must not
+     * cost a schema read or a pass through the validator.
+     */
+    public function testAThrottledAttemptCostsNoSchemaReadAndNoValidation(): void
+    {
+        $this->mockPost(200, ['responseCode' => 200, 'content' => ['submissionID' => '1']]);
+
+        for ($i = 0; $i < RateLimiter::DEFAULT_PER_MINUTE; $i++) {
+            $fields            = $this->valid();
+            $fields['message'] = 'Message number ' . $i;
+
+            $this->pipeline()->submit('contact', $fields, ['ip' => '203.0.113.7']);
+        }
+
+        unset($this->options[SchemaRepository::optionKey(self::FORM_ID)]);
+
+        // Nonsense values: reaching the validator at all would produce a 422
+        // instead of the 429 the guard owes us.
+        $outcome = $this->pipeline()->submit(
+            'contact',
+            ['not-a-field' => str_repeat('x', 4000)],
+            ['ip' => '203.0.113.7']
+        );
+
+        $this->assertSame(429, $outcome->status());
+        $this->assertArrayNotHasKey('errors', $outcome->body());
+    }
+
+    public function testEachAddressHasItsOwnBudget(): void
+    {
+        $this->mockPost(200, ['responseCode' => 200, 'content' => ['submissionID' => '1']]);
+
+        for ($i = 0; $i < RateLimiter::DEFAULT_PER_MINUTE + 2; $i++) {
+            $fields            = $this->valid();
+            $fields['message'] = 'Message number ' . $i;
+
+            $this->pipeline()->submit('contact', $fields, ['ip' => '203.0.113.7']);
+        }
+
+        $this->assertSame(
+            200,
+            $this->pipeline()->submit('contact', $this->valid(), ['ip' => '198.51.100.9'])->status()
+        );
     }
 
     public function testTheOutcomeNeverLeaksTheApiKey(): void

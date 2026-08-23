@@ -22,13 +22,18 @@ final class SubmissionOutcome
     /** @var array<string, mixed> */
     private array $body;
 
+    /** @var array<string, string> Extra response headers. */
+    private array $headers;
+
     /**
-     * @param array<string, mixed> $body
+     * @param array<string, mixed>  $body
+     * @param array<string, string> $headers
      */
-    private function __construct(int $status, array $body)
+    private function __construct(int $status, array $body, array $headers = [])
     {
-        $this->status = $status;
-        $this->body   = $body;
+        $this->status  = $status;
+        $this->body    = $body;
+        $this->headers = $headers;
     }
 
     /**
@@ -70,14 +75,18 @@ final class SubmissionOutcome
         );
     }
 
-    public static function error(int $status, string $message): self
+    /**
+     * @param array<string, string> $headers Extra headers, e.g. Retry-After.
+     */
+    public static function error(int $status, string $message, array $headers = []): self
     {
         return new self(
             $status,
             [
                 'success' => false,
                 'message' => $message,
-            ]
+            ],
+            $headers
         );
     }
 
@@ -92,6 +101,16 @@ final class SubmissionOutcome
     public function body(): array
     {
         return $this->body;
+    }
+
+    /**
+     * Headers the controller has to add on top of the ones it always sends.
+     *
+     * @return array<string, string>
+     */
+    public function headers(): array
+    {
+        return $this->headers;
     }
 
     public function isSuccess(): bool

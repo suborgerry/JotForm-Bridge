@@ -21,7 +21,8 @@ if (!defined('ABSPATH')) {
  * The REST controller owns none of this: it unwraps the HTTP request, calls
  * submit() and serializes the outcome. That keeps the pipeline testable without
  * WordPress and makes the security-relevant order explicit in one place —
- * lookup, activity, schema, validation, spam check, mapping, upstream call.
+ * lookup, activity, rate limit, schema, validation, duplicate check, spam
+ * check, mapping, upstream call.
  *
  * The visitor never influences which Jotform form is used: the slug is a lookup
  * key and nothing more.
@@ -56,6 +57,8 @@ final class SubmissionPipeline
 
     private RedirectTarget $redirects;
 
+    private RateLimiter $limiter;
+
     public function __construct(
         IntegrationRepository $integrations,
         SchemaRepository $schemas,
@@ -64,9 +67,11 @@ final class SubmissionPipeline
         ?SubmissionMapper $mapper = null,
         ?SpamGuard $spam = null,
         ?Logger $logger = null,
-        ?RedirectTarget $redirects = null
+        ?RedirectTarget $redirects = null,
+        ?RateLimiter $limiter = null
     ) {
         $this->redirects = $redirects ?? new RedirectTarget();
+        $this->limiter   = $limiter ?? new RateLimiter();
         $this->integrations = $integrations;
         $this->schemas      = $schemas;
         $this->client       = $client;
@@ -91,6 +96,25 @@ final class SubmissionPipeline
 
         if (!$integration->isActive()) {
             return SubmissionOutcome::error(403, __('This form is not accepting submissions.', 'jotform-bridge'));
+        }
+
+        // Deliberately the first thing checked after the integration exists and
+        // is open. It needs neither the schema nor the values, so an address
+        // that is flooding the endpoint is turned away before the request costs
+        // a schema read or a pass through the validator.
+        $wait = $this->limiter->check($slug, $this->ip($context));
+
+        if ($wait > 0) {
+            $this->note('Submission refused by the rate limit.', [
+                'integration' => $slug,
+                'retry_after' => $wait,
+            ]);
+
+            return SubmissionOutcome::error(
+                429,
+                __('Too many submissions from this device. Please wait a moment and try again.', 'jotform-bridge'),
+                ['Retry-After' => (string) $wait]
+            );
         }
 
         if (!is_array($fields)) {
@@ -268,9 +292,16 @@ final class SubmissionPipeline
      */
     private function fingerprint(string $slug, array $values, array $context): string
     {
-        $ip = isset($context['ip']) && is_scalar($context['ip']) ? (string) $context['ip'] : '';
+        return self::DUPLICATE_TRANSIENT_PREFIX
+            . md5($slug . '|' . $this->ip($context) . '|' . (string) wp_json_encode($values));
+    }
 
-        return self::DUPLICATE_TRANSIENT_PREFIX . md5($slug . '|' . $ip . '|' . (string) wp_json_encode($values));
+    /**
+     * @param array<string, mixed> $context
+     */
+    private function ip(array $context): string
+    {
+        return isset($context['ip']) && is_scalar($context['ip']) ? (string) $context['ip'] : '';
     }
 
     private function upstreamMessage(): string
