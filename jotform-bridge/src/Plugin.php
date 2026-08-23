@@ -8,6 +8,7 @@ use JotformBridge\Admin\ApiKeyNotice;
 use JotformBridge\Admin\IntegrationsPage;
 use JotformBridge\Admin\QuotaNotice;
 use JotformBridge\Admin\SettingsPage;
+use JotformBridge\Admin\TurnstileNotice;
 use JotformBridge\Api\ConnectionState;
 use JotformBridge\Api\JotformClient;
 use JotformBridge\Forms\FormRepository;
@@ -139,6 +140,10 @@ final class Plugin
             // A tripped circuit breaker has to be visible and clearable, and
             // this is also the only place the account-wide spend is refreshed.
             (new QuotaNotice($this->quota(), $this->settings, $this->client()))->register();
+
+            // Says how to switch the challenge on, once, and how to finish the
+            // job if only half of it was done.
+            (new TurnstileNotice())->register();
 
             // Registration order decides the submenu order: Integrations first.
             (new IntegrationsPage(
