@@ -102,7 +102,7 @@ final class IntegrationsPage
             self::CAPABILITY,
             self::MENU_SLUG,
             [$this, 'render'],
-            'dashicons-feedback',
+            $this->menuIcon(),
             58
         );
 
@@ -114,6 +114,23 @@ final class IntegrationsPage
             self::MENU_SLUG,
             [$this, 'render']
         );
+    }
+
+    /**
+     * Brand mark for the top-level menu, inlined as a data URI.
+     *
+     * Falls back to a Dashicon if the asset is missing.
+     */
+    private function menuIcon(): string
+    {
+        $path = JOTFORM_BRIDGE_DIR . 'assets/menu-icon.svg';
+        $svg  = is_readable($path) ? file_get_contents($path) : false;
+
+        if ($svg === false || $svg === '') {
+            return 'dashicons-feedback';
+        }
+
+        return 'data:image/svg+xml;base64,' . base64_encode($svg);
     }
 
     public function render(): void
