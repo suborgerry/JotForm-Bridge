@@ -523,3 +523,56 @@ outcome is to delete the block — which is a good outcome, not a failure.
 answering it wrongly means building a second notification surface next to one
 that already works.
 
+---
+
+## 16. Sweep for hardcoding and over-engineering
+
+**Problem.** Nobody has read the plugin looking specifically for two opposite
+faults: a value that should have been derived or configurable but was typed in,
+and machinery that costs more than the problem it solves. Both accumulate
+quietly, and both are easiest to see in one deliberate pass rather than while
+working on something else.
+
+This is a sweep, not a rewrite. Most of what it finds should be left alone with
+a note; the point is to know which is which.
+
+**Hardcoding — concrete candidates already visible:**
+
+* `Api\JotformClient::FORMS_PAGE_LIMIT = 1000`, and `getForms()` does not
+  paginate. An account with more than a thousand forms is silently truncated,
+  and the missing ones simply never appear in the integration editor. This is
+  the one item on the list that is a defect rather than a question.
+* `Guards\ProofOfWork::BITS = 16` and `POW_BITS = 16` in `assets/frontend.js`
+  are the same number written twice in two languages. The `jotform_bridge_pow_bits`
+  filter changes only the PHP side, so using it silently breaks every submission
+  — the docblock admits this. Either the script learns the number, or the filter
+  goes.
+* The menu position `58` in `IntegrationsPage::registerMenu()` is a bare
+  literal, and it is the kind of number two plugins collide on.
+* `assets/admin.css` carries the WordPress core palette as literal hex — the
+  values are right, but nothing says where they came from.
+* Worth confirming as deliberate rather than accidental: `MIN_DAILY`,
+  `BURST_FACTOR`, `MEDIAN_DAYS`, the four rate-limit defaults, `DUPLICATE_WINDOW`,
+  `MIN_SECONDS`, `MAX_BODY_BYTES`, `HEADER_BYTES`, `SOURCE_BYTES`, and the 15 and
+  5 second HTTP timeouts. Most already have a docblock arguing for the value,
+  which is the standard the rest should meet.
+
+**Over-engineering — concrete candidates:**
+
+* `SubmissionPipeline::__construct()` takes eleven parameters, nine of them
+  nullable with defaults constructed inside. That is a constructor doing
+  container work, and it makes the dependency graph invisible from the outside.
+  `IntegrationsPage` has eight, `FormRenderer` seven.
+* `Rest\SubmissionController::__construct()` accepts either a pipeline or a
+  factory returning one, and normalizes between them. Two ways to do one thing,
+  where the laziness the factory buys is only needed on one path.
+* `Settings::$generation`, a static counter that exists so an instance memo can
+  notice a write made through a static method. Six references for a case the
+  class's own docblock says does not currently occur.
+* `TemplateScanner::lastChange()` takes `max(filemtime, filectime)` to survive
+  tools that preserve mtime — clever, and worth confirming anyone depends on it.
+
+**What the pass should produce.** For each finding, one of three outcomes: fix
+it, or write down why it stays, or delete the machinery. A finding that ends in
+none of the three has not been resolved, only visited.
+
