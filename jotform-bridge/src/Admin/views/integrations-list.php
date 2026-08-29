@@ -186,14 +186,13 @@ $jfbNewUrl = add_query_arg(['page' => $page, 'view' => 'new'], admin_url('admin.
             <tr>
                 <th scope="col"><?php echo esc_html__('Template', 'jotform-bridge'); ?></th>
                 <th scope="col"><?php echo esc_html__('Slug', 'jotform-bridge'); ?></th>
-                <th scope="col"><?php echo esc_html__('Source', 'jotform-bridge'); ?></th>
                 <th scope="col"><?php echo esc_html__('File', 'jotform-bridge'); ?></th>
             </tr>
         </thead>
         <tbody>
             <?php if ($templates->isEmpty()) : ?>
                 <tr>
-                    <td colspan="4">
+                    <td colspan="3">
                         <?php echo esc_html__('No templates found. Add a PHP file with a Jotform template header to your theme /forms/ directory.', 'jotform-bridge'); ?>
                     </td>
                 </tr>
@@ -203,18 +202,6 @@ $jfbNewUrl = add_query_arg(['page' => $page, 'view' => 'new'], admin_url('admin.
                 <tr>
                     <td><strong><?php echo esc_html((string) $jfbTemplate['name']); ?></strong></td>
                     <td><code><?php echo esc_html((string) $jfbTemplate['slug']); ?></code></td>
-                    <td>
-                        <?php
-                        $jfbSources = [
-                            TemplateScanner::SOURCE_CHILD_THEME  => __('Child theme', 'jotform-bridge'),
-                            TemplateScanner::SOURCE_PARENT_THEME => __('Parent theme', 'jotform-bridge'),
-                            TemplateScanner::SOURCE_THEME        => __('Theme', 'jotform-bridge'),
-                            TemplateScanner::SOURCE_FILTER       => __('Filter', 'jotform-bridge'),
-                        ];
-
-                        echo esc_html($jfbSources[(string) $jfbTemplate['source']] ?? (string) $jfbTemplate['source']);
-                        ?>
-                    </td>
                     <td><code><?php echo esc_html((string) $jfbTemplate['file']); ?></code></td>
                 </tr>
             <?php endforeach; ?>
