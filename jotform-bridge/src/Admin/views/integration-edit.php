@@ -80,15 +80,6 @@ $jfbReport  = $compatibility['report'] instanceof CompatibilityReport ? $compati
                         value="<?php echo esc_attr($integration->slug()); ?>"
                         pattern="[A-Za-z0-9_\-]+"
                     >
-                    <p class="description">
-                        <?php
-                        printf(
-                            /* translators: %s: example PHP call */
-                            esc_html__('The public local identifier, for example %s.', 'jotform-bridge'),
-                            '<code>' . esc_html("jotform_bridge_render('contact')") . '</code>'
-                        );
-                        ?>
-                    </p>
                 </td>
             </tr>
 
