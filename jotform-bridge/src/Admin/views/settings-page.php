@@ -88,7 +88,12 @@ if (!$jfbHasKey) {
                     <label for="jfb-region"><?php echo esc_html__('API Region', 'jotform-bridge'); ?></label>
                 </th>
                 <td>
-                    <select id="jfb-region" name="jotform_bridge[region]">
+                    <select
+                        id="jfb-region"
+                        name="jotform_bridge[region]"
+                        data-jfb-toggle=".jfb-custom-base-url-field"
+                        data-jfb-toggle-value="<?php echo esc_attr(Settings::REGION_CUSTOM); ?>"
+                    >
                         <?php foreach (Settings::regions() as $jfbSlug => $jfbLabel) : ?>
                             <option
                                 value="<?php echo esc_attr($jfbSlug); ?>"
@@ -173,31 +178,6 @@ if (!$jfbHasKey) {
         <?php submit_button(__('Save Settings', 'jotform-bridge')); ?>
     </form>
 
-    <script>
-        /* The custom base URL only matters for the custom region. With JavaScript
-           off the field stays visible, which is a usable form, not a broken one:
-           the server ignores the value unless the region asks for it. */
-        (function () {
-            var region = document.getElementById('jfb-region');
-            var rows = document.querySelectorAll('.jfb-custom-base-url-field');
-
-            if (!region) {
-                return;
-            }
-
-            function sync() {
-                var show = region.value === '<?php echo esc_js(Settings::REGION_CUSTOM); ?>';
-
-                for (var i = 0; i < rows.length; i++) {
-                    rows[i].style.display = show ? '' : 'none';
-                }
-            }
-
-            region.addEventListener('change', sync);
-            sync();
-        })();
-    </script>
-
     <h2><?php echo esc_html__('Sync & Connection', 'jotform-bridge'); ?></h2>
     <p>
         <?php
@@ -248,12 +228,12 @@ if (!$jfbHasKey) {
         </p>
     <?php endif; ?>
     <div class="jfb-actions">
-        <form method="post" action="<?php echo esc_url(admin_url('admin-post.php')); ?>" style="display:inline-block;margin-right:8px;">
+        <form method="post" action="<?php echo esc_url(admin_url('admin-post.php')); ?>" class="jfb-action-form">
             <input type="hidden" name="action" value="<?php echo esc_attr(SettingsPage::ACTION_TEST); ?>">
             <?php wp_nonce_field(SettingsPage::ACTION_TEST); ?>
             <?php submit_button(__('Test Connection', 'jotform-bridge'), 'secondary', 'submit', false); ?>
         </form>
-        <form method="post" action="<?php echo esc_url(admin_url('admin-post.php')); ?>" style="display:inline-block;">
+        <form method="post" action="<?php echo esc_url(admin_url('admin-post.php')); ?>" class="jfb-action-form">
             <input type="hidden" name="action" value="<?php echo esc_attr(SettingsPage::ACTION_REFRESH); ?>">
             <?php wp_nonce_field(SettingsPage::ACTION_REFRESH); ?>
             <?php submit_button(__('Sync with Jotform', 'jotform-bridge'), 'secondary', 'submit', false); ?>

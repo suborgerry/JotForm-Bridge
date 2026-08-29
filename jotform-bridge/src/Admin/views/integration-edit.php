@@ -114,7 +114,12 @@ $jfbReport  = $compatibility['report'] instanceof CompatibilityReport ? $compati
                     <label for="jfb-mode"><?php echo esc_html__('Rendering Mode', 'jotform-bridge'); ?></label>
                 </th>
                 <td>
-                    <select id="jfb-mode" name="jotform_integration[mode]">
+                    <select
+                        id="jfb-mode"
+                        name="jotform_integration[mode]"
+                        data-jfb-toggle=".jfb-template-field"
+                        data-jfb-toggle-value="<?php echo esc_attr(Integration::MODE_CUSTOM); ?>"
+                    >
                         <?php foreach (Integration::modes() as $jfbMode => $jfbLabel) : ?>
                             <option
                                 value="<?php echo esc_attr($jfbMode); ?>"
@@ -164,7 +169,12 @@ $jfbReport  = $compatibility['report'] instanceof CompatibilityReport ? $compati
                     <label for="jfb-success-action"><?php echo esc_html__('Success Action', 'jotform-bridge'); ?></label>
                 </th>
                 <td>
-                    <select id="jfb-success-action" name="jotform_integration[success_action]">
+                    <select
+                        id="jfb-success-action"
+                        name="jotform_integration[success_action]"
+                        data-jfb-toggle=".jfb-redirect-field"
+                        data-jfb-toggle-value="<?php echo esc_attr(Integration::SUCCESS_REDIRECT); ?>"
+                    >
                         <?php foreach (Integration::successActions() as $jfbAction => $jfbActionLabel) : ?>
                             <option
                                 value="<?php echo esc_attr($jfbAction); ?>"
@@ -198,7 +208,7 @@ $jfbReport  = $compatibility['report'] instanceof CompatibilityReport ? $compati
                         <?php echo esc_html__('Only published pages of this site can be chosen. A free URL is deliberately not accepted.', 'jotform-bridge'); ?>
                     </p>
                     <?php if (RedirectTarget::isBroken($redirect)) : ?>
-                        <p class="description" style="color:#b32d2e;">
+                        <p class="description jfb-state-error">
                             <strong><?php echo esc_html((string) $redirect['label']); ?>:</strong>
                             <?php echo esc_html((string) $redirect['message']); ?>
                         </p>
@@ -236,93 +246,12 @@ $jfbReport  = $compatibility['report'] instanceof CompatibilityReport ? $compati
 
     </form>
 
-    <script>
-        /* The redirect fields are only meaningful for the redirect action, and the
-           template only for the custom mode. With JavaScript off everything stays
-           visible, which is a usable form, not a broken one: the server ignores
-           the fields the chosen action or mode does not ask for. */
-        (function () {
-            function toggle(control, selector, wanted) {
-                var rows = document.querySelectorAll(selector);
-
-                if (!control) {
-                    return;
-                }
-
-                function sync() {
-                    var show = control.value === wanted;
-
-                    for (var i = 0; i < rows.length; i++) {
-                        rows[i].style.display = show ? '' : 'none';
-                    }
-                }
-
-                control.addEventListener('change', sync);
-                sync();
-            }
-
-            toggle(
-                document.getElementById('jfb-success-action'),
-                '.jfb-redirect-field',
-                '<?php echo esc_js(Integration::SUCCESS_REDIRECT); ?>'
-            );
-            toggle(
-                document.getElementById('jfb-mode'),
-                '.jfb-template-field',
-                '<?php echo esc_js(Integration::MODE_CUSTOM); ?>'
-            );
-        })();
-    </script>
-
-    <style>
-        /* WordPress ships no destructive button style, only the red link class,
-           so the delete button borrows the core error colours. */
-        .jfb-actions {
-            margin-bottom: 16px;
-        }
-        .jfb-actions .jfb-button-delete {
-            border-color: #b32d2e;
-            background: #b32d2e;
-            color: #fff;
-        }
-
-        .jfb-actions-footer {
-            margin-top: 24px;
-            padding-top: 16px;
-            border-top: 1px solid #dcdcde;
-        }
-
-        .jfb-actions-footer .button-primary {
-            margin-right: 8px;
-        }
-
-        .jfb-actions .jfb-button-delete:hover,
-        .jfb-actions .jfb-button-delete:focus {
-            border-color: #8a2424;
-            background: #8a2424;
-            color: #fff;
-        }
-
-        /* A field the bridge cannot map is worth finding in a long schema, but
-           it is not an error: the row keeps the core warning tint and a marker
-           on its edge instead of shouting in red. The stripes are overridden so
-           that the tint survives on every other row. */
-        .widefat.striped > tbody > tr.jfb-row-unsupported,
-        .widefat > tbody > tr.jfb-row-unsupported {
-            background-color: #fcf9e8;
-            box-shadow: inset 3px 0 0 #dba617;
-        }
-
-        tr.jfb-row-unsupported .jfb-unsupported-note {
-            color: #996800;
-        }
-    </style>
 
     <h2><?php echo esc_html__('Schema', 'jotform-bridge'); ?></h2>
 
     <div class="jfb-actions">
         <?php if (!$isNew) : ?>
-            <form method="post" action="<?php echo esc_url(admin_url('admin-post.php')); ?>" style="display:inline-block;margin-right:8px;">
+            <form method="post" action="<?php echo esc_url(admin_url('admin-post.php')); ?>" class="jfb-action-form">
                 <input type="hidden" name="action" value="<?php echo esc_attr(IntegrationsPage::ACTION_SYNC); ?>">
                 <input type="hidden" name="integration" value="<?php echo esc_attr($integration->slug()); ?>">
                 <input type="hidden" name="return_view" value="edit">
@@ -336,7 +265,7 @@ $jfbReport  = $compatibility['report'] instanceof CompatibilityReport ? $compati
             <form
                 method="post"
                 action="<?php echo esc_url(admin_url('admin-post.php')); ?>"
-                style="display:inline-block;margin-right:8px;"
+                class="jfb-action-form"
                 onsubmit="return confirm('<?php echo esc_js(__('This sends a real submission to Jotform. It will appear in your inbox, trigger the form\'s notifications and count towards your monthly allowance. Continue?', 'jotform-bridge')); ?>');"
             >
                 <input type="hidden" name="action" value="<?php echo esc_attr(IntegrationsPage::ACTION_TEST); ?>">
@@ -534,12 +463,14 @@ $jfbReport  = $compatibility['report'] instanceof CompatibilityReport ? $compati
         </p>
 
         <p>
-            <button type="button" class="button button-secondary" id="jfb-copy-scaffold">
+            <button
+                type="button"
+                class="button button-secondary jfb-copy-scaffold"
+                data-jfb-copy-from="#jfb-scaffold"
+            >
                 <?php esc_html_e('Copy to clipboard', 'jotform-bridge'); ?>
+                <span class="jfb-copied"><?php esc_html_e('Copied', 'jotform-bridge'); ?></span>
             </button>
-            <span id="jfb-copy-scaffold-done" class="description" style="display:none;">
-                <?php esc_html_e('Copied.', 'jotform-bridge'); ?>
-            </span>
         </p>
 
         <textarea
@@ -551,38 +482,6 @@ $jfbReport  = $compatibility['report'] instanceof CompatibilityReport ? $compati
             aria-label="<?php echo esc_attr__('Starter template source', 'jotform-bridge'); ?>"
         ><?php echo esc_textarea($scaffold); ?></textarea>
 
-        <script>
-            (function () {
-                var button = document.getElementById('jfb-copy-scaffold');
-                var source = document.getElementById('jfb-scaffold');
-                var done = document.getElementById('jfb-copy-scaffold-done');
-
-                if (!button || !source) {
-                    return;
-                }
-
-                button.addEventListener('click', function () {
-                    source.focus();
-                    source.select();
-
-                    // Selecting is the fallback: where the clipboard API is
-                    // unavailable the text is at least ready to copy by hand.
-                    if (navigator.clipboard && navigator.clipboard.writeText) {
-                        navigator.clipboard.writeText(source.value);
-                    } else {
-                        try {
-                            document.execCommand('copy');
-                        } catch (error) {
-                            return;
-                        }
-                    }
-
-                    if (done) {
-                        done.style.display = 'inline';
-                    }
-                });
-            })();
-        </script>
     <?php endif; ?>
 
     <div class="jfb-actions jfb-actions-footer">
@@ -601,7 +500,7 @@ $jfbReport  = $compatibility['report'] instanceof CompatibilityReport ? $compati
             <form
                 method="post"
                 action="<?php echo esc_url(admin_url('admin-post.php')); ?>"
-                style="display:inline-block;"
+                class="jfb-action-form"
                 onsubmit="return confirm('<?php echo esc_js(__('Delete this integration? This cannot be undone.', 'jotform-bridge')); ?>');"
             >
                 <input type="hidden" name="action" value="<?php echo esc_attr(IntegrationsPage::ACTION_DELETE); ?>">

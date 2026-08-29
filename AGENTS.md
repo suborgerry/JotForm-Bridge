@@ -1331,6 +1331,26 @@ AutoRenderer строит semantic accessible HTML из Normalized Schema.
 
 Не добавлять тяжелый frontend CSS framework.
 
+## Admin assets
+
+Никакого inline `<script>` и `<style>` в админских views и в notice-классах.
+CSS и JS живут в `assets/admin.css` и `assets/admin.js` и подключаются через
+`Admin\AdminAssets` только на экранах плагина.
+
+Причина не только в кешировании: inline-блок отклоняется любым сайтом с
+Content Security Policy, и админка молча ломается наполовину.
+
+Поведение объявляется в разметке, а не проводом на каждом экране:
+
+```text
+[data-jfb-toggle="<selector>"] + [data-jfb-toggle-value="<value>"]
+[data-jfb-copy="<text>"] | [data-jfb-copy-from="<selector>"]
+```
+
+Так значение PHP-константы попадает в HTML-атрибут через `esc_attr()`, а не в
+тело скрипта через `esc_js()`, и новая строка или новая кнопка копирования не
+требуют ни строчки JavaScript.
+
 ---
 
 # Хранение и кеширование

@@ -471,6 +471,22 @@ final class IntegrationsPage
             : ['view' => 'new'];
     }
 
+    /**
+     * A timestamp in the site's own date format and timezone.
+     *
+     * Both tables on the list screen print one, and they have to agree with the
+     * rest of the admin rather than invent a format of their own. Called from
+     * the view, which is included inside a method of this class and therefore
+     * shares its scope.
+     */
+    private function formatDateTime(int $timestamp): string
+    {
+        $date = (string) get_option('date_format', 'Y-m-d');
+        $time = (string) get_option('time_format', 'H:i');
+
+        return (string) wp_date(trim($date . ' ' . $time), $timestamp);
+    }
+
     private function isKnownForm(string $formId): bool
     {
         foreach ($this->forms->all() as $form) {

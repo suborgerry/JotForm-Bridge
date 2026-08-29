@@ -73,10 +73,10 @@ final class TurnstileNotice
     private function renderStatus(): void
     {
         printf(
-            '<div class="notice notice-info inline" style="margin:1em 15px 2px 0;border-left-color:#c3c4c7;">'
-            . '<p style="margin:.5em 0;">%1$s</p>'
-            . '<details style="margin:0 0 .5em;"><summary style="cursor:pointer;">%2$s</summary>'
-            . '<p>%3$s</p><pre style="margin:0 0 1em;white-space:pre-wrap;"><code>%4$s</code></pre>'
+            '<div class="notice notice-info inline jfb-challenge-notice">'
+            . '<p>%1$s</p>'
+            . '<details><summary>%2$s</summary>'
+            . '<p>%3$s</p><pre><code>%4$s</code></pre>'
             . '<p>%5$s</p></details></div>',
             esc_html__(
                 'Challenge: off. Your forms still refuse bots that fill hidden fields, submit instantly or flood the endpoint; a challenge is the optional layer that also stops a bot driving a real browser.',
@@ -100,7 +100,7 @@ final class TurnstileNotice
     private function renderHalfConfigured(): void
     {
         printf(
-            '<div class="notice notice-warning" style="margin:1em 15px 2px 0;"><p><strong>%1$s</strong> %2$s</p><p>%3$s</p></div>',
+            '<div class="notice notice-warning jfb-challenge-notice"><p><strong>%1$s</strong> %2$s</p><p>%3$s</p></div>',
             esc_html__('The Jotform Bridge challenge is only half configured.', 'jotform-bridge'),
             esc_html(
                 sprintf(

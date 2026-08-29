@@ -772,6 +772,10 @@ before deleting. The API key is not involved either way: it lives in
   values from the same IP, not idempotency keys, and two genuinely simultaneous
   requests can still both go through.
 * **One site, one Jotform account.** There is no per-integration API key.
+* **JavaScript is required to submit.** The inputs carry semantic identifiers
+  rather than `name` attributes, so the form is sent by the plugin's script and
+  by nothing else. A visitor without JavaScript is told so — the auto renderer
+  prints the notice, and a custom template gets the same line as `$noscript`.
 * **A redirect target is a page of this site.** It is picked from the published
   pages, not typed as a URL, and an off-site target is refused by design. To send
   a visitor elsewhere, cancel the redirect on `jotformbridge:success` and

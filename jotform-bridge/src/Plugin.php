@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace JotformBridge;
 
+use JotformBridge\Admin\AdminAssets;
 use JotformBridge\Admin\ApiKeyNotice;
 use JotformBridge\Admin\IntegrationsPage;
 use JotformBridge\Admin\QuotaNotice;
@@ -145,6 +146,9 @@ final class Plugin
         (new SubmissionController(static fn(): SubmissionPipeline => self::instance()->pipeline()))->register();
 
         if (is_admin()) {
+            // Only on this plugin's own screens; the class decides.
+            (new AdminAssets())->register();
+
             (new ApiKeyNotice($this->settings))->register();
 
             // A tripped circuit breaker has to be visible and clearable.

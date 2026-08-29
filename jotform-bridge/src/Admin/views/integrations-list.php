@@ -22,21 +22,6 @@ if (!defined('ABSPATH')) {
 }
 
 $jfbNewUrl = add_query_arg(['page' => $page, 'view' => 'new'], admin_url('admin.php'));
-
-if (!function_exists('jfb_format_datetime')) {
-    /**
-     * Both tables print a timestamp the same way: the site's own date and time
-     * format, in the site's timezone, so the column matches the rest of the
-     * admin instead of inventing a format of its own.
-     */
-    function jfb_format_datetime(int $timestamp): string
-    {
-        $date = (string) get_option('date_format', 'Y-m-d');
-        $time = (string) get_option('time_format', 'H:i');
-
-        return (string) wp_date(trim($date . ' ' . $time), $timestamp);
-    }
-}
 ?>
 <div class="wrap jfb-integrations">
     <h2 class="wp-heading-inline"><?php echo esc_html__('Integrations', 'jotform-bridge'); ?></h2>
@@ -136,7 +121,7 @@ if (!function_exists('jfb_format_datetime')) {
                         <button
                             type="button"
                             class="button-link jfb-copy-shortcode"
-                            data-jfb-shortcode="<?php echo esc_attr($jfbShortcode); ?>"
+                            data-jfb-copy="<?php echo esc_attr($jfbShortcode); ?>"
                             title="<?php echo esc_attr__('Copy to clipboard', 'jotform-bridge'); ?>"
                         >
                             <code><?php echo esc_html($jfbShortcode); ?></code>
@@ -153,7 +138,7 @@ if (!function_exists('jfb_format_datetime')) {
                             : $jfbIntegration->createdAt();
                         ?>
                         <?php if ($jfbModified > 0) : ?>
-                            <?php echo esc_html(jfb_format_datetime($jfbModified)); ?>
+                            <?php echo esc_html($this->formatDateTime($jfbModified)); ?>
                         <?php else : ?>
                             <span aria-hidden="true">&mdash;</span>
                             <span class="screen-reader-text">
@@ -239,7 +224,7 @@ if (!function_exists('jfb_format_datetime')) {
                     <td>
                         <?php $jfbMtime = (int) ($jfbTemplate['mtime'] ?? 0); ?>
                         <?php if ($jfbMtime > 0) : ?>
-                            <?php echo esc_html(jfb_format_datetime($jfbMtime)); ?>
+                            <?php echo esc_html($this->formatDateTime($jfbMtime)); ?>
                         <?php else : ?>
                             <span aria-hidden="true">&mdash;</span>
                             <span class="screen-reader-text">
@@ -264,153 +249,4 @@ if (!function_exists('jfb_format_datetime')) {
         </ul>
     <?php endif; ?>
 
-    <style>
-        /* As the first child of .wrap the title is caught by the pre-4.4
-           back-compat rule that styles it like a page h1, and
-           .wp-heading-inline is only defined for h1, so both are undone here:
-           the values below are the ones the "Templates" h2 below gets, plus the
-           inline flow and the gap that keep "Add New" beside the title. The
-           selector names .wrap and both element types so that it outweighs the
-           back-compat rule, which load-styles.php would otherwise win on
-           specificity. */
-        .wrap.jfb-integrations > h2.wp-heading-inline {
-            display: inline-block;
-            color: #1d2327;
-            font-size: 1.3em;
-            font-weight: 600;
-            line-height: inherit;
-            margin: 1em 4px 1em 0;
-            padding: 0;
-        }
-
-        /* An integration whose template is gone renders nothing on the front end,
-           so the row carries the core error colours as a tint and an edge
-           marker. The stripes are overridden so the tint survives on every
-           other row. */
-        .widefat.striped > tbody > tr.jfb-row-broken,
-        .widefat > tbody > tr.jfb-row-broken {
-            background-color: #fcf0f1;
-            box-shadow: inset 3px 0 0 #d63638;
-        }
-
-        tr.jfb-row-broken .jfb-broken-note {
-            color: #b32d2e;
-        }
-
-        /* The cell still has to read as the identifier it is, so the button keeps
-           the plain <code> look and only gains a pointer and the copied marker. */
-        /* Several integrations can share one template, so the cell is a list
-           that stays readable at any count instead of a run-on line. */
-        .jfb-integrations .jfb-template-usage {
-            margin: 0;
-        }
-
-        .jfb-integrations .jfb-template-usage li {
-            margin: 0 0 .25em;
-        }
-
-        .jfb-integrations .jfb-template-usage li:last-child {
-            margin-bottom: 0;
-        }
-
-        .jfb-integrations .jfb-copy-shortcode {
-            position: relative;
-            padding: 0;
-            border: 0;
-            background: none;
-            cursor: pointer;
-            text-decoration: none;
-        }
-
-        .jfb-integrations .jfb-copy-shortcode code {
-            cursor: pointer;
-        }
-
-        /* Taken out of the flow so that showing it never reflows the row: the
-           marker sits to the right of the shortcode and overlaps the cell
-           padding instead of widening the column. */
-        .jfb-integrations .jfb-copy-shortcode .jfb-copied {
-            position: absolute;
-            top: 0;
-            left: 100%;
-            margin-left: .5em;
-            color: #007017;
-            white-space: nowrap;
-            opacity: 0;
-            pointer-events: none;
-            transition: opacity .15s ease-in-out;
-        }
-
-        .jfb-integrations .jfb-copy-shortcode.is-copied .jfb-copied {
-            opacity: 1;
-        }
-    </style>
-
-    <script>
-        /* Click-to-copy for the shortcode column. With JavaScript off, or on a
-           context where the clipboard is not available, the cell is still the
-           shortcode in plain text and can be selected by hand. */
-        (function () {
-            var buttons = document.querySelectorAll('.jfb-copy-shortcode');
-            var timers = [];
-
-            function fallbackCopy(text) {
-                var field = document.createElement('textarea');
-
-                field.value = text;
-                field.setAttribute('readonly', 'readonly');
-                field.style.position = 'fixed';
-                field.style.opacity = '0';
-                document.body.appendChild(field);
-                field.select();
-
-                var done = false;
-
-                try {
-                    done = document.execCommand('copy');
-                } catch (error) {
-                    done = false;
-                }
-
-                document.body.removeChild(field);
-
-                return done;
-            }
-
-            function confirmCopy(button, index) {
-                button.classList.add('is-copied');
-                window.clearTimeout(timers[index]);
-                timers[index] = window.setTimeout(function () {
-                    button.classList.remove('is-copied');
-                }, 1500);
-            }
-
-            for (var i = 0; i < buttons.length; i++) {
-                (function (button, index) {
-                    button.addEventListener('click', function () {
-                        var text = button.getAttribute('data-jfb-shortcode') || '';
-
-                        if (navigator.clipboard && window.isSecureContext) {
-                            navigator.clipboard.writeText(text).then(
-                                function () {
-                                    confirmCopy(button, index);
-                                },
-                                function () {
-                                    if (fallbackCopy(text)) {
-                                        confirmCopy(button, index);
-                                    }
-                                }
-                            );
-
-                            return;
-                        }
-
-                        if (fallbackCopy(text)) {
-                            confirmCopy(button, index);
-                        }
-                    });
-                })(buttons[i], i);
-            }
-        })();
-    </script>
 </div>
