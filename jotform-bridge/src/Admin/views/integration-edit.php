@@ -127,9 +127,6 @@ $jfbReport  = $compatibility['report'] instanceof CompatibilityReport ? $compati
                             </option>
                         <?php endforeach; ?>
                     </select>
-                    <p class="description">
-                        <?php echo esc_html__('A custom template gives the theme full control of the markup. Automatic rendering builds a plain, accessible form from the Jotform schema and ignores the template below.', 'jotform-bridge'); ?>
-                    </p>
                 </td>
             </tr>
 
