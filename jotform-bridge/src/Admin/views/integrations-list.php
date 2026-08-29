@@ -38,6 +38,7 @@ $jfbNewUrl = add_query_arg(['page' => $page, 'view' => 'new'], admin_url('admin.
             <tr>
                 <th scope="col"><?php echo esc_html__('Name', 'jotform-bridge'); ?></th>
                 <th scope="col"><?php echo esc_html__('Jotform Form', 'jotform-bridge'); ?></th>
+                <th scope="col"><?php echo esc_html__('Rendering', 'jotform-bridge'); ?></th>
                 <?php if ($showStats) : ?>
                     <th scope="col"><?php echo esc_html__('Last 7 days', 'jotform-bridge'); ?></th>
                 <?php endif; ?>
@@ -47,7 +48,7 @@ $jfbNewUrl = add_query_arg(['page' => $page, 'view' => 'new'], admin_url('admin.
         <tbody>
             <?php if ($rows === []) : ?>
                 <tr>
-                    <td colspan="<?php echo $showStats ? 4 : 3; ?>">
+                    <td colspan="<?php echo $showStats ? 5 : 4; ?>">
                         <?php echo esc_html__('No integrations yet. Add one to connect a Jotform form to a template.', 'jotform-bridge'); ?>
                     </td>
                 </tr>
@@ -92,6 +93,29 @@ $jfbNewUrl = add_query_arg(['page' => $page, 'view' => 'new'], admin_url('admin.
                             <span class="description">
                                 <?php echo esc_html__('Not in the stored form list', 'jotform-bridge'); ?>
                             </span>
+                        <?php endif; ?>
+                    </td>
+                    <td>
+                        <?php if (!$jfbIntegration->usesCustomTemplate()) : ?>
+                            <?php echo esc_html__('Auto (rendered from the schema)', 'jotform-bridge'); ?>
+                        <?php else : ?>
+                            <?php $jfbUsedTemplate = $templates->get($jfbIntegration->templateSlug()); ?>
+                            <?php if ($jfbUsedTemplate !== null) : ?>
+                                <?php echo esc_html((string) $jfbUsedTemplate['name']); ?>
+                                <br>
+                                <code><?php echo esc_html($jfbIntegration->templateSlug()); ?></code>
+                            <?php elseif ($jfbIntegration->templateSlug() !== '') : ?>
+                                <?php // The slug is kept as stored so a template that went missing stays identifiable. ?>
+                                <code><?php echo esc_html($jfbIntegration->templateSlug()); ?></code>
+                                <br>
+                                <span class="description" style="color:#b32d2e;">
+                                    <?php echo esc_html__('Not in the registry', 'jotform-bridge'); ?>
+                                </span>
+                            <?php else : ?>
+                                <span class="description">
+                                    <?php echo esc_html__('No template chosen', 'jotform-bridge'); ?>
+                                </span>
+                            <?php endif; ?>
                         <?php endif; ?>
                     </td>
                     <?php if ($showStats) : ?>
