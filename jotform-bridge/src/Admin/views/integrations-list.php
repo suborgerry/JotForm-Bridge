@@ -87,9 +87,6 @@ if (!function_exists('jfb_format_datetime')) {
                                 <?php echo esc_html($jfbIntegration->name()); ?>
                             </a>
                         </strong>
-                        <div class="row-actions visible">
-                            <a href="<?php echo esc_url($jfbEditUrl); ?>"><?php echo esc_html__('Edit', 'jotform-bridge'); ?></a>
-                        </div>
                     </td>
                     <td>
                         <?php if ($jfbRow['form_title'] !== '') : ?>
