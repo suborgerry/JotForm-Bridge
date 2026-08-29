@@ -577,7 +577,6 @@ $jfbReport  = $compatibility['report'] instanceof CompatibilityReport ? $compati
                 <tr>
                     <th scope="col"><?php echo esc_html__('Label', 'jotform-bridge'); ?></th>
                     <th scope="col"><?php echo esc_html__('Semantic Key', 'jotform-bridge'); ?></th>
-                    <th scope="col"><?php echo esc_html__('QID', 'jotform-bridge'); ?></th>
                     <th scope="col"><?php echo esc_html__('Type', 'jotform-bridge'); ?></th>
                     <th scope="col"><?php echo esc_html__('Required', 'jotform-bridge'); ?></th>
                     <th scope="col"><?php echo esc_html__('Template Status', 'jotform-bridge'); ?></th>
@@ -594,7 +593,6 @@ $jfbReport  = $compatibility['report'] instanceof CompatibilityReport ? $compati
                                 <span class="description">—</span>
                             <?php endif; ?>
                         </td>
-                        <td><?php echo esc_html((string) $jfbRow['qid']); ?></td>
                         <td><?php echo esc_html((string) $jfbRow['type']); ?></td>
                         <td>
                             <?php
