@@ -293,6 +293,13 @@ if (!function_exists('jfb_format_datetime')) {
     <?php endif; ?>
 
     <style>
+        /* WordPress only styles .wp-heading-inline on the page's h1, so the h2
+           title has to keep the inline flow and the gap before "Add New". */
+        .jfb-integrations > .wp-heading-inline {
+            display: inline-block;
+            margin-right: 4px;
+        }
+
         /* The cell still has to read as the identifier it is, so the button keeps
            the plain <code> look and only gains a pointer and the copied marker. */
         /* Several integrations can share one template, so the cell is a list
