@@ -302,6 +302,20 @@ $jfbReport  = $compatibility['report'] instanceof CompatibilityReport ? $compati
             background: #8a2424;
             color: #fff;
         }
+
+        /* A field the bridge cannot map is worth finding in a long schema, but
+           it is not an error: the row keeps the core warning tint and a marker
+           on its edge instead of shouting in red. The stripes are overridden so
+           that the tint survives on every other row. */
+        .widefat.striped > tbody > tr.jfb-row-unsupported,
+        .widefat > tbody > tr.jfb-row-unsupported {
+            background-color: #fcf9e8;
+            box-shadow: inset 3px 0 0 #dba617;
+        }
+
+        tr.jfb-row-unsupported .jfb-unsupported-note {
+            color: #996800;
+        }
     </style>
 
     <?php if ($stats !== null && $statsToday !== null) : ?>
@@ -572,7 +586,7 @@ $jfbReport  = $compatibility['report'] instanceof CompatibilityReport ? $compati
                         true
                     );
                     ?>
-                    <tr>
+                    <tr<?php echo $jfbUnsupported ? ' class="jfb-row-unsupported"' : ''; ?>>
                         <td><?php echo esc_html((string) $jfbRow['label']); ?></td>
                         <td>
                             <?php if ((string) $jfbRow['path'] !== '') : ?>
@@ -584,7 +598,7 @@ $jfbReport  = $compatibility['report'] instanceof CompatibilityReport ? $compati
                         <td>
                             <?php echo esc_html((string) $jfbRow['type']); ?>
                             <?php if ($jfbUnsupported) : ?>
-                                <p class="description">
+                                <p class="description jfb-unsupported-note">
                                     <?php
                                     echo esc_html__(
                                         'This Jotform type cannot be mapped yet.',
