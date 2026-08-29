@@ -622,6 +622,11 @@ $jfbReport  = $compatibility['report'] instanceof CompatibilityReport ? $compati
     <?php endif; ?>
 
     <?php if ($scaffold !== '') : ?>
+        <?php
+        // The scaffold is built from the supported fields alone, so the ones
+        // marked in the schema table above are worth naming as missing here.
+        $jfbScaffoldSkipped = count($schema !== null ? $schema->unsupportedFields() : []);
+        ?>
         <h2><?php echo esc_html__('Starter template', 'jotform-bridge'); ?></h2>
         <p class="description">
             <?php
@@ -634,6 +639,19 @@ $jfbReport  = $compatibility['report'] instanceof CompatibilityReport ? $compati
                 '<code>' . esc_html(TemplateScanner::DIRECTORY . '/' . $scaffoldFile) . '</code>'
             );
             ?>
+            <?php if ($jfbScaffoldSkipped > 0) : ?>
+                <br>
+                <?php
+                echo esc_html(
+                    _n(
+                        'The unsupported field is not part of this starter.',
+                        'The unsupported fields are not part of this starter.',
+                        $jfbScaffoldSkipped,
+                        'jotform-bridge'
+                    )
+                );
+                ?>
+            <?php endif; ?>
         </p>
 
         <p>
