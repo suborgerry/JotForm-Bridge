@@ -165,21 +165,12 @@ final class IntegrationsPage
 
         foreach ($integrations as $integration) {
             $rows[$integration->slug()] = [
-                'integration'   => $integration,
-                'compatibility' => $this->compatibility->check($integration),
-                'redirect'      => $this->redirects->check($integration),
-                'form_title'    => $this->formTitle($integration->formId()),
-                'schema_meta'   => $integration->formId() !== ''
-                    ? $this->schemas->meta($integration->formId())
-                    : null,
-                'schema_synced' => $integration->formId() !== ''
-                    && $this->schemas->isSynced($integration->formId()),
-                'schema_stale'  => $integration->formId() !== ''
-                    && $this->schemas->isStale($integration->formId()),
+                'integration' => $integration,
+                'form_title'  => $this->formTitle($integration->formId()),
                 // Counting never stops; only the reading of it is optional.
-                'stats'         => $showStats ? $this->stats->summary($integration->slug(), 7) : null,
-                'health'        => $showStats ? $this->stats->health($integration->slug()) : '',
-                'last_ok'       => $showStats ? $this->stats->lastSuccess($integration->slug()) : 0,
+                'stats'       => $showStats ? $this->stats->summary($integration->slug(), 7) : null,
+                'health'      => $showStats ? $this->stats->health($integration->slug()) : '',
+                'last_ok'     => $showStats ? $this->stats->lastSuccess($integration->slug()) : 0,
             ];
         }
 

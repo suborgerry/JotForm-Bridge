@@ -3,7 +3,8 @@
 /**
  * Integrations list screen.
  *
- * @var array<string, array{integration:\JotformBridge\Integrations\Integration, compatibility:array<string,mixed>, redirect:array<string,mixed>, form_title:string, schema_meta:array<string,mixed>|null, schema_synced:bool, schema_stale:bool}> $rows
+ * @var array<string, array{integration:\JotformBridge\Integrations\Integration, form_title:string, stats:array<string,int>|null, health:string, last_ok:int}> $rows
+ * @var bool                                     $showStats
  * @var \JotformBridge\Templates\TemplateRegistry $templates
  * @var array<int, array<string, string>>         $diagnostics
  * @var array<string, mixed>|null                 $notice
@@ -15,7 +16,6 @@
 declare(strict_types=1);
 
 use JotformBridge\Admin\IntegrationsPage;
-use JotformBridge\Integrations\RedirectTarget;
 use JotformBridge\Templates\TemplateScanner;
 
 if (!defined('ABSPATH')) {
@@ -39,22 +39,16 @@ $jfbNewUrl = add_query_arg(['page' => $page, 'view' => 'new'], admin_url('admin.
                 <th scope="col"><?php echo esc_html__('Name', 'jotform-bridge'); ?></th>
                 <th scope="col"><?php echo esc_html__('Slug', 'jotform-bridge'); ?></th>
                 <th scope="col"><?php echo esc_html__('Jotform Form', 'jotform-bridge'); ?></th>
-                <th scope="col"><?php echo esc_html__('Rendering Mode', 'jotform-bridge'); ?></th>
-                <th scope="col"><?php echo esc_html__('Template', 'jotform-bridge'); ?></th>
                 <th scope="col"><?php echo esc_html__('Active', 'jotform-bridge'); ?></th>
                 <?php if ($showStats) : ?>
                     <th scope="col"><?php echo esc_html__('Last 7 days', 'jotform-bridge'); ?></th>
                 <?php endif; ?>
-                <th scope="col"><?php echo esc_html__('Schema', 'jotform-bridge'); ?></th>
-                <th scope="col"><?php echo esc_html__('Compatibility', 'jotform-bridge'); ?></th>
-                <th scope="col"><?php echo esc_html__('Redirect target', 'jotform-bridge'); ?></th>
-                <th scope="col"><?php echo esc_html__('Actions', 'jotform-bridge'); ?></th>
             </tr>
         </thead>
         <tbody>
             <?php if ($rows === []) : ?>
                 <tr>
-                    <td colspan="<?php echo $showStats ? 11 : 10; ?>">
+                    <td colspan="<?php echo $showStats ? 5 : 4; ?>">
                         <?php echo esc_html__('No integrations yet. Add one to connect a Jotform form to a template.', 'jotform-bridge'); ?>
                     </td>
                 </tr>
@@ -79,6 +73,32 @@ $jfbNewUrl = add_query_arg(['page' => $page, 'view' => 'new'], admin_url('admin.
                                 <?php echo esc_html($jfbIntegration->name()); ?>
                             </a>
                         </strong>
+                        <div class="row-actions visible">
+                            <a href="<?php echo esc_url($jfbEditUrl); ?>"><?php echo esc_html__('Edit', 'jotform-bridge'); ?></a>
+                            |
+                            <form method="post" action="<?php echo esc_url(admin_url('admin-post.php')); ?>" style="display:inline;">
+                                <input type="hidden" name="action" value="<?php echo esc_attr(IntegrationsPage::ACTION_SYNC); ?>">
+                                <input type="hidden" name="integration" value="<?php echo esc_attr($jfbIntegration->slug()); ?>">
+                                <?php wp_nonce_field(IntegrationsPage::ACTION_SYNC); ?>
+                                <button type="submit" class="button-link">
+                                    <?php echo esc_html__('Sync schema', 'jotform-bridge'); ?>
+                                </button>
+                            </form>
+                            |
+                            <form method="post" action="<?php echo esc_url(admin_url('admin-post.php')); ?>" style="display:inline;">
+                                <input type="hidden" name="action" value="<?php echo esc_attr(IntegrationsPage::ACTION_TOGGLE); ?>">
+                                <input type="hidden" name="integration" value="<?php echo esc_attr($jfbIntegration->slug()); ?>">
+                                <input type="hidden" name="active" value="<?php echo $jfbIntegration->isActive() ? '0' : '1'; ?>">
+                                <?php wp_nonce_field(IntegrationsPage::ACTION_TOGGLE); ?>
+                                <button type="submit" class="button-link">
+                                    <?php
+                                    echo $jfbIntegration->isActive()
+                                        ? esc_html__('Deactivate', 'jotform-bridge')
+                                        : esc_html__('Activate', 'jotform-bridge');
+                                    ?>
+                                </button>
+                            </form>
+                        </div>
                     </td>
                     <td><code><?php echo esc_html($jfbIntegration->slug()); ?></code></td>
                     <td>
@@ -88,14 +108,6 @@ $jfbNewUrl = add_query_arg(['page' => $page, 'view' => 'new'], admin_url('admin.
                             <span class="description">
                                 <?php echo esc_html__('Not in the stored form list', 'jotform-bridge'); ?>
                             </span>
-                        <?php endif; ?>
-                    </td>
-                    <td><?php echo esc_html($jfbIntegration->modeLabel()); ?></td>
-                    <td>
-                        <?php if ($jfbIntegration->templateSlug() !== '') : ?>
-                            <code><?php echo esc_html($jfbIntegration->templateSlug()); ?></code>
-                        <?php else : ?>
-                            <span class="description">—</span>
                         <?php endif; ?>
                     </td>
                     <td>
@@ -146,67 +158,6 @@ $jfbNewUrl = add_query_arg(['page' => $page, 'view' => 'new'], admin_url('admin.
                         <?php endif; ?>
                     </td>
                     <?php endif; ?>
-                    <td>
-                        <?php if (!$jfbRow['schema_synced']) : ?>
-                            <strong style="color:#b32d2e;">
-                                <?php echo esc_html__('Not synced', 'jotform-bridge'); ?>
-                            </strong>
-                        <?php else : ?>
-                            <?php
-                            $jfbSyncedAt = $jfbRow['schema_meta'] !== null ? (int) $jfbRow['schema_meta']['synced_at'] : 0;
-
-                            if ($jfbSyncedAt > 0) {
-                                printf(
-                                    /* translators: %s: human readable time difference */
-                                    esc_html__('Synced %s ago', 'jotform-bridge'),
-                                    esc_html(human_time_diff($jfbSyncedAt, time()))
-                                );
-                            } else {
-                                echo esc_html__('Synced', 'jotform-bridge');
-                            }
-                            ?>
-                            <?php if ($jfbRow['schema_stale']) : ?>
-                                <p class="description">
-                                    <?php echo esc_html__('Synced by an older plugin version.', 'jotform-bridge'); ?>
-                                </p>
-                            <?php endif; ?>
-                        <?php endif; ?>
-                    </td>
-                    <td><?php echo esc_html($jfbRow['compatibility']['label']); ?></td>
-                    <td>
-                        <?php echo esc_html((string) $jfbRow['redirect']['label']); ?>
-                        <?php if (RedirectTarget::isBroken($jfbRow['redirect'])) : ?>
-                            <p class="description" style="color:#b32d2e;">
-                                <?php echo esc_html((string) $jfbRow['redirect']['message']); ?>
-                            </p>
-                        <?php endif; ?>
-                    </td>
-                    <td>
-                        <a href="<?php echo esc_url($jfbEditUrl); ?>"><?php echo esc_html__('Edit', 'jotform-bridge'); ?></a>
-                        |
-                        <form method="post" action="<?php echo esc_url(admin_url('admin-post.php')); ?>" style="display:inline;">
-                            <input type="hidden" name="action" value="<?php echo esc_attr(IntegrationsPage::ACTION_SYNC); ?>">
-                            <input type="hidden" name="integration" value="<?php echo esc_attr($jfbIntegration->slug()); ?>">
-                            <?php wp_nonce_field(IntegrationsPage::ACTION_SYNC); ?>
-                            <button type="submit" class="button-link">
-                                <?php echo esc_html__('Sync schema', 'jotform-bridge'); ?>
-                            </button>
-                        </form>
-                        |
-                        <form method="post" action="<?php echo esc_url(admin_url('admin-post.php')); ?>" style="display:inline;">
-                            <input type="hidden" name="action" value="<?php echo esc_attr(IntegrationsPage::ACTION_TOGGLE); ?>">
-                            <input type="hidden" name="integration" value="<?php echo esc_attr($jfbIntegration->slug()); ?>">
-                            <input type="hidden" name="active" value="<?php echo $jfbIntegration->isActive() ? '0' : '1'; ?>">
-                            <?php wp_nonce_field(IntegrationsPage::ACTION_TOGGLE); ?>
-                            <button type="submit" class="button-link">
-                                <?php
-                                echo $jfbIntegration->isActive()
-                                    ? esc_html__('Deactivate', 'jotform-bridge')
-                                    : esc_html__('Activate', 'jotform-bridge');
-                                ?>
-                            </button>
-                        </form>
-                    </td>
                 </tr>
             <?php endforeach; ?>
         </tbody>
