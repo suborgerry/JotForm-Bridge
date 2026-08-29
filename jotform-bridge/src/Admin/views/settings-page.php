@@ -109,18 +109,6 @@ if (!$jfbHasKey) {
                 <td>
                     <?php if ($jfbHasKey) : ?>
                         <p><code><?php echo esc_html($settings->maskedApiKey()); ?></code></p>
-                        <p class="description">
-                            <?php
-                            printf(
-                                /* translators: %s: JOTFORM_API_KEY */
-                                esc_html__(
-                                    'The key comes from the %s constant in wp-config.php.',
-                                    'jotform-bridge'
-                                ),
-                                '<code>' . esc_html(Settings::KEY_CONSTANT) . '</code>'
-                            );
-                            ?>
-                        </p>
                     <?php else : ?>
                         <p>
                             <strong><?php echo esc_html__('No API key configured.', 'jotform-bridge'); ?></strong>
