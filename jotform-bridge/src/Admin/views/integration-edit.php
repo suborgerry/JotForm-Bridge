@@ -105,9 +105,6 @@ $jfbReport  = $compatibility['report'] instanceof CompatibilityReport ? $compati
                                 </option>
                             <?php endforeach; ?>
                         </select>
-                        <p class="description">
-                            <?php echo esc_html__('Your theme never needs the Jotform form ID — only this integration does.', 'jotform-bridge'); ?>
-                        </p>
                     <?php endif; ?>
                 </td>
             </tr>
