@@ -187,14 +187,13 @@ $jfbNewUrl = add_query_arg(['page' => $page, 'view' => 'new'], admin_url('admin.
                 <th scope="col"><?php echo esc_html__('Template', 'jotform-bridge'); ?></th>
                 <th scope="col"><?php echo esc_html__('Slug', 'jotform-bridge'); ?></th>
                 <th scope="col"><?php echo esc_html__('Source', 'jotform-bridge'); ?></th>
-                <th scope="col"><?php echo esc_html__('Fields', 'jotform-bridge'); ?></th>
                 <th scope="col"><?php echo esc_html__('File', 'jotform-bridge'); ?></th>
             </tr>
         </thead>
         <tbody>
             <?php if ($templates->isEmpty()) : ?>
                 <tr>
-                    <td colspan="5">
+                    <td colspan="4">
                         <?php echo esc_html__('No templates found. Add a PHP file with a Jotform template header to your theme /forms/ directory.', 'jotform-bridge'); ?>
                     </td>
                 </tr>
@@ -214,30 +213,6 @@ $jfbNewUrl = add_query_arg(['page' => $page, 'view' => 'new'], admin_url('admin.
                         ];
 
                         echo esc_html($jfbSources[(string) $jfbTemplate['source']] ?? (string) $jfbTemplate['source']);
-                        ?>
-                    </td>
-                    <td>
-                        <?php
-                        $jfbFields = array_map('strval', (array) $jfbTemplate['fields']);
-
-                        echo $jfbFields === []
-                            ? '<span class="description">—</span>'
-                            : '<code>' . implode('</code> <code>', array_map('esc_html', $jfbFields)) . '</code>';
-
-                        if ((int) $jfbTemplate['dynamic'] > 0) {
-                            echo ' <em>' . esc_html(
-                                sprintf(
-                                    /* translators: %d: number of dynamic identifiers */
-                                    _n(
-                                        '+%d dynamic',
-                                        '+%d dynamic',
-                                        (int) $jfbTemplate['dynamic'],
-                                        'jotform-bridge'
-                                    ),
-                                    (int) $jfbTemplate['dynamic']
-                                )
-                            ) . '</em>';
-                        }
                         ?>
                     </td>
                     <td><code><?php echo esc_html((string) $jfbTemplate['file']); ?></code></td>
