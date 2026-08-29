@@ -46,13 +46,24 @@ final class MinimumTimeTest extends TestCase
     public function testAnImplausiblyLongDurationIsTreatedAsAbsent(): void
     {
         $this->assertTrue($this->check(['t' => 999999]));
-        $this->assertTrue($this->check(['t' => -5]));
     }
 
     public function testANonNumericValueIsRejected(): void
     {
         $this->assertFalse($this->check(['t' => 'soon']));
         $this->assertFalse($this->check(['t' => ['x']]));
+    }
+
+    /**
+     * The script clamps its own measurement at zero, so a negative number is
+     * not a slow browser — it is the cheapest possible forgery, and it used to
+     * be read as "not measured" and let straight through.
+     */
+    public function testANegativeDurationIsRejectedRatherThanTreatedAsAbsent(): void
+    {
+        $this->assertFalse($this->check(['t' => -1]));
+        $this->assertFalse($this->check(['t' => '-1']));
+        $this->assertFalse($this->check(['t' => -99999999]));
     }
 
     public function testTheThresholdIsFilterable(): void

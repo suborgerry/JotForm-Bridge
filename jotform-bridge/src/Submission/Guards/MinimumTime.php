@@ -28,7 +28,9 @@ if (!defined('ABSPATH')) {
  * A submission that carries no measurement is allowed through, exactly like a
  * form with no honeypot: templates and integrations must keep working when the
  * markup has not been updated, and refusing them would break sites rather than
- * bots.
+ * bots. "No measurement" means the key is absent, though — a value that is
+ * present but could not have been produced by the script is a forgery, and is
+ * refused.
  */
 final class MinimumTime
 {
@@ -84,7 +86,17 @@ final class MinimumTime
 
         $seconds = (int) $raw;
 
-        if ($seconds < 0 || $seconds > self::MAX_SECONDS) {
+        // The script clamps its own measurement at zero, so a negative number
+        // cannot come from a browser that ran it. Treating it as "not measured"
+        // would hand every bot a one-character way past this check.
+        if ($seconds < 0) {
+            return false;
+        }
+
+        // Beyond the ceiling the number says nothing either way: a tab left
+        // open overnight is not evidence, and refusing it would punish a real
+        // visitor for being slow.
+        if ($seconds > self::MAX_SECONDS) {
             return $allowed;
         }
 
