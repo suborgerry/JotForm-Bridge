@@ -579,11 +579,23 @@ $jfbReport  = $compatibility['report'] instanceof CompatibilityReport ? $compati
                     <th scope="col"><?php echo esc_html__('Semantic Key', 'jotform-bridge'); ?></th>
                     <th scope="col"><?php echo esc_html__('Type', 'jotform-bridge'); ?></th>
                     <th scope="col"><?php echo esc_html__('Required', 'jotform-bridge'); ?></th>
-                    <th scope="col"><?php echo esc_html__('Template Status', 'jotform-bridge'); ?></th>
                 </tr>
             </thead>
             <tbody>
                 <?php foreach ($jfbReport->rows() as $jfbRow) : ?>
+                    <?php
+                    /* Everything else the report says is spelled out under
+                       Compatibility above; only the unmappable type belongs
+                       next to the type it is about. */
+                    $jfbUnsupported = in_array(
+                        (string) $jfbRow['status'],
+                        [
+                            CompatibilityReport::UNSUPPORTED_REQUIRED,
+                            CompatibilityReport::UNSUPPORTED_OPTIONAL,
+                        ],
+                        true
+                    );
+                    ?>
                     <tr>
                         <td><?php echo esc_html((string) $jfbRow['label']); ?></td>
                         <td>
@@ -593,19 +605,25 @@ $jfbReport  = $compatibility['report'] instanceof CompatibilityReport ? $compati
                                 <span class="description">—</span>
                             <?php endif; ?>
                         </td>
-                        <td><?php echo esc_html((string) $jfbRow['type']); ?></td>
+                        <td>
+                            <?php echo esc_html((string) $jfbRow['type']); ?>
+                            <?php if ($jfbUnsupported) : ?>
+                                <p class="description">
+                                    <?php
+                                    echo esc_html__(
+                                        'This Jotform type cannot be mapped yet.',
+                                        'jotform-bridge'
+                                    );
+                                    ?>
+                                </p>
+                            <?php endif; ?>
+                        </td>
                         <td>
                             <?php
                             echo $jfbRow['required']
                                 ? esc_html__('Yes', 'jotform-bridge')
                                 : esc_html__('No', 'jotform-bridge');
                             ?>
-                        </td>
-                        <td>
-                            <?php echo esc_html(CompatibilityReport::label((string) $jfbRow['status'])); ?>
-                            <?php if ((string) $jfbRow['message'] !== '') : ?>
-                                <p class="description"><?php echo esc_html((string) $jfbRow['message']); ?></p>
-                            <?php endif; ?>
                         </td>
                     </tr>
                 <?php endforeach; ?>
