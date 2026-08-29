@@ -240,3 +240,45 @@ same configuration has to exist on staging and production — and at that point
 the file-backed configuration in item 4 above solves most of it, because git
 becomes the audit trail and the backup. Worth revisiting together with that
 rather than building a second mechanism.
+
+---
+
+## 8. The rate limiter writes to `wp_options` and counts non-atomically
+
+**Problem.** `Submission\RateLimiter` keeps its buckets in transients, and both
+properties of that storage are wrong under load rather than merely imperfect.
+
+*Non-atomic counting.* `get_transient()` then `set_transient()` is a
+read-modify-write, so two requests arriving together read the same number and
+write the same increment. A burst can overshoot a limit of five by a few. It
+blurs the boundary; it does not open it.
+
+*Row growth.* One submission to a real integration charges two scopes across
+two windows — four transients, eight `wp_options` rows per address per hour. A
+flood that rotates addresses grows the table quickly.
+
+**Why it is parked, not urgent.** The second problem is smaller than it looks:
+expiring transients are stored with `autoload = 'no'`, so they cost nothing per
+page load, and WordPress collects the expired ones daily through
+`wp_scheduled_delete`. What is left is table size, bounded by roughly a day of
+traffic.
+
+**Shape, when it matters.** Two independent moves, in this order:
+
+1. With a persistent object cache, count with `wp_cache_incr()` — atomic, and no
+   database rows at all. Only when `wp_using_ext_object_cache()` is true:
+   without a backing store `wp_cache_*` lives for one request, which would turn
+   the limiter off rather than speed it up. Transients stay as the fallback.
+2. Without an object cache, merge both windows of one scope into a single
+   transient with the hour's TTL and keep the minute counter inside the value.
+   Eight rows become four, and both limits survive.
+
+**Explicitly rejected: dropping the hourly window.** It halves the rows the same
+way, and it is the wrong trade. The minute window bounds a burst; the hour
+window bounds a steady trickle, and those are different attacks. Without it one
+address goes from 30 submissions an hour to 300 on one integration, and from 60
+to 900 across all of them. Worse, the daily circuit breaker trips at 200
+*accepted* submissions, so the time a single address needs to take the form
+offline for everybody falls from about seven hours to about forty minutes. The
+hourly window is availability protection, not only spam protection.
+
