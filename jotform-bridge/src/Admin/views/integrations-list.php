@@ -6,6 +6,7 @@
  * @var array<string, array{integration:\JotformBridge\Integrations\Integration, form_title:string, stats:array<string,int>|null, health:string, last_ok:int}> $rows
  * @var bool                                     $showStats
  * @var \JotformBridge\Templates\TemplateRegistry $templates
+ * @var array<string, array<int, \JotformBridge\Integrations\Integration>> $templateUsage
  * @var array<int, array<string, string>>         $diagnostics
  * @var array<string, mixed>|null                 $notice
  * @var string                                    $page
@@ -159,12 +160,13 @@ $jfbNewUrl = add_query_arg(['page' => $page, 'view' => 'new'], admin_url('admin.
                 <th scope="col"><?php echo esc_html__('Template', 'jotform-bridge'); ?></th>
                 <th scope="col"><?php echo esc_html__('Slug', 'jotform-bridge'); ?></th>
                 <th scope="col"><?php echo esc_html__('File', 'jotform-bridge'); ?></th>
+                <th scope="col"><?php echo esc_html__('Used by', 'jotform-bridge'); ?></th>
             </tr>
         </thead>
         <tbody>
             <?php if ($templates->isEmpty()) : ?>
                 <tr>
-                    <td colspan="3">
+                    <td colspan="4">
                         <?php echo esc_html__('No templates found. Add a PHP file with a Jotform template header to your theme /forms/ directory.', 'jotform-bridge'); ?>
                     </td>
                 </tr>
@@ -183,6 +185,35 @@ $jfbNewUrl = add_query_arg(['page' => $page, 'view' => 'new'], admin_url('admin.
                         $jfbDir  = dirname($jfbFile);
                         ?>
                         <code><?php echo esc_html(basename(dirname($jfbDir)) . '/' . basename($jfbDir) . '/' . basename($jfbFile)); ?></code>
+                    </td>
+                    <td>
+                        <?php $jfbUsedBy = $templateUsage[(string) $jfbTemplate['slug']] ?? []; ?>
+                        <?php if ($jfbUsedBy === []) : ?>
+                            <span aria-hidden="true">&mdash;</span>
+                            <span class="screen-reader-text">
+                                <?php echo esc_html__('Not used by any integration', 'jotform-bridge'); ?>
+                            </span>
+                        <?php else : ?>
+                            <ul class="jfb-template-usage">
+                                <?php foreach ($jfbUsedBy as $jfbUsedByIntegration) : ?>
+                                    <?php
+                                    $jfbUsedByUrl = add_query_arg(
+                                        [
+                                            'page'        => $page,
+                                            'view'        => 'edit',
+                                            'integration' => $jfbUsedByIntegration->slug(),
+                                        ],
+                                        admin_url('admin.php')
+                                    );
+                                    ?>
+                                    <li>
+                                        <a href="<?php echo esc_url($jfbUsedByUrl); ?>">
+                                            <?php echo esc_html($jfbUsedByIntegration->name()); ?>
+                                        </a>
+                                    </li>
+                                <?php endforeach; ?>
+                            </ul>
+                        <?php endif; ?>
                     </td>
                 </tr>
             <?php endforeach; ?>
@@ -204,6 +235,20 @@ $jfbNewUrl = add_query_arg(['page' => $page, 'view' => 'new'], admin_url('admin.
     <style>
         /* The cell still has to read as the identifier it is, so the button keeps
            the plain <code> look and only gains a pointer and the copied marker. */
+        /* Several integrations can share one template, so the cell is a list
+           that stays readable at any count instead of a run-on line. */
+        .jfb-integrations .jfb-template-usage {
+            margin: 0;
+        }
+
+        .jfb-integrations .jfb-template-usage li {
+            margin: 0 0 .25em;
+        }
+
+        .jfb-integrations .jfb-template-usage li:last-child {
+            margin-bottom: 0;
+        }
+
         .jfb-integrations .jfb-copy-shortcode {
             position: relative;
             padding: 0;

@@ -176,6 +176,19 @@ final class IntegrationsPage
         $diagnostics = $this->templates->diagnostics();
         $page        = self::MENU_SLUG;
 
+        // The templates table reads the reverse of the integration list: one
+        // template can back several integrations, so each slug collects every
+        // integration bound to it rather than a single one.
+        $templateUsage = [];
+
+        foreach ($integrations as $integration) {
+            if (!$integration->usesCustomTemplate() || $integration->templateSlug() === '') {
+                continue;
+            }
+
+            $templateUsage[$integration->templateSlug()][] = $integration;
+        }
+
         require __DIR__ . '/views/integrations-list.php';
     }
 
