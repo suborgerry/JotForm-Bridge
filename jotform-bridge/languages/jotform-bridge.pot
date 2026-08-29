@@ -831,7 +831,7 @@ msgstr ""
 #. translators: %s: JOTFORM_API_KEY
 #: src/Admin/views/settings-page.php:115
 #, php-format
-msgid "The key comes from the %s constant in wp-config.php. It is never stored in the database and never sent to the frontend."
+msgid "The key comes from the %s constant in wp-config.php."
 msgstr ""
 
 #: src/Admin/views/settings-page.php:129

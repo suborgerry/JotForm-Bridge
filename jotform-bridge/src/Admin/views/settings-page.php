@@ -113,7 +113,7 @@ if (!$jfbHasKey) {
                             printf(
                                 /* translators: %s: JOTFORM_API_KEY */
                                 esc_html__(
-                                    'The key comes from the %s constant in wp-config.php. It is never stored in the database and never sent to the frontend.',
+                                    'The key comes from the %s constant in wp-config.php.',
                                     'jotform-bridge'
                                 ),
                                 '<code>' . esc_html(Settings::KEY_CONSTANT) . '</code>'
@@ -172,7 +172,7 @@ if (!$jfbHasKey) {
                 </td>
             </tr>
 
-            <tr>
+            <tr class="jfb-custom-base-url-field">
                 <th scope="row">
                     <label for="jfb-base-url"><?php echo esc_html__('Custom Base URL', 'jotform-bridge'); ?></label>
                 </th>
@@ -274,6 +274,31 @@ if (!$jfbHasKey) {
 
         <?php submit_button(__('Save Settings', 'jotform-bridge')); ?>
     </form>
+
+    <script>
+        /* The custom base URL only matters for the custom region. With JavaScript
+           off the field stays visible, which is a usable form, not a broken one:
+           the server ignores the value unless the region asks for it. */
+        (function () {
+            var region = document.getElementById('jfb-region');
+            var rows = document.querySelectorAll('.jfb-custom-base-url-field');
+
+            if (!region) {
+                return;
+            }
+
+            function sync() {
+                var show = region.value === '<?php echo esc_js(Settings::REGION_CUSTOM); ?>';
+
+                for (var i = 0; i < rows.length; i++) {
+                    rows[i].style.display = show ? '' : 'none';
+                }
+            }
+
+            region.addEventListener('change', sync);
+            sync();
+        })();
+    </script>
 
     <h2><?php echo esc_html__('Actions', 'jotform-bridge'); ?></h2>
     <div class="jfb-actions">
