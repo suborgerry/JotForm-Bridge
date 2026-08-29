@@ -669,7 +669,6 @@ Template обнаруживается по file header.
 <?php
 /*
 Jotform Template Name: Contact Form
-Jotform Template Slug: contact
 */
 ?>
 ```
@@ -678,8 +677,12 @@ Jotform Template Slug: contact
 
 ```text
 Jotform Template Name
-Jotform Template Slug
 ```
+
+Slug шаблона — это имя файла, пропущенное через `sanitize_key()`
+(`jotform-bridge-templates/contact.php` → `contact`). Заголовок
+`Jotform Template Slug` остался только для старых шаблонов: он игнорируется,
+а сканер пишет об этом warning.
 
 Jotform Form ID внутри template запрещен.
 

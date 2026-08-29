@@ -249,7 +249,7 @@ final class CompatibilityCheckerTest extends TestCase
     {
         file_put_contents(
             $this->root . '/theme/jotform-bridge-templates/' . $slug . '.php',
-            "<?php\n/*\nJotform Template Name: Contact Form\nJotform Template Slug: {$slug}\n*/\n?>\n{$body}\n"
+            "<?php\n/*\nJotform Template Name: Contact Form\n*/\n?>\n{$body}\n"
         );
     }
 

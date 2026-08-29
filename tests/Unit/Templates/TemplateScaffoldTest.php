@@ -38,7 +38,10 @@ final class TemplateScaffoldTest extends TestCase
         $source = $this->build();
 
         $this->assertStringContainsString(TemplateScanner::HEADER_NAME . ': Contact', $source);
-        $this->assertStringContainsString(TemplateScanner::HEADER_SLUG . ': contact', $source);
+
+        // The slug is the file name now, so declaring one would only earn the
+        // warning the scanner raises for a header it ignores.
+        $this->assertStringNotContainsString(TemplateScanner::HEADER_SLUG . ':', $source);
 
         // Naming a Jotform form in a template is rejected by the scanner, so
         // the scaffold must not be tempted to add one.

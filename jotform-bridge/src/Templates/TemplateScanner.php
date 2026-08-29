@@ -28,6 +28,12 @@ if (!defined('ABSPATH')) {
 final class TemplateScanner
 {
     public const HEADER_NAME = 'Jotform Template Name';
+
+    /**
+     * The slug is the file name, so a declared one has nothing left to say. It
+     * is still looked for, because a template written for an earlier version
+     * deserves to be told that the line is now ignored.
+     */
     public const HEADER_SLUG = 'Jotform Template Slug';
 
     /**
@@ -48,11 +54,9 @@ final class TemplateScanner
     public const LEVEL_NOTICE  = 'notice';
 
     public const CODE_MISSING_NAME    = 'missing_name';
-    public const CODE_MISSING_SLUG    = 'missing_slug';
     public const CODE_INVALID_SLUG    = 'invalid_slug';
-    public const CODE_NORMALIZED_SLUG = 'normalized_slug';
+    public const CODE_IGNORED_SLUG    = 'ignored_slug';
     public const CODE_FORBIDDEN       = 'forbidden_header';
-    public const CODE_DUPLICATE       = 'duplicate_slug';
     public const CODE_OVERRIDDEN      = 'template_overridden';
     public const CODE_UNREADABLE      = 'unreadable_file';
     public const CODE_OUTSIDE_ROOT    = 'outside_template_root';
@@ -96,7 +100,7 @@ final class TemplateScanner
                 $slug = (string) $template['slug'];
 
                 if (isset($templates[$slug])) {
-                    $diagnostics[] = $this->duplicateDiagnostic($templates[$slug], $template, $priority);
+                    $diagnostics[] = $this->overrideDiagnostic($templates[$slug], $template);
 
                     continue;
                 }
@@ -262,12 +266,12 @@ final class TemplateScanner
             return null;
         }
 
-        $name    = $this->headerValue($header, self::HEADER_NAME);
-        $rawSlug = $this->headerValue($header, self::HEADER_SLUG);
+        $name         = $this->headerValue($header, self::HEADER_NAME);
+        $declaredSlug = $this->headerValue($header, self::HEADER_SLUG);
 
         // Not a Jotform template at all — an ordinary theme file in the same
         // directory is not an error.
-        if ($name === '' && $rawSlug === '') {
+        if ($name === '' && $declaredSlug === '') {
             return null;
         }
 
@@ -278,7 +282,7 @@ final class TemplateScanner
                 'level'   => self::LEVEL_ERROR,
                 'code'    => self::CODE_FORBIDDEN,
                 'file'    => $file,
-                'slug'    => $rawSlug,
+                'slug'    => '',
                 'message' => sprintf(
                     /* translators: 1: file name, 2: forbidden header name */
                     __(
@@ -298,7 +302,7 @@ final class TemplateScanner
                 'level'   => self::LEVEL_ERROR,
                 'code'    => self::CODE_MISSING_NAME,
                 'file'    => $file,
-                'slug'    => $rawSlug,
+                'slug'    => '',
                 'message' => sprintf(
                     /* translators: 1: file name, 2: header name */
                     __('"%1$s" is missing the "%2$s" header.', 'jotform-bridge'),
@@ -310,52 +314,41 @@ final class TemplateScanner
             return null;
         }
 
-        if ($rawSlug === '') {
-            $diagnostics[] = [
-                'level'   => self::LEVEL_ERROR,
-                'code'    => self::CODE_MISSING_SLUG,
-                'file'    => $file,
-                'slug'    => '',
-                'message' => sprintf(
-                    /* translators: 1: file name, 2: header name */
-                    __('"%1$s" is missing the "%2$s" header.', 'jotform-bridge'),
-                    $shortName,
-                    self::HEADER_SLUG
-                ),
-            ];
-
-            return null;
-        }
-
-        $slug = sanitize_key($rawSlug);
+        // The file name is the identifier, so a template keeps working while
+        // its title changes and an integration points at something a person
+        // can find on disk.
+        $slug = sanitize_key(basename($file, '.php'));
 
         if ($slug === '') {
             $diagnostics[] = [
                 'level'   => self::LEVEL_ERROR,
                 'code'    => self::CODE_INVALID_SLUG,
                 'file'    => $file,
-                'slug'    => $rawSlug,
+                'slug'    => '',
                 'message' => sprintf(
-                    /* translators: 1: file name, 2: declared slug */
-                    __('The slug "%2$s" declared in "%1$s" contains no usable characters.', 'jotform-bridge'),
-                    $shortName,
-                    $rawSlug
+                    /* translators: %s: file name */
+                    __('The name of the file "%s" holds no characters usable as a slug.', 'jotform-bridge'),
+                    $shortName
                 ),
             ];
 
             return null;
         }
 
-        if ($slug !== $rawSlug) {
+        if ($declaredSlug !== '') {
             $diagnostics[] = [
                 'level'   => self::LEVEL_WARNING,
-                'code'    => self::CODE_NORMALIZED_SLUG,
+                'code'    => self::CODE_IGNORED_SLUG,
                 'file'    => $file,
                 'slug'    => $slug,
                 'message' => sprintf(
-                    /* translators: 1: declared slug, 2: normalized slug */
-                    __('The slug "%1$s" was normalized to "%2$s".', 'jotform-bridge'),
-                    $rawSlug,
+                    /* translators: 1: file name, 2: header name, 3: slug taken from the file name */
+                    __(
+                        '"%1$s" declares "%2$s". The header is ignored: the slug is the file name, so this template is "%3$s".',
+                        'jotform-bridge'
+                    ),
+                    $shortName,
+                    self::HEADER_SLUG,
                     $slug
                 ),
             ];
@@ -393,40 +386,21 @@ final class TemplateScanner
      *
      * @return array<string, string>
      */
-    private function duplicateDiagnostic(array $kept, array $rejected, int $priority): array
+    private function overrideDiagnostic(array $kept, array $rejected): array
     {
-        $sameRoot = ($kept['priority'] ?? -1) === $priority;
-
-        if (!$sameRoot) {
-            // The expected child-theme override: informational, not a problem.
-            return [
-                'level'   => self::LEVEL_NOTICE,
-                'code'    => self::CODE_OVERRIDDEN,
-                'file'    => (string) $rejected['file'],
-                'slug'    => (string) $rejected['slug'],
-                'message' => sprintf(
-                    /* translators: 1: template slug, 2: winning file path */
-                    __('The template "%1$s" is overridden by "%2$s".', 'jotform-bridge'),
-                    (string) $rejected['slug'],
-                    (string) $kept['file']
-                ),
-            ];
-        }
-
+        // Two files can only share a slug by having the same name in different
+        // roots, which is the child theme overriding the parent: expected, and
+        // worth saying out loud so the file nobody edits is easy to spot.
         return [
-            'level'   => self::LEVEL_ERROR,
-            'code'    => self::CODE_DUPLICATE,
+            'level'   => self::LEVEL_NOTICE,
+            'code'    => self::CODE_OVERRIDDEN,
             'file'    => (string) $rejected['file'],
             'slug'    => (string) $rejected['slug'],
             'message' => sprintf(
-                /* translators: 1: template slug, 2: ignored file, 3: used file */
-                __(
-                    'The slug "%1$s" is declared twice in the same directory. "%2$s" was ignored in favour of "%3$s".',
-                    'jotform-bridge'
-                ),
+                /* translators: 1: template slug, 2: winning file path */
+                __('The template "%1$s" is overridden by "%2$s".', 'jotform-bridge'),
                 (string) $rejected['slug'],
-                basename((string) $rejected['file']),
-                basename((string) $kept['file'])
+                (string) $kept['file']
             ),
         ];
     }

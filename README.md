@@ -199,19 +199,23 @@ Adding, renaming or removing a template file takes effect immediately: the theme
 <?php
 /**
  * Jotform Template Name: Contact
- * Jotform Template Slug: contact
  */
 ```
 
 | Header | Required | Meaning |
 | --- | --- | --- |
 | `Jotform Template Name` | yes | Label shown in the admin |
-| `Jotform Template Slug` | yes | Identifier the integration stores |
+| `Jotform Template Slug` | **ignored** | Left over from an earlier version; the file name is the slug |
 | `Jotform Form ID` | **rejected** | Binding a template to one form is the integration's job |
 
-A file in `jotform-bridge-templates/` with neither header is ignored silently — an ordinary theme
-partial in the same directory is not an error. A file with one header and not the
-other is reported as an error, because it was clearly meant to be a template.
+The slug an integration stores is the file name run through `sanitize_key()`:
+`jotform-bridge-templates/contact.php` is `contact`, and a child theme overrides
+a parent template by using the same file name. Renaming the file therefore means
+picking the template again in the integration — the list says so, in red, on the
+row whose template no longer exists.
+
+A file in `jotform-bridge-templates/` without the name header is ignored silently
+— an ordinary theme partial in the same directory is not an error.
 
 ### `data-jotform-field`
 
@@ -316,7 +320,6 @@ Copy it to `your-theme/jotform-bridge-templates/contact.php`. The short version:
 <?php
 /**
  * Jotform Template Name: Contact
- * Jotform Template Slug: contact
  */
 ?>
 <form

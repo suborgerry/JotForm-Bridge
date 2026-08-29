@@ -79,8 +79,14 @@ if (!function_exists('jfb_format_datetime')) {
                     ],
                     admin_url('admin.php')
                 );
+
+                // A template lives in the theme, so it can be renamed or
+                // deleted long after the integration was set up. The row says
+                // so instead of leaving the integration looking healthy.
+                $jfbTemplateMissing = $jfbIntegration->usesCustomTemplate()
+                    && !$templates->has($jfbIntegration->templateSlug());
                 ?>
-                <tr>
+                <tr<?php echo $jfbTemplateMissing ? ' class="jfb-row-broken"' : ''; ?>>
                     <td>
                         <strong>
                             <a href="<?php echo esc_url($jfbEditUrl); ?>">
@@ -110,12 +116,18 @@ if (!function_exists('jfb_format_datetime')) {
                                 <?php // The slug is kept as stored so a template that went missing stays identifiable. ?>
                                 <code><?php echo esc_html($jfbIntegration->templateSlug()); ?></code>
                                 <br>
-                                <span class="description" style="color:#b32d2e;">
-                                    <?php echo esc_html__('Not in the registry', 'jotform-bridge'); ?>
+                                <span class="description jfb-broken-note">
+                                    <?php
+                                    printf(
+                                        /* translators: %s: expected template file name */
+                                        esc_html__('No theme file named %s. This form does not render.', 'jotform-bridge'),
+                                        '<code>' . esc_html($jfbIntegration->templateSlug() . '.php') . '</code>'
+                                    );
+                                    ?>
                                 </span>
                             <?php else : ?>
-                                <span class="description">
-                                    <?php echo esc_html__('No template chosen', 'jotform-bridge'); ?>
+                                <span class="description jfb-broken-note">
+                                    <?php echo esc_html__('No template chosen. This form does not render.', 'jotform-bridge'); ?>
                                 </span>
                             <?php endif; ?>
                         <?php endif; ?>
@@ -306,6 +318,20 @@ if (!function_exists('jfb_format_datetime')) {
             line-height: inherit;
             margin: 1em 4px 1em 0;
             padding: 0;
+        }
+
+        /* An integration whose template is gone renders nothing on the front end,
+           so the row carries the core error colours as a tint and an edge
+           marker. The stripes are overridden so the tint survives on every
+           other row. */
+        .widefat.striped > tbody > tr.jfb-row-broken,
+        .widefat > tbody > tr.jfb-row-broken {
+            background-color: #fcf0f1;
+            box-shadow: inset 3px 0 0 #d63638;
+        }
+
+        tr.jfb-row-broken .jfb-broken-note {
+            color: #b32d2e;
         }
 
         /* The cell still has to read as the identifier it is, so the button keeps

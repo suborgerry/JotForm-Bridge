@@ -55,7 +55,7 @@ final class TemplateRegistryTest extends TestCase
 
     public function testAReadFindsWhatIsOnDiskRightNow(): void
     {
-        $this->write('contact.php', 'Contact Form', 'contact', '<input data-jotform-field="email">');
+        $this->write('contact.php', 'Contact Form', '<input data-jotform-field="email">');
 
         $registry = new TemplateRegistry();
 
@@ -70,11 +70,11 @@ final class TemplateRegistryTest extends TestCase
      */
     public function testANewFileIsPickedUpWithoutAnyRefresh(): void
     {
-        $this->write('contact.php', 'Contact Form', 'contact', '<input data-jotform-field="email">');
+        $this->write('contact.php', 'Contact Form', '<input data-jotform-field="email">');
 
         (new TemplateRegistry())->all();
 
-        $this->write('consultation.php', 'Consultation', 'consultation', '');
+        $this->write('consultation.php', 'Consultation', '');
 
         $this->assertSame(
             ['consultation', 'contact'],
@@ -88,14 +88,13 @@ final class TemplateRegistryTest extends TestCase
      */
     public function testAnEditedTemplateReportsItsNewFields(): void
     {
-        $this->write('contact.php', 'Contact Form', 'contact', '<input data-jotform-field="email">');
+        $this->write('contact.php', 'Contact Form', '<input data-jotform-field="email">');
 
         $this->assertSame(['email'], (new TemplateRegistry())->fields('contact'));
 
         $this->write(
             'contact.php',
             'Contact Form',
-            'contact',
             '<input data-jotform-field="email"><input data-jotform-field="message">'
         );
 
@@ -108,7 +107,7 @@ final class TemplateRegistryTest extends TestCase
      */
     public function testADeletedTemplateDisappears(): void
     {
-        $this->write('contact.php', 'Contact Form', 'contact', '');
+        $this->write('contact.php', 'Contact Form', '');
 
         $this->assertTrue((new TemplateRegistry())->has('contact'));
 
@@ -126,13 +125,13 @@ final class TemplateRegistryTest extends TestCase
      */
     public function testTheScanIsMemoizedWithinOneRequest(): void
     {
-        $this->write('contact.php', 'Contact Form', 'contact', '<input data-jotform-field="email">');
+        $this->write('contact.php', 'Contact Form', '<input data-jotform-field="email">');
 
         $registry = new TemplateRegistry();
 
         $registry->all();
 
-        $this->write('consultation.php', 'Consultation', 'consultation', '');
+        $this->write('consultation.php', 'Consultation', '');
 
         $this->assertSame(['contact'], array_keys($registry->all()));
 
@@ -143,7 +142,7 @@ final class TemplateRegistryTest extends TestCase
 
     public function testAnUnknownSlugHasNoFile(): void
     {
-        $this->write('contact.php', 'Contact Form', 'contact', '');
+        $this->write('contact.php', 'Contact Form', '');
 
         $registry = new TemplateRegistry();
 
@@ -161,7 +160,7 @@ final class TemplateRegistryTest extends TestCase
      */
     public function testAPathShapedSlugNeverResolvesToAFile(string $slug): void
     {
-        $this->write('contact.php', 'Contact Form', 'contact', '');
+        $this->write('contact.php', 'Contact Form', '');
 
         $registry = new TemplateRegistry();
 
@@ -188,7 +187,7 @@ final class TemplateRegistryTest extends TestCase
 
     public function testOnlyARegisteredTemplateResolvesToAFile(): void
     {
-        $this->write('contact.php', 'Contact Form', 'contact', '');
+        $this->write('contact.php', 'Contact Form', '');
 
         $registry = new TemplateRegistry();
 
@@ -197,7 +196,7 @@ final class TemplateRegistryTest extends TestCase
 
     public function testAVanishedFileIsNotHandedOutFromTheCache(): void
     {
-        $this->write('contact.php', 'Contact Form', 'contact', '');
+        $this->write('contact.php', 'Contact Form', '');
 
         $registry = new TemplateRegistry();
         $registry->all();
@@ -210,11 +209,11 @@ final class TemplateRegistryTest extends TestCase
         $this->assertNull($registry->file('contact'));
     }
 
-    private function write(string $file, string $name, string $slug, string $body): void
+    private function write(string $file, string $name, string $body): void
     {
         file_put_contents(
             $this->root . '/theme/jotform-bridge-templates/' . $file,
-            "<?php\n/*\nJotform Template Name: {$name}\nJotform Template Slug: {$slug}\n*/\n?>\n{$body}\n"
+            "<?php\n/*\nJotform Template Name: {$name}\n*/\n?>\n{$body}\n"
         );
     }
 

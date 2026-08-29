@@ -1,16 +1,16 @@
 <?php
 /**
  * Jotform Template Name: Contact
- * Jotform Template Slug: contact
  *
  * A complete custom form template.
  *
- * Copy this file into your theme, in `forms/contact.php`, then press
- * "Rescan Templates" on the Jotform Bridge → Integrations screen and pick
- * "Contact" as the template of your integration.
+ * Copy this file into your theme, in `jotform-bridge-templates/contact.php`,
+ * then open Jotform Bridge → Integrations and pick "Contact" as the template
+ * of your integration.
  *
- * The two header lines above are what makes this file a template. The name is
- * what you see in the admin; the slug is the identifier the integration stores.
+ * The header line above is what makes this file a template, and it only sets
+ * the name you see in the admin. The identifier an integration stores is the
+ * file name, so renaming the file means picking the template again.
  * A `Jotform Form ID` header is deliberately rejected by the scanner: binding a
  * template to one specific Jotform form is the integration's job, which is what
  * lets the same template serve several forms.

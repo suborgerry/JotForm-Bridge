@@ -107,9 +107,9 @@ final class FormRenderer
             return $this->diagnostic(
                 $slug,
                 sprintf(
-                    /* translators: %s: template slug */
-                    __('No template file in the theme declares the slug "%s".', 'jotform-bridge'),
-                    $integration->templateSlug()
+                    /* translators: %s: expected template file name */
+                    __('No template file named "%s" in the theme.', 'jotform-bridge'),
+                    $integration->templateSlug() . '.php'
                 )
             );
         }
