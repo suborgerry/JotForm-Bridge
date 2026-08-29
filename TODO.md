@@ -118,8 +118,8 @@ breaker is open, queue and answer success.
 
 **Caveat.** The moment submissions are stored locally, the plugin holds
 personal data, which today it deliberately does not — see the promise in
-`Support\Stats` and in readme.txt. That has to be a conscious decision with
-retention limits and an uninstall story, not a side effect.
+readme.txt. That has to be a conscious decision with retention limits and an
+uninstall story, not a side effect.
 
 ---
 
@@ -219,8 +219,11 @@ the plugin could add is honesty about it: read the account-wide spend, compare
 it with what this site believes it sent, and say plainly when the two do not
 match because somebody else is spending from the same pot.
 
-**Depends on.** The account allowance tracking currently switched off behind
-`Features::ACCOUNT_QUOTA`.
+**Depends on.** Account allowance tracking, which the plugin no longer has:
+reading `GET /user/usage` and keeping a snapshot of the spend was removed in
+favour of reacting to Jotform's own refusal. Reviving it means bringing back a
+second, always-stale source of truth, and that trade has to be made
+deliberately.
 
 ---
 

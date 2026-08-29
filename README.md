@@ -645,6 +645,10 @@ values.
 | Normalized schema (one per form) | option `jotform_bridge_schema_{id}` | never | **Sync Schema** |
 | Account form list | option `jotform_bridge_forms` | never | **Sync with Jotform** |
 | Trashed forms dismissed by hand | option `jotform_bridge_forms_hidden` | never | **Remove from list** |
+| Integrations | option `jotform_bridge_integrations` | never | the integration editor |
+| Settings | option `jotform_bridge_settings` | never | the settings screen |
+| Circuit-breaker state | option `jotform_bridge_quota` | daily counts, 30 days | every accepted submission |
+| Rate-limit and anti-replay buckets | transients | minutes to hours | every submission |
 
 The template list is deliberately absent: it is not stored at all. Only the
 header of each file in `jotform-bridge-templates/` is read, on demand and once per request, which
@@ -729,13 +733,13 @@ Common situations:
 
 ## Uninstalling
 
-Deactivating drops the template registry and keeps everything else, synced
-schemas included.
+Deactivating changes nothing: the plugin keeps no derived state that outlives a
+request, so everything — synced schemas included — is exactly as you left it
+when you activate it again.
 
-Deleting the plugin removes the synced schemas, the form list and the registry
-too — but **not** the integrations or the
-settings, so the usual "deactivate, delete, reinstall" round trip does not
-destroy work somebody did by hand. For a full removal, tick *Delete the
+Deleting the plugin removes the synced schemas and the form list — but **not**
+the integrations or the settings, so the usual "deactivate, delete, reinstall"
+round trip does not destroy work somebody did by hand. For a full removal, tick *Delete the
 integrations and the settings when the plugin is deleted* on the settings screen
 before deleting. The API key is not involved either way: it lives in
 `wp-config.php`, which is yours to edit.
