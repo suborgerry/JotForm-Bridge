@@ -7,9 +7,13 @@ rediscovering the reasoning.
 Not a backlog of everything imaginable — things that were considered and
 rejected are not here, and should not be added back without a new decision.
 
-**Next up** is the toolchain: four small items that are cheap on their own and
+**Next up** is the toolchain: five small items that are cheap on their own and
 worth doing together, because each of them is currently a claim nobody can
 check. **Later** is the rest, in no particular order.
+
+An entry marked *Reconsider* is not work. It is a decision already taken and
+recorded, kept here so the trade-off behind it is not forgotten and so that
+revisiting it starts from evidence rather than from memory.
 
 ---
 
@@ -281,4 +285,75 @@ to 900 across all of them. Worse, the daily circuit breaker trips at 200
 *accepted* submissions, so the time a single address needs to take the form
 offline for everybody falls from about seven hours to about forty minutes. The
 hourly window is availability protection, not only spam protection.
+
+---
+
+## 9. No integration tests
+
+**Problem.** 450 tests, and every one of them is a unit test. Nothing exercises
+a REST request end to end, nothing exercises an `admin_post` action, and nothing
+renders a template from an actual file through the actual registry.
+
+That is not a coverage statistic — it is where the bugs were. Of the defects
+found in the August 2026 review, the ones that mattered lived precisely in the
+seams no unit test looks at: settings saving reset a stored value because a
+hidden field was read unconditionally from `$_POST`; the admin screens carried
+two stale instructions naming a directory and a button that no longer existed;
+the auto-rendered form posted an empty body to the REST endpoint with no
+JavaScript. Each of those is invisible to a test that constructs one class and
+calls one method.
+
+**Shape.** A second suite, separate from `tests/Unit/`, that boots enough of
+WordPress to be honest:
+
+* the REST route, exercised through `WP_REST_Request` against the registered
+  route rather than by calling the pipeline directly — including the permission
+  callback, the JSON body and the response headers;
+* the `admin_post` handlers, exercised with and without a valid nonce and with
+  and without the capability, asserting that the guard actually fires;
+* rendering a real template file through `TemplateRegistry`, including a file
+  that resolves outside its root;
+* activation, upgrade and uninstall against a real options table.
+
+`wp-env` or `wp-phpunit` is the usual way to get there, and it needs the CI in
+Next up item 3 to be worth having — a suite nobody runs is a suite that rots.
+
+**Why it is parked.** It is the largest piece of work in this file, and it is
+worth strictly more once CI exists. Doing it before then means writing tests
+that only run when somebody remembers to run them.
+
+---
+
+## 10. Reconsider: template discovery reads the theme on every render
+
+**Flagged for thought, not for action.** The decision is recorded and justified
+in "Amendment: template discovery reads the theme on demand" in `AGENTS.md`, and
+the reasoning behind it still stands. This entry exists so the trade-off is not
+forgotten, and so that if it is ever revisited it is revisited with numbers
+rather than from memory.
+
+**The state of things.** Rendering an integration that uses a custom template
+calls `TemplateRegistry::file()`, which scans the theme: `scandir()` of up to two
+directories, plus an `fopen`/`fread` of the first 8 KB of every PHP file in them.
+Memoized within the request, nothing cached between requests. A page with no
+form of ours on it scans nothing.
+
+**Why it was made that way.** A cached registry meant a developer could add a
+file to the theme and not see it, and — worse — an edited template left the
+compatibility report describing yesterday's version of the file. The `Rescan`
+button was a symptom cure that required a person to remember a cache they never
+asked for.
+
+**What would have to be true to change it.** Actual numbers from a real site:
+how many template files, how long the scan takes, and what share of the page's
+total time that is. On a theme with a handful of templates this is a few stat
+calls and a few short reads, which is noise next to a single database query.
+It becomes worth revisiting if a site has a large template directory, or if
+`opcache.validate_timestamps=0` in production makes filesystem access more
+expensive than it looks.
+
+**And what the answer would be.** An object-cache layer keyed on the directory
+mtime — not the return of the `Rescan` button. Whatever happens, the admin has
+to keep reading the state of the files directly, because that is the property
+the cache cost us last time.
 
