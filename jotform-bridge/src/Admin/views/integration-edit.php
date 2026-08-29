@@ -284,6 +284,23 @@ $jfbReport  = $compatibility['report'] instanceof CompatibilityReport ? $compati
         })();
     </script>
 
+    <style>
+        /* WordPress ships no destructive button style, only the red link class,
+           so the delete button borrows the core error colours. */
+        .jfb-actions .jfb-button-delete {
+            border-color: #b32d2e;
+            background: #b32d2e;
+            color: #fff;
+        }
+
+        .jfb-actions .jfb-button-delete:hover,
+        .jfb-actions .jfb-button-delete:focus {
+            border-color: #8a2424;
+            background: #8a2424;
+            color: #fff;
+        }
+    </style>
+
     <h2><?php echo esc_html__('Actions', 'jotform-bridge'); ?></h2>
     <div class="jfb-actions">
         <?php if (!$isNew) : ?>
@@ -318,12 +335,12 @@ $jfbReport  = $compatibility['report'] instanceof CompatibilityReport ? $compati
                 method="post"
                 action="<?php echo esc_url(admin_url('admin-post.php')); ?>"
                 style="display:inline-block;"
-                onsubmit="return confirm('<?php echo esc_js(__('Delete this integration?', 'jotform-bridge')); ?>');"
+                onsubmit="return confirm('<?php echo esc_js(__('Delete this integration? This cannot be undone.', 'jotform-bridge')); ?>');"
             >
                 <input type="hidden" name="action" value="<?php echo esc_attr(IntegrationsPage::ACTION_DELETE); ?>">
                 <input type="hidden" name="integration" value="<?php echo esc_attr($integration->slug()); ?>">
                 <?php wp_nonce_field(IntegrationsPage::ACTION_DELETE); ?>
-                <?php submit_button(__('Delete', 'jotform-bridge'), 'delete', 'submit', false); ?>
+                <?php submit_button(__('Delete', 'jotform-bridge'), 'button jfb-button-delete', 'submit', false); ?>
             </form>
         <?php endif; ?>
     </div>
