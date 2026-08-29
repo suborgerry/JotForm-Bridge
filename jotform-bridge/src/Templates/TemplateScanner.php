@@ -366,8 +366,24 @@ final class TemplateScanner
             'name'   => $name,
             'file'   => $file,
             'source' => $source,
-            'mtime'  => (int) @filemtime($file),
+            'mtime'  => $this->lastChange($file),
         ];
+    }
+
+    /**
+     * The moment the file last changed on disk.
+     *
+     * Editors and sync tools that rewrite a file with its original timestamp
+     * (cp -p, rsync -t, "preserve modification time") leave filemtime() behind,
+     * while the inode change time still moves, so the later of the two is the
+     * closer answer to "when was this template last touched".
+     */
+    private function lastChange(string $file): int
+    {
+        $mtime = (int) @filemtime($file);
+        $ctime = (int) @filectime($file);
+
+        return max($mtime, $ctime);
     }
 
 
