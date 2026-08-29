@@ -37,12 +37,12 @@ $jfbNewUrl = add_query_arg(['page' => $page, 'view' => 'new'], admin_url('admin.
         <thead>
             <tr>
                 <th scope="col"><?php echo esc_html__('Name', 'jotform-bridge'); ?></th>
-                <th scope="col"><?php echo esc_html__('Shortcode', 'jotform-bridge'); ?></th>
                 <th scope="col"><?php echo esc_html__('Jotform Form', 'jotform-bridge'); ?></th>
                 <th scope="col"><?php echo esc_html__('Active', 'jotform-bridge'); ?></th>
                 <?php if ($showStats) : ?>
                     <th scope="col"><?php echo esc_html__('Last 7 days', 'jotform-bridge'); ?></th>
                 <?php endif; ?>
+                <th scope="col"><?php echo esc_html__('Shortcode', 'jotform-bridge'); ?></th>
             </tr>
         </thead>
         <tbody>
@@ -99,18 +99,6 @@ $jfbNewUrl = add_query_arg(['page' => $page, 'view' => 'new'], admin_url('admin.
                                 </button>
                             </form>
                         </div>
-                    </td>
-                    <?php $jfbShortcode = '[jotform_form id="' . $jfbIntegration->slug() . '"]'; ?>
-                    <td>
-                        <button
-                            type="button"
-                            class="button-link jfb-copy-shortcode"
-                            data-jfb-shortcode="<?php echo esc_attr($jfbShortcode); ?>"
-                            title="<?php echo esc_attr__('Copy to clipboard', 'jotform-bridge'); ?>"
-                        >
-                            <code><?php echo esc_html($jfbShortcode); ?></code>
-                            <span class="jfb-copied"><?php echo esc_html__('Copied', 'jotform-bridge'); ?></span>
-                        </button>
                     </td>
                     <td>
                         <?php if ($jfbRow['form_title'] !== '') : ?>
@@ -169,6 +157,18 @@ $jfbNewUrl = add_query_arg(['page' => $page, 'view' => 'new'], admin_url('admin.
                         <?php endif; ?>
                     </td>
                     <?php endif; ?>
+                    <?php $jfbShortcode = '[jotform_form id="' . $jfbIntegration->slug() . '"]'; ?>
+                    <td>
+                        <button
+                            type="button"
+                            class="button-link jfb-copy-shortcode"
+                            data-jfb-shortcode="<?php echo esc_attr($jfbShortcode); ?>"
+                            title="<?php echo esc_attr__('Copy to clipboard', 'jotform-bridge'); ?>"
+                        >
+                            <code><?php echo esc_html($jfbShortcode); ?></code>
+                            <span class="jfb-copied"><?php echo esc_html__('Copied', 'jotform-bridge'); ?></span>
+                        </button>
+                    </td>
                 </tr>
             <?php endforeach; ?>
         </tbody>
@@ -284,6 +284,7 @@ $jfbNewUrl = add_query_arg(['page' => $page, 'view' => 'new'], admin_url('admin.
         /* The cell still has to read as the identifier it is, so the button keeps
            the plain <code> look and only gains a pointer and the copied marker. */
         .jfb-integrations .jfb-copy-shortcode {
+            position: relative;
             padding: 0;
             border: 0;
             background: none;
@@ -295,14 +296,23 @@ $jfbNewUrl = add_query_arg(['page' => $page, 'view' => 'new'], admin_url('admin.
             cursor: pointer;
         }
 
+        /* Taken out of the flow so that showing it never reflows the row: the
+           marker sits to the right of the shortcode and overlaps the cell
+           padding instead of widening the column. */
         .jfb-integrations .jfb-copy-shortcode .jfb-copied {
-            display: none;
+            position: absolute;
+            top: 0;
+            left: 100%;
             margin-left: .5em;
             color: #007017;
+            white-space: nowrap;
+            opacity: 0;
+            pointer-events: none;
+            transition: opacity .15s ease-in-out;
         }
 
         .jfb-integrations .jfb-copy-shortcode.is-copied .jfb-copied {
-            display: inline;
+            opacity: 1;
         }
     </style>
 
