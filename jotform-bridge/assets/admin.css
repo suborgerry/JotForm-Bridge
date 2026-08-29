@@ -195,3 +195,27 @@ tr.jfb-row-unsupported .jfb-unsupported-note {
     margin: 0 0 1em;
     white-space: pre-wrap;
 }
+
+/* The editor's primary action sits beside the title rather than at the foot of
+   the page: the fields it saves are the first thing on the screen, and the
+   schema table and starter template below them are reference material nobody
+   should have to scroll past to press Save. */
+.jfb-page-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 12px;
+    flex-wrap: wrap;
+}
+
+.jfb-page-header > h1 {
+    margin: 0;
+    padding: 9px 0 4px;
+}
+
+/* submit_button() emits the input inside a <p>; it is the flex child here. */
+.jfb-page-header > p.submit {
+    margin: 0;
+    padding: 0;
+    float: none;
+}

@@ -34,13 +34,30 @@ if (!defined('ABSPATH')) {
 $jfbReport  = $compatibility['report'] instanceof CompatibilityReport ? $compatibility['report'] : null;
 ?>
 <div class="wrap jfb-integration">
-    <h1 class="wp-heading-inline">
+    <div class="jfb-page-header">
+        <h1 class="wp-heading-inline">
+            <?php
+            echo $isNew
+                ? esc_html__('Add Integration', 'jotform-bridge')
+                : esc_html__('Edit Integration', 'jotform-bridge');
+            ?>
+        </h1>
+
         <?php
-        echo $isNew
-            ? esc_html__('Add Integration', 'jotform-bridge')
-            : esc_html__('Edit Integration', 'jotform-bridge');
+        /* The button lives outside the form it submits, so it names the form.
+           It sits beside the title rather than at the foot of the page: the
+           fields it saves are the first thing on the screen, and everything
+           below them — the schema table, the starter template — is reference
+           material somebody should not have to scroll past to press Save. */
+        submit_button(
+            $isNew ? __('Create Integration', 'jotform-bridge') : __('Save Integration', 'jotform-bridge'),
+            'primary',
+            'submit',
+            false,
+            ['form' => 'jfb-integration-form']
+        );
         ?>
-    </h1>
+    </div>
     <hr class="wp-header-end">
 
     <?php require __DIR__ . '/partials/notice.php'; ?>
@@ -484,19 +501,8 @@ $jfbReport  = $compatibility['report'] instanceof CompatibilityReport ? $compati
 
     <?php endif; ?>
 
-    <div class="jfb-actions jfb-actions-footer">
-        <?php
-        /* The button lives outside the form it submits, so it names the form. */
-        submit_button(
-            $isNew ? __('Create Integration', 'jotform-bridge') : __('Save Integration', 'jotform-bridge'),
-            'primary',
-            'submit',
-            false,
-            ['form' => 'jfb-integration-form']
-        );
-        ?>
-
-        <?php if (!$isNew) : ?>
+    <?php if (!$isNew) : ?>
+        <div class="jfb-actions jfb-actions-footer">
             <form
                 method="post"
                 action="<?php echo esc_url(admin_url('admin-post.php')); ?>"
@@ -508,6 +514,6 @@ $jfbReport  = $compatibility['report'] instanceof CompatibilityReport ? $compati
                 <?php wp_nonce_field(IntegrationsPage::ACTION_DELETE); ?>
                 <?php submit_button(__('Delete', 'jotform-bridge'), 'button jfb-button-delete', 'submit', false); ?>
             </form>
-        <?php endif; ?>
-    </div>
+        </div>
+    <?php endif; ?>
 </div>
