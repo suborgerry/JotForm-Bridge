@@ -357,3 +357,122 @@ mtime — not the return of the `Rescan` button. Whatever happens, the admin has
 to keep reading the state of the files directly, because that is the property
 the cache cost us last time.
 
+---
+
+## 11. No accessibility audit against WCAG
+
+**Problem.** This is a plugin whose entire output is forms, and forms are where
+accessibility is most often got wrong and most keenly felt. The markup was
+written with the right intentions — `<label for>`, `<fieldset>`/`<legend>` for
+choice groups, `aria-describedby` on every control, `aria-invalid` set by the
+script, `role="alert"` with `aria-live="assertive"` for form errors and
+`role="status"` with `aria-live="polite"` for the success message, focus moved
+to the first invalid control on failure — but nothing has been measured against
+the standard. Good intentions and a conformance check are different things.
+
+**Shape.** WCAG 2.2 AA as the target, on both renderers and on the admin:
+
+* automated first — axe-core or Lighthouse through the browser MCP, on an
+  auto-rendered form, a custom-template form and the two admin screens;
+* then the parts a tool cannot see: keyboard-only completion of a form,
+  the announcement order when validation fails, whether the live region actually
+  reads the error or is beaten by the focus move, the visible focus ring on the
+  copy buttons and the delete button, and the required-field marker being
+  understandable without colour;
+* the auto renderer's error slots are `<span>` elements written to by
+  JavaScript — check they are announced when filled, since an `aria-live`
+  region added after page load is not reliably announced in every screen reader.
+
+Fix what the audit finds; record what is deliberately not fixed and why.
+
+**Why it is parked.** It is a real piece of work, not a checkbox, and it wants
+the browser MCP available. It should not be parked for long: of everything in
+this file it is the item most likely to be affecting real people right now.
+
+---
+
+## 12. No check against current web standards
+
+**Problem.** The output has never been validated. The plugin generates HTML from
+a schema it does not control, and Jotform allows labels and option values that
+are not obviously safe to interpolate into markup — so "it renders in Chrome" is
+not evidence of much.
+
+**Shape.**
+
+* run the generated markup of both renderers through the W3C validator,
+  including a form with a schema that exercises the awkward cases: an empty
+  label, a label with quotes and angle brackets, duplicate option values, an
+  option value that is an empty string, a very long label;
+* check the same for the admin screens;
+* confirm the generated IDs are unique with two of the same integration on one
+  page, which the instance counter is supposed to handle;
+* check `assets/frontend.js` against what the supported browser range actually
+  provides. It is written as ES5 and now guards `window.fetch`, but nothing
+  states what that range is — decide it and write it down, because the answer
+  changes whether the ES5 style is still worth its cost.
+
+---
+
+## 13. Reconsider: Tailwind and Alpine for the admin screens
+
+**The question.** Would the admin be better built on Tailwind and Alpine, or is
+that the wrong tool here?
+
+**What is known before anybody starts.** The evidence currently points at "wrong
+tool", and it is worth writing down so the investigation starts from it rather
+than from taste:
+
+* The plugin's stated promise is that the release ZIP works with no
+  `composer install`, no `npm install` and no `npm run build`. Tailwind needs a
+  build step; the play CDN is not an option for a shipped plugin, and it would
+  also be blocked by the CSP rules that made us move the inline JS out in the
+  first place.
+* WordPress admin already ships a design system — `common.css`, `forms.css`,
+  `.widefat`, `.form-table`, `submit_button()`. Tailwind's preflight resets
+  exactly what those depend on. Using Tailwind without preflight, inside markup
+  that has to keep looking like WordPress, gets most of the cost for little of
+  the benefit.
+* The surface is small. The whole admin stylesheet is under 200 lines, and most
+  of it exists to outweigh a core rule or to tint a table row — the kind of thing
+  a utility framework does not help with.
+* Alpine would replace about 170 lines of dependency-free vanilla JS with a
+  runtime dependency, to do two things: toggle rows and copy to the clipboard.
+
+**What would change the answer.** A much larger admin surface — several screens
+with real interactivity, an integration builder, live previews — where hand-
+written CSS and delegated event handlers genuinely stop scaling. That is not
+where this plugin is.
+
+**If it is investigated anyway**, the honest comparison is against the third
+option nobody names: keeping vanilla CSS and JS but organising them better. Most
+of what Tailwind is wanted for at this size is usually consistency, and
+consistency is a naming convention.
+
+---
+
+## 14. Second review pass with a different model
+
+**Problem.** The August 2026 review, the removals that followed it and the fixes
+in this file were all produced in one long session by one model. That is a
+single point of view, and the failure it is prone to is not missing an obvious
+bug — it is being consistent with its own earlier reasoning. Every one of these
+decisions looked right to the model that made them, which is exactly what a
+wrong decision also looks like.
+
+**Shape.** A fresh review of the plugin by the Fable model, started cold —
+without this conversation's context, so it is reading the code rather than the
+argument for the code. Worth pointing at specifically:
+
+* the four `Amendment:` sections in `AGENTS.md`, which are the decisions with
+  the most reasoning and the least outside scrutiny;
+* the submission pipeline's ordering and its single-answer refusal policy;
+* the proof-of-work guard, which is home-grown crypto in the security path and
+  was reviewed by nobody;
+* the rate limiter trade-off recorded in item 8, including the option that was
+  rejected there.
+
+Treat disagreement as information rather than as a verdict: the useful output is
+a place where two independent readings differ, which is a place worth looking at
+by hand.
+
