@@ -180,9 +180,6 @@ $jfbReport  = $compatibility['report'] instanceof CompatibilityReport ? $compati
                             </option>
                         <?php endforeach; ?>
                     </select>
-                    <p class="description">
-                        <?php echo esc_html__('What happens after a submission is accepted. A redirect target is resolved when the answer is sent, never stored as a URL.', 'jotform-bridge'); ?>
-                    </p>
                 </td>
             </tr>
 
