@@ -23,6 +23,21 @@ if (!defined('ABSPATH')) {
 }
 
 $jfbNewUrl = add_query_arg(['page' => $page, 'view' => 'new'], admin_url('admin.php'));
+
+if (!function_exists('jfb_format_datetime')) {
+    /**
+     * Both tables print a timestamp the same way: the site's own date and time
+     * format, in the site's timezone, so the column matches the rest of the
+     * admin instead of inventing a format of its own.
+     */
+    function jfb_format_datetime(int $timestamp): string
+    {
+        $date = (string) get_option('date_format', 'Y-m-d');
+        $time = (string) get_option('time_format', 'H:i');
+
+        return (string) wp_date(trim($date . ' ' . $time), $timestamp);
+    }
+}
 ?>
 <div class="wrap jfb-integrations">
     <h1 class="wp-heading-inline"><?php echo esc_html__('Integrations', 'jotform-bridge'); ?></h1>
@@ -39,6 +54,7 @@ $jfbNewUrl = add_query_arg(['page' => $page, 'view' => 'new'], admin_url('admin.
                 <th scope="col"><?php echo esc_html__('Name', 'jotform-bridge'); ?></th>
                 <th scope="col"><?php echo esc_html__('Jotform Form', 'jotform-bridge'); ?></th>
                 <th scope="col"><?php echo esc_html__('Rendering', 'jotform-bridge'); ?></th>
+                <th scope="col"><?php echo esc_html__('Last modified', 'jotform-bridge'); ?></th>
                 <?php if ($showStats) : ?>
                     <th scope="col"><?php echo esc_html__('Last 7 days', 'jotform-bridge'); ?></th>
                 <?php endif; ?>
@@ -48,7 +64,7 @@ $jfbNewUrl = add_query_arg(['page' => $page, 'view' => 'new'], admin_url('admin.
         <tbody>
             <?php if ($rows === []) : ?>
                 <tr>
-                    <td colspan="<?php echo $showStats ? 5 : 4; ?>">
+                    <td colspan="<?php echo $showStats ? 6 : 5; ?>">
                         <?php echo esc_html__('No integrations yet. Add one to connect a Jotform form to a template.', 'jotform-bridge'); ?>
                     </td>
                 </tr>
@@ -118,6 +134,24 @@ $jfbNewUrl = add_query_arg(['page' => $page, 'view' => 'new'], admin_url('admin.
                             <?php endif; ?>
                         <?php endif; ?>
                     </td>
+                    <td>
+                        <?php
+                        // An integration stored before the timestamps existed
+                        // has neither, and the creation time is the closest
+                        // truth available for one that was never edited.
+                        $jfbModified = $jfbIntegration->updatedAt() > 0
+                            ? $jfbIntegration->updatedAt()
+                            : $jfbIntegration->createdAt();
+                        ?>
+                        <?php if ($jfbModified > 0) : ?>
+                            <?php echo esc_html(jfb_format_datetime($jfbModified)); ?>
+                        <?php else : ?>
+                            <span aria-hidden="true">&mdash;</span>
+                            <span class="screen-reader-text">
+                                <?php echo esc_html__('Unknown', 'jotform-bridge'); ?>
+                            </span>
+                        <?php endif; ?>
+                    </td>
                     <?php if ($showStats) : ?>
                     <td>
                         <?php
@@ -185,12 +219,13 @@ $jfbNewUrl = add_query_arg(['page' => $page, 'view' => 'new'], admin_url('admin.
                 <th scope="col"><?php echo esc_html__('Slug', 'jotform-bridge'); ?></th>
                 <th scope="col"><?php echo esc_html__('File', 'jotform-bridge'); ?></th>
                 <th scope="col"><?php echo esc_html__('Used by', 'jotform-bridge'); ?></th>
+                <th scope="col"><?php echo esc_html__('Last modified', 'jotform-bridge'); ?></th>
             </tr>
         </thead>
         <tbody>
             <?php if ($templates->isEmpty()) : ?>
                 <tr>
-                    <td colspan="4">
+                    <td colspan="5">
                         <?php echo esc_html__('No templates found. Add a PHP file with a Jotform template header to your theme /forms/ directory.', 'jotform-bridge'); ?>
                     </td>
                 </tr>
@@ -237,6 +272,17 @@ $jfbNewUrl = add_query_arg(['page' => $page, 'view' => 'new'], admin_url('admin.
                                     </li>
                                 <?php endforeach; ?>
                             </ul>
+                        <?php endif; ?>
+                    </td>
+                    <td>
+                        <?php $jfbMtime = (int) ($jfbTemplate['mtime'] ?? 0); ?>
+                        <?php if ($jfbMtime > 0) : ?>
+                            <?php echo esc_html(jfb_format_datetime($jfbMtime)); ?>
+                        <?php else : ?>
+                            <span aria-hidden="true">&mdash;</span>
+                            <span class="screen-reader-text">
+                                <?php echo esc_html__('Unknown', 'jotform-bridge'); ?>
+                            </span>
                         <?php endif; ?>
                     </td>
                 </tr>
