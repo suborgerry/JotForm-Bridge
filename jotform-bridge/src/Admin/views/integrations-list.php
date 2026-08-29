@@ -293,12 +293,17 @@ if (!function_exists('jfb_format_datetime')) {
     <?php endif; ?>
 
     <style>
-        /* WordPress only styles .wp-heading-inline on the page's h1, so the h2
-           title has to keep the inline flow and the gap before "Add New". As the
-           first child of .wrap it also picks up the old h1 spacing, so the
-           margins and padding are reset to the ones any other h2 gets. */
+        /* As the first child of .wrap the title is caught by the pre-4.4
+           back-compat rule that styles it like a page h1, and
+           .wp-heading-inline is only defined for h1, so both are undone here:
+           the values below are the ones the "Templates" h2 below gets, plus the
+           inline flow and the gap that keep "Add New" beside the title. */
         .jfb-integrations > .wp-heading-inline {
             display: inline-block;
+            color: #1d2327;
+            font-size: 1.3em;
+            font-weight: 600;
+            line-height: inherit;
             margin: 1em 4px 1em 0;
             padding: 0;
         }
