@@ -628,7 +628,7 @@ msgstr ""
 #. translators: %s: file name to create in the theme
 #: src/Admin/views/integration-edit.php:641
 #, php-format
-msgid "Built from the schema above. Save it as %s in your theme, then pick it as this integration's template — it appears in the select straight away. Restyle it however you like: only the data-jotform-* attributes matter."
+msgid "Built from the schema above. Edit and save it as %s in your theme, then pick it as this integration's template — it appears in the select straight away. Restyle it however you like: only the data-jotform-* attributes matter."
 msgstr ""
 
 #: src/Admin/views/integration-edit.php:652

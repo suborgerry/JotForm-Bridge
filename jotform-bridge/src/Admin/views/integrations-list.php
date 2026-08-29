@@ -54,11 +54,11 @@ if (!function_exists('jfb_format_datetime')) {
                 <th scope="col"><?php echo esc_html__('Name', 'jotform-bridge'); ?></th>
                 <th scope="col"><?php echo esc_html__('Jotform Form', 'jotform-bridge'); ?></th>
                 <th scope="col"><?php echo esc_html__('Rendering', 'jotform-bridge'); ?></th>
-                <th scope="col"><?php echo esc_html__('Last modified', 'jotform-bridge'); ?></th>
                 <?php if ($showStats) : ?>
                     <th scope="col"><?php echo esc_html__('Last 7 days', 'jotform-bridge'); ?></th>
                 <?php endif; ?>
                 <th scope="col"><?php echo esc_html__('Shortcode', 'jotform-bridge'); ?></th>
+                <th scope="col"><?php echo esc_html__('Last modified', 'jotform-bridge'); ?></th>
             </tr>
         </thead>
         <tbody>
