@@ -705,10 +705,6 @@ msgstr ""
 msgid "Edit"
 msgstr ""
 
-#: src/Admin/views/integrations-list.php:192
-msgid "Sync schema"
-msgstr ""
-
 #: src/Admin/views/integrations-list.php:204
 msgid "Deactivate"
 msgstr ""

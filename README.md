@@ -471,7 +471,7 @@ background refresh and no expiry anywhere in the plugin.
 
 | Action | Where | What it does |
 | --- | --- | --- |
-| **Sync Schema** | Integrations list (per row) and integration editor | Reloads **one** form's definition, re-normalizes it, stores it and re-checks compatibility |
+| **Sync Schema** | Integration editor | Reloads **one** form's definition, re-normalizes it, stores it and re-checks compatibility |
 | **Test Connection** | Settings | One read-only `GET /user` call; records the result |
 | **Sync with Jotform** | Settings | Reloads the account form list from Jotform |
 | **Remove from list** | Settings, on a form Jotform reports as `DELETED` | Drops that row from the stored list; nothing is sent to Jotform |

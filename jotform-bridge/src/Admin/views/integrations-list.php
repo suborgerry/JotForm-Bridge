@@ -16,8 +16,6 @@
 
 declare(strict_types=1);
 
-use JotformBridge\Admin\IntegrationsPage;
-
 if (!defined('ABSPATH')) {
     exit;
 }
@@ -91,15 +89,6 @@ if (!function_exists('jfb_format_datetime')) {
                         </strong>
                         <div class="row-actions visible">
                             <a href="<?php echo esc_url($jfbEditUrl); ?>"><?php echo esc_html__('Edit', 'jotform-bridge'); ?></a>
-                            |
-                            <form method="post" action="<?php echo esc_url(admin_url('admin-post.php')); ?>" style="display:inline;">
-                                <input type="hidden" name="action" value="<?php echo esc_attr(IntegrationsPage::ACTION_SYNC); ?>">
-                                <input type="hidden" name="integration" value="<?php echo esc_attr($jfbIntegration->slug()); ?>">
-                                <?php wp_nonce_field(IntegrationsPage::ACTION_SYNC); ?>
-                                <button type="submit" class="button-link">
-                                    <?php echo esc_html__('Sync schema', 'jotform-bridge'); ?>
-                                </button>
-                            </form>
                         </div>
                     </td>
                     <td>
