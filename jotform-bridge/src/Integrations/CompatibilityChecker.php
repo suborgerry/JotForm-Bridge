@@ -4,7 +4,6 @@ declare(strict_types=1);
 
 namespace JotformBridge\Integrations;
 
-use JotformBridge\Forms\FormSchema;
 use JotformBridge\Forms\SchemaRepository;
 use JotformBridge\Templates\CompatibilityReport;
 use JotformBridge\Templates\TemplateRegistry;
@@ -80,17 +79,14 @@ final class CompatibilityChecker
             // not an approximation — it is what the visitor will get.
             $report = $this->validator->validate($schema, $schema->semanticPaths());
 
+            // What auto rendering produces is already spelled out by the
+            // schema table, field by field; a headline saying the same thing
+            // in numbers would only repeat it.
             return [
                 'state'       => self::STATE_AUTO,
                 'report'      => $report,
-                'label'       => $report->status() === CompatibilityReport::STATUS_COMPATIBLE
-                    ? __('Auto rendering', 'jotform-bridge')
-                    : sprintf(
-                        /* translators: %s: compatibility status, e.g. "Compatible with warnings" */
-                        __('Auto rendering — %s', 'jotform-bridge'),
-                        $report->statusLabel()
-                    ),
-                'message'     => $this->autoMessage($schema),
+                'label'       => '',
+                'message'     => '',
                 'fingerprint' => $schema->fingerprint(),
             ];
         }
@@ -121,45 +117,6 @@ final class CompatibilityChecker
             'message'     => '',
             'fingerprint' => $schema->fingerprint(),
         ];
-    }
-
-    /**
-     * What auto rendering will actually produce, in one sentence.
-     */
-    private function autoMessage(FormSchema $schema): string
-    {
-        $supported   = count($schema->semanticPaths());
-        $unsupported = count($schema->unsupportedFields());
-
-        if ($supported === 0) {
-            return __('This form has no fields that can be rendered automatically.', 'jotform-bridge');
-        }
-
-        $message = sprintf(
-            /* translators: %d: number of inputs */
-            _n(
-                'The form is built from the schema: %d input.',
-                'The form is built from the schema: %d inputs.',
-                $supported,
-                'jotform-bridge'
-            ),
-            $supported
-        );
-
-        if ($unsupported > 0) {
-            $message .= ' ' . sprintf(
-                /* translators: %d: number of skipped fields */
-                _n(
-                    '%d Jotform field is not supported and is left out.',
-                    '%d Jotform fields are not supported and are left out.',
-                    $unsupported,
-                    'jotform-bridge'
-                ),
-                $unsupported
-            );
-        }
-
-        return $message;
     }
 
     /**

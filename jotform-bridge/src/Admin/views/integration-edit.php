@@ -429,12 +429,16 @@ $jfbReport  = $compatibility['report'] instanceof CompatibilityReport ? $compati
     <?php endif; ?>
 
     <h2><?php echo esc_html__('Compatibility', 'jotform-bridge'); ?></h2>
-    <p>
-        <strong><?php echo esc_html((string) $compatibility['label']); ?></strong>
-        <?php if ((string) $compatibility['message'] !== '') : ?>
-            <?php echo esc_html((string) $compatibility['message']); ?>
-        <?php endif; ?>
-    </p>
+    <?php if ((string) $compatibility['label'] !== '' || (string) $compatibility['message'] !== '') : ?>
+        <p>
+            <?php if ((string) $compatibility['label'] !== '') : ?>
+                <strong><?php echo esc_html((string) $compatibility['label']); ?></strong>
+            <?php endif; ?>
+            <?php if ((string) $compatibility['message'] !== '') : ?>
+                <?php echo esc_html((string) $compatibility['message']); ?>
+            <?php endif; ?>
+        </p>
+    <?php endif; ?>
 
     <?php
     /**
@@ -572,6 +576,36 @@ $jfbReport  = $compatibility['report'] instanceof CompatibilityReport ? $compati
     <?php endif; ?>
 
     <?php if ($jfbReport !== null) : ?>
+        <?php
+        $jfbInputs      = count($schema !== null ? $schema->semanticPaths() : []);
+        $jfbUnsupported = count($schema !== null ? $schema->unsupportedFields() : []);
+        ?>
+        <p class="description">
+            <?php
+            printf(
+                /* translators: %d: number of inputs the schema renders */
+                esc_html(_n('%d input.', '%d inputs.', $jfbInputs, 'jotform-bridge')),
+                (int) $jfbInputs
+            );
+            ?>
+            <?php if ($jfbUnsupported > 0) : ?>
+                <?php
+                printf(
+                    /* translators: %d: number of fields left out */
+                    esc_html(
+                        _n(
+                            '%d Jotform field is not supported and is left out.',
+                            '%d Jotform fields are not supported and are left out.',
+                            $jfbUnsupported,
+                            'jotform-bridge'
+                        )
+                    ),
+                    (int) $jfbUnsupported
+                );
+                ?>
+            <?php endif; ?>
+        </p>
+
         <table class="widefat striped">
             <thead>
                 <tr>

@@ -604,6 +604,22 @@ msgstr ""
 msgid "Type"
 msgstr ""
 
+#. translators: %d: number of inputs the schema renders
+#: src/Admin/views/integration-edit.php:587
+#, php-format
+msgid "%d input."
+msgid_plural "%d inputs."
+msgstr[0] ""
+msgstr[1] ""
+
+#. translators: %d: number of fields left out
+#: src/Admin/views/integration-edit.php:597
+#, php-format
+msgid "%d Jotform field is not supported and is left out."
+msgid_plural "%d Jotform fields are not supported and are left out."
+msgstr[0] ""
+msgstr[1] ""
+
 #: src/Admin/views/integration-edit.php:599
 msgid "Required"
 msgstr ""
@@ -1013,16 +1029,6 @@ msgstr ""
 msgid "Use Sync Schema to load the form definition from Jotform."
 msgstr ""
 
-#: src/Integrations/CompatibilityChecker.php:87
-msgid "Auto rendering"
-msgstr ""
-
-#. translators: %s: compatibility status, e.g. "Compatible with warnings"
-#: src/Integrations/CompatibilityChecker.php:90
-#, php-format
-msgid "Auto rendering — %s"
-msgstr ""
-
 #: src/Integrations/CompatibilityChecker.php:101
 msgid "Template not found"
 msgstr ""
@@ -1032,26 +1038,6 @@ msgstr ""
 #, php-format
 msgid "No template file in the theme declares the slug \"%s\". Check its header, or pick another template."
 msgstr ""
-
-#: src/Integrations/CompatibilityChecker.php:135
-msgid "This form has no fields that can be rendered automatically."
-msgstr ""
-
-#. translators: %d: number of inputs
-#: src/Integrations/CompatibilityChecker.php:140
-#, php-format
-msgid "The form is built from the schema: %d input."
-msgid_plural "The form is built from the schema: %d inputs."
-msgstr[0] ""
-msgstr[1] ""
-
-#. translators: %d: number of skipped fields
-#: src/Integrations/CompatibilityChecker.php:152
-#, php-format
-msgid "%d Jotform field is not supported and is left out."
-msgid_plural "%d Jotform fields are not supported and are left out."
-msgstr[0] ""
-msgstr[1] ""
 
 #: src/Integrations/Integration.php:101
 msgid "Custom template"
