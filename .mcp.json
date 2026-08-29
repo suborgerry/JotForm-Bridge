@@ -1,0 +1,16 @@
+{
+  "mcpServers": {
+    "wordpress-playground": {
+      "command": "npx",
+      "args": ["-y", "@wp-playground/mcp"]
+    },
+    "playwright": {
+      "command": "npx",
+      "args": ["-y", "@playwright/mcp@latest", "--browser", "chrome"]
+    },
+    "jotform": {
+      "type": "http",
+      "url": "https://mcp.jotform.com"
+    }
+  }
+}
