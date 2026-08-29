@@ -294,8 +294,11 @@ if (!function_exists('jfb_format_datetime')) {
            back-compat rule that styles it like a page h1, and
            .wp-heading-inline is only defined for h1, so both are undone here:
            the values below are the ones the "Templates" h2 below gets, plus the
-           inline flow and the gap that keep "Add New" beside the title. */
-        .jfb-integrations > .wp-heading-inline {
+           inline flow and the gap that keep "Add New" beside the title. The
+           selector names .wrap and both element types so that it outweighs the
+           back-compat rule, which load-styles.php would otherwise win on
+           specificity. */
+        .wrap.jfb-integrations > h2.wp-heading-inline {
             display: inline-block;
             color: #1d2327;
             font-size: 1.3em;
