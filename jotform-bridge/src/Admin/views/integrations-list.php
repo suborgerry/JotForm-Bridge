@@ -134,24 +134,7 @@ if (!function_exists('jfb_format_datetime')) {
                             <?php endif; ?>
                         <?php endif; ?>
                     </td>
-                    <td>
-                        <?php
-                        // An integration stored before the timestamps existed
-                        // has neither, and the creation time is the closest
-                        // truth available for one that was never edited.
-                        $jfbModified = $jfbIntegration->updatedAt() > 0
-                            ? $jfbIntegration->updatedAt()
-                            : $jfbIntegration->createdAt();
-                        ?>
-                        <?php if ($jfbModified > 0) : ?>
-                            <?php echo esc_html(jfb_format_datetime($jfbModified)); ?>
-                        <?php else : ?>
-                            <span aria-hidden="true">&mdash;</span>
-                            <span class="screen-reader-text">
-                                <?php echo esc_html__('Unknown', 'jotform-bridge'); ?>
-                            </span>
-                        <?php endif; ?>
-                    </td>
+                   
                     <?php if ($showStats) : ?>
                     <td>
                         <?php
@@ -204,6 +187,24 @@ if (!function_exists('jfb_format_datetime')) {
                             <code><?php echo esc_html($jfbShortcode); ?></code>
                             <span class="jfb-copied"><?php echo esc_html__('Copied', 'jotform-bridge'); ?></span>
                         </button>
+                    </td>
+                     <td>
+                        <?php
+                        // An integration stored before the timestamps existed
+                        // has neither, and the creation time is the closest
+                        // truth available for one that was never edited.
+                        $jfbModified = $jfbIntegration->updatedAt() > 0
+                            ? $jfbIntegration->updatedAt()
+                            : $jfbIntegration->createdAt();
+                        ?>
+                        <?php if ($jfbModified > 0) : ?>
+                            <?php echo esc_html(jfb_format_datetime($jfbModified)); ?>
+                        <?php else : ?>
+                            <span aria-hidden="true">&mdash;</span>
+                            <span class="screen-reader-text">
+                                <?php echo esc_html__('Unknown', 'jotform-bridge'); ?>
+                            </span>
+                        <?php endif; ?>
                     </td>
                 </tr>
             <?php endforeach; ?>
