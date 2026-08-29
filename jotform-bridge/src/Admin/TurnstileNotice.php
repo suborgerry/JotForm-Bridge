@@ -11,15 +11,17 @@ if (!defined('ABSPATH')) {
 }
 
 /**
- * Tells an administrator how to switch the challenge on — once, and politely.
+ * Says whether the optional challenge is on, and how to switch it on.
  *
  * Built along the same lines as ApiKeyNotice: the keys live in wp-config.php,
  * so the only useful thing the admin area can do is say what to write and
  * where. The tone is different though, and deliberately so. A missing API key
  * means the plugin does not work; a missing challenge means one optional layer
- * is off, which is a perfectly reasonable state to be in. So this is an
- * informational notice that can be dismissed for good, not a warning that
- * follows somebody around forever.
+ * is off, which is a perfectly reasonable state to be in. So this is a plain
+ * line of information, not a warning and not a campaign: no colour beyond the
+ * default, no call to action, and the instructions folded away until somebody
+ * asks for them. Nothing to dismiss either — there is nothing to escape from,
+ * and a state worth reading stays readable.
  *
  * The one case that does get a warning is half a configuration: with only one
  * of the two constants defined the challenge silently does nothing, and
@@ -28,14 +30,6 @@ if (!defined('ABSPATH')) {
 final class TurnstileNotice
 {
     public const CAPABILITY = 'manage_options';
-
-    public const ACTION_DISMISS = 'jotform_bridge_dismiss_turnstile_notice';
-
-    /**
-     * Per user, not per site: one administrator deciding they are not
-     * interested should not make the suggestion vanish for their colleagues.
-     */
-    public const USER_META = 'jotform_bridge_turnstile_notice_dismissed';
 
     /**
      * The lines an administrator has to paste into wp-config.php.
@@ -52,7 +46,6 @@ final class TurnstileNotice
     public function register(): void
     {
         add_action('admin_notices', [$this, 'render']);
-        add_action('admin_post_' . self::ACTION_DISMISS, [$this, 'handleDismiss']);
     }
 
     public function render(): void
@@ -71,41 +64,25 @@ final class TurnstileNotice
             return;
         }
 
-        if ((bool) get_user_meta(get_current_user_id(), self::USER_META, true)) {
-            return;
-        }
-
-        $this->renderInvitation();
+        $this->renderStatus();
     }
 
-    public function handleDismiss(): void
-    {
-        if (!current_user_can(self::CAPABILITY)) {
-            wp_die(esc_html__('You are not allowed to perform this action.', 'jotform-bridge'), '', ['response' => 403]);
-        }
-
-        check_admin_referer(self::ACTION_DISMISS);
-
-        update_user_meta(get_current_user_id(), self::USER_META, 1);
-
-        wp_safe_redirect(
-            add_query_arg(['page' => IntegrationsPage::MENU_SLUG], admin_url('admin.php'))
-        );
-
-        exit;
-    }
-
-    private function renderInvitation(): void
+    /**
+     * One sentence of state, with the setup steps behind a disclosure.
+     */
+    private function renderStatus(): void
     {
         printf(
-            '<div class="notice notice-info"><p><strong>%1$s</strong> %2$s</p>'
+            '<div class="notice notice-info inline" style="border-left-color:#c3c4c7;">'
+            . '<p style="margin:.5em 0;">%1$s</p>'
+            . '<details style="margin:0 0 .5em;"><summary style="cursor:pointer;">%2$s</summary>'
             . '<p>%3$s</p><pre style="margin:0 0 1em;white-space:pre-wrap;"><code>%4$s</code></pre>'
-            . '<p>%5$s</p><p>%6$s</p></div>',
-            esc_html__('Add a challenge to your forms?', 'jotform-bridge'),
+            . '<p>%5$s</p></details></div>',
             esc_html__(
-                'Your forms already refuse bots that fill hidden fields, submit instantly or flood the endpoint. A challenge is the layer that also stops a bot driving a real browser. It is optional and free.',
+                'Challenge: off. Your forms still refuse bots that fill hidden fields, submit instantly or flood the endpoint; a challenge is the optional layer that also stops a bot driving a real browser.',
                 'jotform-bridge'
             ),
+            esc_html__('How to switch it on', 'jotform-bridge'),
             sprintf(
                 /* translators: %s: link to the Cloudflare Turnstile dashboard */
                 esc_html__('Add your site at %s, then put the two keys it gives you into wp-config.php, above the "That\'s all, stop editing!" comment:', 'jotform-bridge'),
@@ -114,10 +91,9 @@ final class TurnstileNotice
             ),
             esc_html(self::SNIPPET),
             esc_html__(
-                'You do not need to move your domain to Cloudflare. After adding the keys, clear your page cache: submissions without a challenge token are refused, and pages cached beforehand do not carry the widget.',
+                'It is free, and you do not need to move your domain to Cloudflare. After adding the keys, clear your page cache: submissions without a challenge token are refused, and pages cached beforehand do not carry the widget.',
                 'jotform-bridge'
-            ),
-            $this->dismissButton()
+            )
         );
     }
 
@@ -135,22 +111,6 @@ final class TurnstileNotice
             ),
             esc_html__('Add the missing constant to wp-config.php, or remove the other one to make it clear the challenge is off on purpose.', 'jotform-bridge')
         );
-    }
-
-    private function dismissButton(): string
-    {
-        ob_start();
-        ?>
-        <form method="post" action="<?php echo esc_url(admin_url('admin-post.php')); ?>" style="display:inline;">
-            <?php wp_nonce_field(self::ACTION_DISMISS); ?>
-            <input type="hidden" name="action" value="<?php echo esc_attr(self::ACTION_DISMISS); ?>">
-            <button type="submit" class="button-link">
-                <?php esc_html_e('No thanks, do not show this again', 'jotform-bridge'); ?>
-            </button>
-        </form>
-        <?php
-
-        return (string) ob_get_clean();
     }
 
     private function isHalfConfigured(): bool

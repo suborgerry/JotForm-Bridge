@@ -151,7 +151,6 @@ msgstr ""
 #: src/Admin/IntegrationsPage.php:461
 #: src/Admin/QuotaNotice.php:75
 #: src/Admin/SettingsPage.php:155
-#: src/Admin/TurnstileNotice.php:84
 msgid "You are not allowed to perform this action."
 msgstr ""
 
@@ -251,44 +250,40 @@ msgstr ""
 msgid "Set the JOTFORM_API_KEY constant in wp-config.php before using this action."
 msgstr ""
 
-#: src/Admin/TurnstileNotice.php:104
-msgid "Add a challenge to your forms?"
+#: src/Admin/TurnstileNotice.php:81
+msgid "Challenge: off. Your forms still refuse bots that fill hidden fields, submit instantly or flood the endpoint; a challenge is the optional layer that also stops a bot driving a real browser."
 msgstr ""
 
-#: src/Admin/TurnstileNotice.php:105
-msgid "Your forms already refuse bots that fill hidden fields, submit instantly or flood the endpoint. A challenge is the layer that also stops a bot driving a real browser. It is optional and free."
+#: src/Admin/TurnstileNotice.php:85
+msgid "How to switch it on"
 msgstr ""
 
 #. translators: %s: link to the Cloudflare Turnstile dashboard
-#: src/Admin/TurnstileNotice.php:111
+#: src/Admin/TurnstileNotice.php:88
 #, php-format
 msgid "Add your site at %s, then put the two keys it gives you into wp-config.php, above the \"That's all, stop editing!\" comment:"
 msgstr ""
 
-#: src/Admin/TurnstileNotice.php:113
+#: src/Admin/TurnstileNotice.php:90
 msgid "Cloudflare Turnstile"
 msgstr ""
 
-#: src/Admin/TurnstileNotice.php:116
-msgid "You do not need to move your domain to Cloudflare. After adding the keys, clear your page cache: submissions without a challenge token are refused, and pages cached beforehand do not carry the widget."
+#: src/Admin/TurnstileNotice.php:93
+msgid "It is free, and you do not need to move your domain to Cloudflare. After adding the keys, clear your page cache: submissions without a challenge token are refused, and pages cached beforehand do not carry the widget."
 msgstr ""
 
-#: src/Admin/TurnstileNotice.php:128
+#: src/Admin/TurnstileNotice.php:104
 msgid "The Jotform Bridge challenge is only half configured."
 msgstr ""
 
 #. translators: %s: name of the missing constant
-#: src/Admin/TurnstileNotice.php:132
+#: src/Admin/TurnstileNotice.php:108
 #, php-format
 msgid "%s is missing, so the challenge is switched off and your forms are running without it."
 msgstr ""
 
-#: src/Admin/TurnstileNotice.php:136
+#: src/Admin/TurnstileNotice.php:112
 msgid "Add the missing constant to wp-config.php, or remove the other one to make it clear the challenge is off on purpose."
-msgstr ""
-
-#: src/Admin/TurnstileNotice.php:148
-msgid "No thanks, do not show this again"
 msgstr ""
 
 #: src/Admin/views/integration-edit.php:40
