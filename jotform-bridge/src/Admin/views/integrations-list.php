@@ -294,10 +294,13 @@ if (!function_exists('jfb_format_datetime')) {
 
     <style>
         /* WordPress only styles .wp-heading-inline on the page's h1, so the h2
-           title has to keep the inline flow and the gap before "Add New". */
+           title has to keep the inline flow and the gap before "Add New". As the
+           first child of .wrap it also picks up the old h1 spacing, so the
+           margins and padding are reset to the ones any other h2 gets. */
         .jfb-integrations > .wp-heading-inline {
             display: inline-block;
-            margin-right: 4px;
+            margin: 1em 4px 1em 0;
+            padding: 0;
         }
 
         /* The cell still has to read as the identifier it is, so the button keeps
