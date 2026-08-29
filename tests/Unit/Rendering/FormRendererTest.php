@@ -94,7 +94,7 @@ final class FormRendererTest extends TestCase
             }
         );
 
-        $this->storeIntegration(true, 'contact');
+        $this->storeIntegration('contact');
         $this->cacheSchema();
     }
 
@@ -165,7 +165,7 @@ final class FormRendererTest extends TestCase
 
     public function testAnAutoIntegrationRendersWithoutAnyTemplate(): void
     {
-        $this->storeIntegration(true, '', 'auto');
+        $this->storeIntegration('', 'auto');
 
         $html = $this->renderer()->render('contact');
 
@@ -178,7 +178,7 @@ final class FormRendererTest extends TestCase
     public function testAutoRenderingIgnoresAnAssignedTemplate(): void
     {
         $this->writeTemplate('contact', '<form data-jotform-bridge class="theme-form"></form>');
-        $this->storeIntegration(true, 'contact', 'auto');
+        $this->storeIntegration('contact', 'auto');
 
         $this->assertStringNotContainsString('theme-form', $this->renderer()->render('contact'));
     }
@@ -189,17 +189,9 @@ final class FormRendererTest extends TestCase
         $this->assertFalse($this->enqueued);
     }
 
-    public function testADisabledIntegrationRendersNothing(): void
-    {
-        $this->writeTemplate('contact', '<form data-jotform-bridge></form>');
-        $this->storeIntegration(false, 'contact');
-
-        $this->assertSame('', $this->renderer()->render('contact'));
-    }
-
     public function testAMissingTemplateRendersNothing(): void
     {
-        $this->storeIntegration(true, 'gone');
+        $this->storeIntegration('gone');
 
         $this->assertSame('', $this->renderer()->render('contact'));
     }
@@ -228,7 +220,7 @@ final class FormRendererTest extends TestCase
             }
         );
 
-        $this->storeIntegration(true, 'contact');
+        $this->storeIntegration('contact');
 
         $this->assertSame('', $this->renderer()->render('contact'));
     }
@@ -244,7 +236,7 @@ final class FormRendererTest extends TestCase
             }
         );
 
-        $this->storeIntegration(true, 'contact');
+        $this->storeIntegration('contact');
 
         $this->assertStringContainsString('Sync Schema', $this->renderer()->render('contact'));
     }
@@ -273,7 +265,7 @@ final class FormRendererTest extends TestCase
         );
     }
 
-    private function storeIntegration(bool $active, string $template, string $mode = 'custom'): void
+    private function storeIntegration(string $template, string $mode = 'custom'): void
     {
         $this->options[IntegrationRepository::OPTION] = [
             'contact' => [
@@ -282,7 +274,6 @@ final class FormRendererTest extends TestCase
                 'form_id'  => self::FORM_ID,
                 'mode'     => $mode,
                 'template' => $template,
-                'active'   => $active,
             ],
         ];
     }

@@ -35,7 +35,6 @@ final class IntegrationsPage
 
     public const ACTION_SAVE    = 'jotform_bridge_save_integration';
     public const ACTION_DELETE  = 'jotform_bridge_delete_integration';
-    public const ACTION_TOGGLE  = 'jotform_bridge_toggle_integration';
     public const ACTION_SYNC    = 'jotform_bridge_sync_schema';
     public const ACTION_TEST    = 'jotform_bridge_test_submission';
 
@@ -86,7 +85,6 @@ final class IntegrationsPage
         add_action('admin_menu', [$this, 'registerMenu']);
         add_action('admin_post_' . self::ACTION_SAVE, [$this, 'handleSave']);
         add_action('admin_post_' . self::ACTION_DELETE, [$this, 'handleDelete']);
-        add_action('admin_post_' . self::ACTION_TOGGLE, [$this, 'handleToggle']);
         add_action('admin_post_' . self::ACTION_SYNC, [$this, 'handleSyncSchema']);
 
         if ($this->tests !== null) {
@@ -202,7 +200,7 @@ final class IntegrationsPage
 
         $isNew         = $integration === null || $view === 'new';
         $originalSlug  = $view === 'edit' ? $slug : '';
-        $integration   = $integration ?? new Integration('', '', '', Integration::MODE_CUSTOM, '', true);
+        $integration   = $integration ?? new Integration('', '', '', Integration::MODE_CUSTOM, '');
         $compatibility = $this->compatibility->check($integration);
         $redirect      = $this->redirects->check($integration);
         $schema        = $integration->formId() !== '' ? $this->schemas->stored($integration->formId()) : null;
@@ -320,29 +318,6 @@ final class IntegrationsPage
             $this->flash('success', __('Integration deleted.', 'jotform-bridge'));
         } else {
             $this->flash('error', __('That integration does not exist.', 'jotform-bridge'));
-        }
-
-        $this->redirect([]);
-    }
-
-    public function handleToggle(): void
-    {
-        $this->guard(self::ACTION_TOGGLE);
-
-        // phpcs:ignore WordPress.Security.NonceVerification.Missing -- verified in guard().
-        $slug = isset($_POST['integration']) ? sanitize_key((string) wp_unslash($_POST['integration'])) : '';
-        // phpcs:ignore WordPress.Security.NonceVerification.Missing -- verified in guard().
-        $active = !empty($_POST['active']);
-
-        if ($this->integrations->setActive($slug, $active)) {
-            $this->flash(
-                'success',
-                $active
-                    ? __('Integration activated.', 'jotform-bridge')
-                    : __('Integration deactivated.', 'jotform-bridge')
-            );
-        } else {
-            $this->flash('error', __('That integration could not be updated.', 'jotform-bridge'));
         }
 
         $this->redirect([]);

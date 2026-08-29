@@ -109,7 +109,7 @@ final class CompatibilityCheckerTest extends TestCase
     {
         $this->cacheSchema();
 
-        $integration = new Integration('contact', 'Contact', self::FORM_ID, Integration::MODE_AUTO, '', true);
+        $integration = new Integration('contact', 'Contact', self::FORM_ID, Integration::MODE_AUTO, '');
 
         $result = $this->checker()->check($integration);
 
@@ -126,7 +126,7 @@ final class CompatibilityCheckerTest extends TestCase
     {
         $this->cacheSchemaWithUnsupportedField();
 
-        $integration = new Integration('contact', 'Contact', self::FORM_ID, Integration::MODE_AUTO, '', true);
+        $integration = new Integration('contact', 'Contact', self::FORM_ID, Integration::MODE_AUTO, '');
 
         $result = $this->checker()->check($integration);
 
@@ -190,7 +190,7 @@ final class CompatibilityCheckerTest extends TestCase
 
     private function integration(): Integration
     {
-        return new Integration('contact', 'Contact', self::FORM_ID, Integration::MODE_CUSTOM, 'contact', true);
+        return new Integration('contact', 'Contact', self::FORM_ID, Integration::MODE_CUSTOM, 'contact');
     }
 
     private function cacheSchema(): void

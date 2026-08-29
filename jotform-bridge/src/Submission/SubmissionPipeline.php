@@ -126,14 +126,6 @@ final class SubmissionPipeline
             return $this->count(Stats::GLOBAL_SCOPE, Stats::UNKNOWN, $this->unavailable());
         }
 
-        if (!$integration->isActive()) {
-            $this->note('A submission arrived for a disabled integration.', [
-                'integration' => $slug,
-            ]);
-
-            return $this->count($slug, Stats::INACTIVE, $this->unavailable());
-        }
-
         // The tighter, per-integration budget. Like the site-wide one it needs
         // neither the schema nor the values, so a flood is turned away before
         // the request costs a schema read or a pass through the validator.

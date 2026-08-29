@@ -29,7 +29,7 @@ final class IntegrationRepository
      * it under us within one request.
      *
      * Sharing the hydrated objects between callers is safe because Integration
-     * is immutable — withSlug(), withActive() and withTimestamps() each return
+     * is immutable — withSlug() and withTimestamps() each return
      * a new instance and nothing assigns to a field after construction.
      *
      * @var array<string, Integration>|null
@@ -74,14 +74,6 @@ final class IntegrationRepository
         );
 
         return $this->memo = $integrations;
-    }
-
-    /**
-     * @return array<string, Integration>
-     */
-    public function active(): array
-    {
-        return array_filter($this->all(), static fn(Integration $i): bool => $i->isActive());
     }
 
     public function get(string $slug): ?Integration
@@ -162,20 +154,6 @@ final class IntegrationRepository
         update_option(self::OPTION, $stored, false);
 
         return true;
-    }
-
-    /**
-     * Goes through save(), which is what drops the memo.
-     */
-    public function setActive(string $slug, bool $active): bool
-    {
-        $integration = $this->get($slug);
-
-        if ($integration === null) {
-            return false;
-        }
-
-        return $this->save($integration->withActive($active), $integration->slug()) === [];
     }
 
     /**

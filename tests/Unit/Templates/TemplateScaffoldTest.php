@@ -180,7 +180,7 @@ final class TemplateScaffoldTest extends TestCase
 
     private function integration(): Integration
     {
-        return new Integration('contact', 'Contact', '240000000000001', Integration::MODE_CUSTOM, '', true);
+        return new Integration('contact', 'Contact', '240000000000001', Integration::MODE_CUSTOM, '');
     }
 
     private function schema(): FormSchema

@@ -201,7 +201,6 @@ final class RedirectTargetTest extends TestCase
             '240000000000001',
             Integration::MODE_CUSTOM,
             'contact',
-            true,
             0,
             0,
             $action,

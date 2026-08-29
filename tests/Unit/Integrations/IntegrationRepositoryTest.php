@@ -57,7 +57,6 @@ final class IntegrationRepositoryTest extends TestCase
         $this->assertSame('240000000000001', $stored->formId());
         $this->assertSame(Integration::MODE_CUSTOM, $stored->mode());
         $this->assertSame('contact', $stored->templateSlug());
-        $this->assertTrue($stored->isActive());
         $this->assertGreaterThan(0, $stored->createdAt());
     }
 
@@ -117,25 +116,25 @@ final class IntegrationRepositoryTest extends TestCase
     {
         $this->assertNotSame(
             [],
-            $this->repository->save(new Integration('contact', '', '240000000000001', 'custom', 'contact', true)),
+            $this->repository->save(new Integration('contact', '', '240000000000001', 'custom', 'contact')),
             'A name is required.'
         );
 
         $this->assertNotSame(
             [],
-            $this->repository->save(new Integration('', 'Contact', '240000000000001', 'custom', 'contact', true)),
+            $this->repository->save(new Integration('', 'Contact', '240000000000001', 'custom', 'contact')),
             'A slug is required.'
         );
 
         $this->assertNotSame(
             [],
-            $this->repository->save(new Integration('contact', 'Contact', '', 'custom', 'contact', true)),
+            $this->repository->save(new Integration('contact', 'Contact', '', 'custom', 'contact')),
             'A Jotform form is required.'
         );
 
         $this->assertNotSame(
             [],
-            $this->repository->save(new Integration('contact', 'Contact', '240000000000001', 'custom', '', true)),
+            $this->repository->save(new Integration('contact', 'Contact', '240000000000001', 'custom', '')),
             'A custom-template integration needs a template.'
         );
 
@@ -145,21 +144,11 @@ final class IntegrationRepositoryTest extends TestCase
     public function testAutoModeDoesNotRequireATemplate(): void
     {
         $errors = $this->repository->save(
-            new Integration('auto', 'Auto', '240000000000001', Integration::MODE_AUTO, '', true)
+            new Integration('auto', 'Auto', '240000000000001', Integration::MODE_AUTO, '')
         );
 
         $this->assertSame([], $errors);
         $this->assertSame(Integration::MODE_AUTO, $this->repository->get('auto')->mode());
-    }
-
-    public function testDeactivatingKeepsTheIntegrationButExcludesItFromActive(): void
-    {
-        $this->repository->save($this->integration('contact'));
-
-        $this->assertTrue($this->repository->setActive('contact', false));
-        $this->assertCount(1, $this->repository->all());
-        $this->assertSame([], $this->repository->active());
-        $this->assertFalse($this->repository->get('contact')->isActive());
     }
 
     public function testDeleteRemovesOnlyTheGivenIntegration(): void
@@ -181,7 +170,6 @@ final class IntegrationRepositoryTest extends TestCase
                 'form_id'  => ' 240000000000001 ',
                 'mode'     => 'custom',
                 'template' => 'contact',
-                'active'   => '1',
             ]
         );
 
@@ -229,7 +217,6 @@ final class IntegrationRepositoryTest extends TestCase
                 'form_id'  => ['240000000000001'],
                 'mode'     => ['auto'],
                 'template' => ['contact'],
-                'active'   => '1',
             ]
         );
 
@@ -253,13 +240,11 @@ final class IntegrationRepositoryTest extends TestCase
                 'slug'    => ['nested'],
                 'name'    => ['nested'],
                 'form_id' => ['nested'],
-                'active'  => true,
             ],
             'careers' => [
                 'slug'    => 'careers',
                 'name'    => 'Careers',
                 'form_id' => '240000000000002',
-                'active'  => true,
             ],
         ];
 
@@ -280,8 +265,7 @@ final class IntegrationRepositoryTest extends TestCase
             $name,
             '240000000000001',
             Integration::MODE_CUSTOM,
-            'contact',
-            true
+            'contact'
         );
     }
 
@@ -336,15 +320,18 @@ final class IntegrationRepositoryTest extends TestCase
         $this->assertNull($repository->get('newsletter'));
     }
 
-    public function testAToggleIsVisibleImmediately(): void
+    public function testAnEditIsVisibleImmediately(): void
     {
         $repository = new IntegrationRepository();
 
         $repository->save($this->integration('newsletter'));
         $repository->all();
 
-        $this->assertTrue($repository->setActive('newsletter', false));
-        $this->assertFalse($repository->get('newsletter')->isActive());
+        $this->assertSame(
+            [],
+            $repository->save($this->integration('newsletter', 'Newsletter'), 'newsletter')
+        );
+        $this->assertSame('Newsletter', $repository->get('newsletter')->name());
     }
 
     /**
@@ -358,8 +345,8 @@ final class IntegrationRepositoryTest extends TestCase
         $repository->save($this->integration('newsletter'));
 
         $first = $repository->get('newsletter');
-        $first->withActive(false);
+        $first->withSlug('changed');
 
-        $this->assertTrue($repository->get('newsletter')->isActive());
+        $this->assertSame('newsletter', $repository->get('newsletter')->slug());
     }
 }

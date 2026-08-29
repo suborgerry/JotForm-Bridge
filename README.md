@@ -152,7 +152,6 @@ slug  →  Jotform form  →  rendering mode  →  optional template
 | Success Action | `Show the success message` or `Redirect to a page` |
 | Redirect Page | Which published page the visitor is sent to (redirect action) |
 | Redirect Delay | Seconds to wait before leaving, `0`–`60` |
-| Active | Inactive integrations render nothing and refuse submissions |
 
 Several integrations may point at the same Jotform form. That is the point:
 `consultation`, `consultation-popup` and `consultation-footer` can share one
@@ -521,7 +520,7 @@ Answers:
 | --- | --- |
 | `200` | `{"success": true, "message": "…"}`, plus `"redirect": {"url": "…", "delay": 0}` when the integration redirects |
 | `422` | `{"success": false, "message": "Validation failed.", "errors": {"<field>": "…"}}` |
-| `403` | Integration inactive, or the spam check rejected the submission |
+| `403` | The spam check rejected the submission |
 | `404` | No such integration |
 | `413` | The request body is larger than 256 KB |
 | `429` | The identical submission was accepted moments ago |

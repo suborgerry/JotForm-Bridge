@@ -254,21 +254,6 @@ $jfbReport  = $compatibility['report'] instanceof CompatibilityReport ? $compati
                     </p>
                 </td>
             </tr>
-
-            <tr>
-                <th scope="row"><?php echo esc_html__('Active', 'jotform-bridge'); ?></th>
-                <td>
-                    <label>
-                        <input
-                            type="checkbox"
-                            name="jotform_integration[active]"
-                            value="1"
-                            <?php checked($integration->isActive()); ?>
-                        >
-                        <?php echo esc_html__('This integration can be rendered on the site', 'jotform-bridge'); ?>
-                    </label>
-                </td>
-            </tr>
         </table>
 
         <?php submit_button($isNew ? __('Create Integration', 'jotform-bridge') : __('Save Integration', 'jotform-bridge')); ?>
@@ -357,7 +342,6 @@ $jfbReport  = $compatibility['report'] instanceof CompatibilityReport ? $compati
             'quota'     => __('Stopped by the quota guard', 'jotform-bridge'),
             'no_schema' => __('No usable schema', 'jotform-bridge'),
             'upstream'  => __('Refused by Jotform', 'jotform-bridge'),
-            'inactive'  => __('Arrived while disabled', 'jotform-bridge'),
         ];
         ?>
 

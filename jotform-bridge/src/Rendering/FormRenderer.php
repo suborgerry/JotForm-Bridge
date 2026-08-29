@@ -70,13 +70,6 @@ final class FormRenderer
             );
         }
 
-        if (!$integration->isActive()) {
-            return $this->diagnostic(
-                $slug,
-                __('This integration is disabled.', 'jotform-bridge')
-            );
-        }
-
         $schema = $this->schema($integration);
 
         if ($schema === null) {

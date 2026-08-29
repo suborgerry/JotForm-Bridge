@@ -39,9 +39,6 @@ final class Stats
     /** No integration with that slug. */
     public const UNKNOWN = 'unknown';
 
-    /** The integration exists but is switched off. */
-    public const INACTIVE = 'inactive';
-
     /** Refused by the rate limit. */
     public const THROTTLED = 'throttled';
 
@@ -86,7 +83,6 @@ final class Stats
         self::QUOTA,
         self::NO_SCHEMA,
         self::UPSTREAM,
-        self::INACTIVE,
         self::UNKNOWN,
     ];
 

@@ -24,7 +24,6 @@ final class IntegrationRedirectTest extends TestCase
                 'name'    => 'Contact',
                 'form_id' => '240000000000001',
                 'mode'    => 'custom',
-                'active'  => true,
             ]
         );
 
@@ -42,7 +41,6 @@ final class IntegrationRedirectTest extends TestCase
             '240000000000001',
             Integration::MODE_CUSTOM,
             'contact',
-            true,
             0,
             0,
             Integration::SUCCESS_REDIRECT,

@@ -41,8 +41,6 @@ final class Integration
 
     private string $templateSlug;
 
-    private bool $active;
-
     private int $createdAt;
 
     private int $updatedAt;
@@ -64,7 +62,6 @@ final class Integration
         string $formId,
         string $mode,
         string $templateSlug,
-        bool $active,
         int $createdAt = 0,
         int $updatedAt = 0,
         string $successAction = self::SUCCESS_MESSAGE,
@@ -76,7 +73,6 @@ final class Integration
         $this->formId         = $formId;
         $this->mode           = self::isMode($mode) ? $mode : self::MODE_CUSTOM;
         $this->templateSlug   = $templateSlug;
-        $this->active         = $active;
         $this->createdAt      = $createdAt;
         $this->updatedAt      = $updatedAt;
         $this->successAction  = self::isSuccessAction($successAction) ? $successAction : self::SUCCESS_MESSAGE;
@@ -154,7 +150,6 @@ final class Integration
             $formId,
             $mode,
             $template,
-            !empty($input['active']),
             0,
             0,
             $successAction,
@@ -189,7 +184,6 @@ final class Integration
             self::scalar($data, 'form_id'),
             $mode !== '' ? $mode : self::MODE_CUSTOM,
             self::scalar($data, 'template'),
-            !empty($data['active']),
             isset($data['created_at']) && is_scalar($data['created_at']) ? (int) $data['created_at'] : 0,
             isset($data['updated_at']) && is_scalar($data['updated_at']) ? (int) $data['updated_at'] : 0,
             // Absent keys are the defaults: an integration stored by an earlier
@@ -211,7 +205,6 @@ final class Integration
             'form_id'          => $this->formId,
             'mode'             => $this->mode,
             'template'         => $this->templateSlug,
-            'active'           => $this->active,
             'created_at'       => $this->createdAt,
             'updated_at'       => $this->updatedAt,
             'success_action'   => $this->successAction,
@@ -284,11 +277,6 @@ final class Integration
         return $this->redirectDelay;
     }
 
-    public function isActive(): bool
-    {
-        return $this->active;
-    }
-
     public function createdAt(): int
     {
         return $this->createdAt;
@@ -303,14 +291,6 @@ final class Integration
     {
         $clone       = clone $this;
         $clone->slug = $slug;
-
-        return $clone;
-    }
-
-    public function withActive(bool $active): self
-    {
-        $clone         = clone $this;
-        $clone->active = $active;
 
         return $clone;
     }

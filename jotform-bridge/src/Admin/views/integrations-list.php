@@ -38,7 +38,6 @@ $jfbNewUrl = add_query_arg(['page' => $page, 'view' => 'new'], admin_url('admin.
             <tr>
                 <th scope="col"><?php echo esc_html__('Name', 'jotform-bridge'); ?></th>
                 <th scope="col"><?php echo esc_html__('Jotform Form', 'jotform-bridge'); ?></th>
-                <th scope="col"><?php echo esc_html__('Active', 'jotform-bridge'); ?></th>
                 <?php if ($showStats) : ?>
                     <th scope="col"><?php echo esc_html__('Last 7 days', 'jotform-bridge'); ?></th>
                 <?php endif; ?>
@@ -48,7 +47,7 @@ $jfbNewUrl = add_query_arg(['page' => $page, 'view' => 'new'], admin_url('admin.
         <tbody>
             <?php if ($rows === []) : ?>
                 <tr>
-                    <td colspan="<?php echo $showStats ? 5 : 4; ?>">
+                    <td colspan="<?php echo $showStats ? 4 : 3; ?>">
                         <?php echo esc_html__('No integrations yet. Add one to connect a Jotform form to a template.', 'jotform-bridge'); ?>
                     </td>
                 </tr>
@@ -84,20 +83,6 @@ $jfbNewUrl = add_query_arg(['page' => $page, 'view' => 'new'], admin_url('admin.
                                     <?php echo esc_html__('Sync schema', 'jotform-bridge'); ?>
                                 </button>
                             </form>
-                            |
-                            <form method="post" action="<?php echo esc_url(admin_url('admin-post.php')); ?>" style="display:inline;">
-                                <input type="hidden" name="action" value="<?php echo esc_attr(IntegrationsPage::ACTION_TOGGLE); ?>">
-                                <input type="hidden" name="integration" value="<?php echo esc_attr($jfbIntegration->slug()); ?>">
-                                <input type="hidden" name="active" value="<?php echo $jfbIntegration->isActive() ? '0' : '1'; ?>">
-                                <?php wp_nonce_field(IntegrationsPage::ACTION_TOGGLE); ?>
-                                <button type="submit" class="button-link">
-                                    <?php
-                                    echo $jfbIntegration->isActive()
-                                        ? esc_html__('Deactivate', 'jotform-bridge')
-                                        : esc_html__('Activate', 'jotform-bridge');
-                                    ?>
-                                </button>
-                            </form>
                         </div>
                     </td>
                     <td>
@@ -108,13 +93,6 @@ $jfbNewUrl = add_query_arg(['page' => $page, 'view' => 'new'], admin_url('admin.
                                 <?php echo esc_html__('Not in the stored form list', 'jotform-bridge'); ?>
                             </span>
                         <?php endif; ?>
-                    </td>
-                    <td>
-                        <?php
-                        echo $jfbIntegration->isActive()
-                            ? esc_html__('Yes', 'jotform-bridge')
-                            : esc_html__('No', 'jotform-bridge');
-                        ?>
                     </td>
                     <?php if ($showStats) : ?>
                     <td>

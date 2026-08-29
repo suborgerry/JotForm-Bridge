@@ -202,7 +202,7 @@ final class AutoRendererTest extends TestCase
 
     private function integration(): Integration
     {
-        return new Integration('contact', 'Contact', self::FORM_ID, Integration::MODE_AUTO, '', true);
+        return new Integration('contact', 'Contact', self::FORM_ID, Integration::MODE_AUTO, '');
     }
 
     private function schema(): FormSchema

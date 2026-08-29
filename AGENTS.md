@@ -250,7 +250,6 @@ Slug
 Jotform Form ID
 Rendering Mode
 Template Slug
-Active
 Success Action
 Redirect Page ID
 Redirect Delay
@@ -1045,7 +1044,6 @@ Frontend validation — только UX.
 Backend проверяет:
 
 * integration exists;
-* integration active;
 * schema available;
 * allowed fields;
 * required fields;
@@ -1392,7 +1390,6 @@ Slug
 Jotform Form
 Rendering Mode
 Template
-Active
 Success Action
 Redirect Page
 Redirect Delay

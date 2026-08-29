@@ -71,7 +71,7 @@ final class SubmissionPipelineTest extends TestCase
             }
         );
 
-        $this->storeIntegration(true);
+        $this->storeIntegration();
         $this->cacheSchema();
     }
 
@@ -84,35 +84,19 @@ final class SubmissionPipelineTest extends TestCase
         $this->assertSame([], $this->requests);
     }
 
-    public function testAnInactiveIntegrationIsRefused(): void
-    {
-        $this->storeIntegration(false);
-
-        $outcome = $this->pipeline()->submit('contact', $this->valid());
-
-        $this->assertSame(503, $outcome->status());
-        $this->assertSame([], $this->requests);
-    }
-
     /**
      * The endpoint must not be usable as a directory of the site's forms: every
-     * reason a form cannot take a submission — missing, disabled, unsynced,
-     * stopped by the quota guard — has to look the same from outside.
+     * reason a form cannot take a submission — missing, unsynced, stopped by
+     * the quota guard — has to look the same from outside.
      */
     public function testTheEndpointDoesNotRevealWhichSlugsExist(): void
     {
         $unknown = $this->pipeline()->submit('nope', $this->valid());
 
-        $this->storeIntegration(false);
-        $disabled = $this->pipeline()->submit('contact', $this->valid());
-
-        $this->storeIntegration(true);
         $this->dropSchema();
         $unsynced = $this->pipeline()->submit('contact', $this->valid());
 
-        $this->assertSame($unknown->status(), $disabled->status());
         $this->assertSame($unknown->status(), $unsynced->status());
-        $this->assertSame($unknown->body(), $disabled->body());
         $this->assertSame($unknown->body(), $unsynced->body());
     }
 
@@ -496,12 +480,6 @@ final class SubmissionPipelineTest extends TestCase
                     $test->dropSchema();
                 },
             ],
-            'disabled'   => [
-                Stats::INACTIVE,
-                static function (self $test): void {
-                    $test->storeIntegration(false);
-                },
-            ],
         ];
     }
 
@@ -736,7 +714,7 @@ final class SubmissionPipelineTest extends TestCase
     public function testAConfiguredRedirectIsResolvedIntoTheSuccessResponse(): void
     {
         $this->mockPost(200, ['responseCode' => 200, 'content' => ['submissionID' => '1']]);
-        $this->storeIntegration(true, ['success_action' => 'redirect', 'redirect_page_id' => 42, 'redirect_delay' => 3]);
+        $this->storeIntegration(['success_action' => 'redirect', 'redirect_page_id' => 42, 'redirect_delay' => 3]);
         $this->mockPage('publish', 'https://example.com/thanks/');
 
         $outcome = $this->pipeline()->submit('contact', $this->valid());
@@ -756,7 +734,7 @@ final class SubmissionPipelineTest extends TestCase
         string $permalink
     ): void {
         $this->mockPost(200, ['responseCode' => 200, 'content' => ['submissionID' => '1']]);
-        $this->storeIntegration(true, ['success_action' => 'redirect', 'redirect_page_id' => 42]);
+        $this->storeIntegration(['success_action' => 'redirect', 'redirect_page_id' => 42]);
         $this->mockPage($status, $permalink);
 
         $outcome = $this->pipeline()->submit('contact', $this->valid());
@@ -804,7 +782,7 @@ final class SubmissionPipelineTest extends TestCase
 
     public function testAValidationFailureNeverCarriesARedirect(): void
     {
-        $this->storeIntegration(true, ['success_action' => 'redirect', 'redirect_page_id' => 42]);
+        $this->storeIntegration(['success_action' => 'redirect', 'redirect_page_id' => 42]);
         $this->mockPage('publish', 'https://example.com/thanks/');
 
         $fields = $this->valid();
@@ -819,7 +797,7 @@ final class SubmissionPipelineTest extends TestCase
     public function testAnUpstreamErrorNeverCarriesARedirect(): void
     {
         $this->mockPost(500, ['responseCode' => 500, 'message' => 'boom']);
-        $this->storeIntegration(true, ['success_action' => 'redirect', 'redirect_page_id' => 42]);
+        $this->storeIntegration(['success_action' => 'redirect', 'redirect_page_id' => 42]);
         $this->mockPage('publish', 'https://example.com/thanks/');
 
         $outcome = $this->pipeline()->submit('contact', $this->valid());
@@ -835,7 +813,7 @@ final class SubmissionPipelineTest extends TestCase
     public function testABrokenRedirectTargetIsWrittenToTheDebugLog(): void
     {
         $this->mockPost(200, ['responseCode' => 200, 'content' => ['submissionID' => '1']]);
-        $this->storeIntegration(true, ['success_action' => 'redirect', 'redirect_page_id' => 42]);
+        $this->storeIntegration(['success_action' => 'redirect', 'redirect_page_id' => 42]);
         $this->mockPage('draft', 'https://example.com/thanks/');
 
         $this->options[Settings::OPTION] = ['debug_logging' => true];
@@ -971,7 +949,7 @@ final class SubmissionPipelineTest extends TestCase
     /**
      * @param array<string, mixed> $extra Redirect settings, when the test needs them.
      */
-    public function storeIntegration(bool $active, array $extra = []): void
+    public function storeIntegration(array $extra = []): void
     {
         $this->options[IntegrationRepository::OPTION] = [
             'contact' => array_merge(
@@ -981,7 +959,6 @@ final class SubmissionPipelineTest extends TestCase
                     'form_id'  => self::FORM_ID,
                     'mode'     => 'custom',
                     'template' => 'contact',
-                    'active'   => $active,
                 ],
                 $extra
             ),
