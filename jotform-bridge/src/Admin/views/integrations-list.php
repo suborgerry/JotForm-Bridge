@@ -37,7 +37,7 @@ $jfbNewUrl = add_query_arg(['page' => $page, 'view' => 'new'], admin_url('admin.
         <thead>
             <tr>
                 <th scope="col"><?php echo esc_html__('Name', 'jotform-bridge'); ?></th>
-                <th scope="col"><?php echo esc_html__('Slug', 'jotform-bridge'); ?></th>
+                <th scope="col"><?php echo esc_html__('Shortcode', 'jotform-bridge'); ?></th>
                 <th scope="col"><?php echo esc_html__('Jotform Form', 'jotform-bridge'); ?></th>
                 <th scope="col"><?php echo esc_html__('Active', 'jotform-bridge'); ?></th>
                 <?php if ($showStats) : ?>
@@ -100,7 +100,18 @@ $jfbNewUrl = add_query_arg(['page' => $page, 'view' => 'new'], admin_url('admin.
                             </form>
                         </div>
                     </td>
-                    <td><code><?php echo esc_html($jfbIntegration->slug()); ?></code></td>
+                    <?php $jfbShortcode = '[jotform_form id="' . $jfbIntegration->slug() . '"]'; ?>
+                    <td>
+                        <button
+                            type="button"
+                            class="button-link jfb-copy-shortcode"
+                            data-jfb-shortcode="<?php echo esc_attr($jfbShortcode); ?>"
+                            title="<?php echo esc_attr__('Copy to clipboard', 'jotform-bridge'); ?>"
+                        >
+                            <code><?php echo esc_html($jfbShortcode); ?></code>
+                            <span class="jfb-copied"><?php echo esc_html__('Copied', 'jotform-bridge'); ?></span>
+                        </button>
+                    </td>
                     <td>
                         <?php if ($jfbRow['form_title'] !== '') : ?>
                             <?php echo esc_html($jfbRow['form_title']); ?>
@@ -268,4 +279,98 @@ $jfbNewUrl = add_query_arg(['page' => $page, 'view' => 'new'], admin_url('admin.
             <?php endforeach; ?>
         </ul>
     <?php endif; ?>
+
+    <style>
+        /* The cell still has to read as the identifier it is, so the button keeps
+           the plain <code> look and only gains a pointer and the copied marker. */
+        .jfb-integrations .jfb-copy-shortcode {
+            padding: 0;
+            border: 0;
+            background: none;
+            cursor: pointer;
+            text-decoration: none;
+        }
+
+        .jfb-integrations .jfb-copy-shortcode code {
+            cursor: pointer;
+        }
+
+        .jfb-integrations .jfb-copy-shortcode .jfb-copied {
+            display: none;
+            margin-left: .5em;
+            color: #007017;
+        }
+
+        .jfb-integrations .jfb-copy-shortcode.is-copied .jfb-copied {
+            display: inline;
+        }
+    </style>
+
+    <script>
+        /* Click-to-copy for the shortcode column. With JavaScript off, or on a
+           context where the clipboard is not available, the cell is still the
+           shortcode in plain text and can be selected by hand. */
+        (function () {
+            var buttons = document.querySelectorAll('.jfb-copy-shortcode');
+            var timers = [];
+
+            function fallbackCopy(text) {
+                var field = document.createElement('textarea');
+
+                field.value = text;
+                field.setAttribute('readonly', 'readonly');
+                field.style.position = 'fixed';
+                field.style.opacity = '0';
+                document.body.appendChild(field);
+                field.select();
+
+                var done = false;
+
+                try {
+                    done = document.execCommand('copy');
+                } catch (error) {
+                    done = false;
+                }
+
+                document.body.removeChild(field);
+
+                return done;
+            }
+
+            function confirmCopy(button, index) {
+                button.classList.add('is-copied');
+                window.clearTimeout(timers[index]);
+                timers[index] = window.setTimeout(function () {
+                    button.classList.remove('is-copied');
+                }, 1500);
+            }
+
+            for (var i = 0; i < buttons.length; i++) {
+                (function (button, index) {
+                    button.addEventListener('click', function () {
+                        var text = button.getAttribute('data-jfb-shortcode') || '';
+
+                        if (navigator.clipboard && window.isSecureContext) {
+                            navigator.clipboard.writeText(text).then(
+                                function () {
+                                    confirmCopy(button, index);
+                                },
+                                function () {
+                                    if (fallbackCopy(text)) {
+                                        confirmCopy(button, index);
+                                    }
+                                }
+                            );
+
+                            return;
+                        }
+
+                        if (fallbackCopy(text)) {
+                            confirmCopy(button, index);
+                        }
+                    });
+                })(buttons[i], i);
+            }
+        })();
+    </script>
 </div>
