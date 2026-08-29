@@ -857,20 +857,12 @@ msgstr ""
 msgid "Log Jotform API failures to the PHP error log"
 msgstr ""
 
-#: src/Admin/views/settings-page.php:241
-msgid "Technical metadata only. The API key is never logged."
-msgstr ""
-
 #: src/Admin/views/settings-page.php:247
 msgid "Uninstall"
 msgstr ""
 
 #: src/Admin/views/settings-page.php:257
 msgid "Delete the integrations and the settings when the plugin is deleted"
-msgstr ""
-
-#: src/Admin/views/settings-page.php:265
-msgid "Off by default: deleting the plugin removes only the derived data — synced schemas, the form list, the template registry — so deactivating and reinstalling keeps your integrations."
 msgstr ""
 
 #: src/Admin/views/settings-page.php:275

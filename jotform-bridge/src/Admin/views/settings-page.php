@@ -226,9 +226,6 @@ if (!$jfbHasKey) {
                         >
                         <?php echo esc_html__('Log Jotform API failures to the PHP error log', 'jotform-bridge'); ?>
                     </label>
-                    <p class="description">
-                        <?php echo esc_html__('Technical metadata only. The API key is never logged.', 'jotform-bridge'); ?>
-                    </p>
                 </td>
             </tr>
 
@@ -249,14 +246,6 @@ if (!$jfbHasKey) {
                         );
                         ?>
                     </label>
-                    <p class="description">
-                        <?php
-                        echo esc_html__(
-                            'Off by default: deleting the plugin removes only the derived data — synced schemas, the form list, the template registry — so deactivating and reinstalling keeps your integrations.',
-                            'jotform-bridge'
-                        );
-                        ?>
-                    </p>
                 </td>
             </tr>
         </table>
