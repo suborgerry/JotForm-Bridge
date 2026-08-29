@@ -412,8 +412,11 @@ msgstr ""
 
 #: src/Admin/views/integration-edit.php:302
 #: src/Admin/views/integrations-list.php:51
-#: src/Admin/views/settings-page.php:278
 msgid "Actions"
+msgstr ""
+
+#: src/Admin/views/settings-page.php:278
+msgid "Sync & Connection"
 msgstr ""
 
 #: src/Admin/views/integration-edit.php:311

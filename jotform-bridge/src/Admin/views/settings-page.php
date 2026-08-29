@@ -228,7 +228,7 @@ if (!$jfbHasKey) {
         })();
     </script>
 
-    <h2><?php echo esc_html__('Actions', 'jotform-bridge'); ?></h2>
+    <h2><?php echo esc_html__('Sync & Connection', 'jotform-bridge'); ?></h2>
     <p>
         <?php
         if (!$jfbHasKey) {
