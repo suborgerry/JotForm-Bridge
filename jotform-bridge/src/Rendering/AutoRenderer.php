@@ -108,11 +108,35 @@ final class AutoRenderer
              * Filters the markup of one automatically rendered field.
              *
              * The intended use is adding a wrapper or a description without
-             * taking over the whole form; the returned string is printed as is,
-             * so a callback that builds markup is responsible for escaping it.
+             * taking over the whole form. The returned string is printed as is,
+             * which makes this the one place where the plugin hands the output
+             * over to somebody else's code.
+             *
+             * `$html` is finished, escaped markup. `$field` is not: it is the
+             * normalized schema entry, and its `label` and `options[*].label`
+             * are text as Jotform reports it, which may legitimately contain a
+             * quote or an angle bracket. Anything taken out of `$field` and put
+             * into markup has to be escaped by the callback:
+             *
+             *     add_filter(
+             *         'jotform_bridge_auto_field_html',
+             *         static function (string $html, array $field): string {
+             *             return '<div class="col">' . $html
+             *                 . '<p>' . esc_html($field['label']) . '</p></div>';
+             *         },
+             *         10,
+             *         2
+             *     );
+             *
+             * The values in `$field` are deliberately left raw, because every
+             * other consumer escapes them at the moment it prints them — see
+             * `Templates\TemplateScaffold::text()`, which does the same job for
+             * the generated starter template. Escaping them here instead would
+             * mean the same array key held escaped text in one context and raw
+             * text in every other.
              *
              * @param string               $html        Escaped field markup.
-             * @param array<string, mixed> $field       Normalized field.
+             * @param array<string, mixed> $field       Normalized field; its text is raw.
              * @param string               $integration Integration slug.
              */
             $parts[] = (string) apply_filters(self::FILTER_FIELD_HTML, $html, $field, $slug);

@@ -602,6 +602,25 @@ always cancel. See [Success redirect](#success-redirect).
 | `jotform_bridge_before_submit` | action | A validated submission is about to be sent |
 | `jotform_bridge_after_submit` | action | Jotform accepted a submission |
 
+`jotform_bridge_auto_field_html` is the one hook whose return value is printed
+as raw markup, so a note about it: the `$html` it receives is finished, escaped
+output, but the `$field` array beside it is not. Its `label` and
+`options[*].label` are text exactly as Jotform reports it, and Jotform allows a
+quote or an angle bracket in a field name. Escape anything you take out of
+`$field`:
+
+```php
+add_filter(
+    'jotform_bridge_auto_field_html',
+    static function (string $html, array $field): string {
+        return '<div class="col">' . $html
+            . '<p>' . esc_html($field['label']) . '</p></div>';
+    },
+    10,
+    2
+);
+```
+
 ---
 
 ## Spam protection
