@@ -576,3 +576,53 @@ a note; the point is to know which is which.
 it, or write down why it stays, or delete the machinery. A finding that ends in
 none of the three has not been resolved, only visited.
 
+---
+
+## 17. Consider storing only the forms actually used, fetched by ID
+
+**The idea.** Instead of pulling the whole account form list and keeping it,
+keep a record only for the forms integrations actually reference, resolved one
+at a time by ID.
+
+**Why it is worth considering.** The account list is the largest thing the
+plugin stores and the least of it is used. A site with three integrations keeps
+every form on the account — a shared agency account can be hundreds — and reads
+that option on every admin screen that shows a form title. It also brings its own
+problems along:
+
+* the pagination defect in item 16: `limit=1000` with no paging, so a large
+  account is silently truncated and the missing forms never reach the select;
+* `jotform_bridge_forms_hidden` and the whole **Remove from list** action exist
+  only because the stored list carries forms nobody wants to see. Under a
+  by-ID model that feature has nothing left to do;
+* a form renamed in Jotform shows its old title until somebody presses Sync, and
+  the list is refreshed as a whole or not at all.
+
+Fetching one form by ID is already supported by the API the plugin uses —
+`GET /form/{formID}` returns the title and status, alongside the
+`/form/{formID}/questions` call the schema sync already makes.
+
+**The tension to resolve first, before any implementation.** A list is what
+makes it possible to *choose* a form without typing an ID, and not typing an ID
+was a deliberate decision in stage 3. Fetching only what you need means knowing
+what you need. Three shapes, and the choice between them is the actual design
+question:
+
+1. **Keep the list for discovery, store only what is used.** The editor fetches
+   the list to populate the select and does not persist it; a chosen form gets
+   its own stored record. Fixes the storage and the truncation for forms that
+   matter, but puts an API call back on the editor screen — which is the thing
+   the manual-sync amendment was written to avoid.
+2. **Paste an ID or a Jotform form URL, resolve it once.** No account list at
+   all. The smallest storage, no truncation, no hidden-forms feature — and the
+   worst first-run experience, since the site owner has to go and find the ID.
+3. **A searchable, paged picker.** Best at scale, most work, and it needs the
+   paging that item 16 says is missing anyway.
+
+**Also to settle.** Sync with Jotform currently does double duty — it checks the
+API key with `GET /user` and records the account name. If the account list stops
+being the reason to press it, that check needs a home.
+
+**Implementation to be agreed separately.** This entry records the idea and the
+constraints, not a decision.
+
