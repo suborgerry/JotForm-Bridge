@@ -1,84 +1,87 @@
 # AGENTS.md — Jotform Bridge
 
-> **Статус.** Семь этапов из `prompts/` реализованы; эти файлы — история, а не
-> задания, и заново их выполнять не нужно. Спека описывает то, что уже есть.
-> Разделы в конце документа, начинающиеся с `Amendment:`, **отменяют** более
-> ранние требования и имеют приоритет над ними — читать их обязательно.
+> **Status.** The seven stages in `prompts/` are implemented; those files are
+> history rather than assignments, and are not to be carried out again. This
+> specification describes what already exists. The sections at the end of the
+> document beginning with `Amendment:` **overturn** earlier requirements and
+> take precedence over them — reading them is not optional.
 >
-> **Язык.** Спека, промпты и обсуждение — по-русски. Код, комментарии,
-> commit-сообщения, `README.md`, `TODO.md` и `readme.txt` — по-английски. Все
-> пользовательские строки проходят через `__()` с доменом `jotform-bridge` и
-> пишутся по-английски: перевод — задача `.po`, а не исходника.
+> **Language.** Everything written down here is in English: this specification,
+> the prompts, the code, the comments, the commit messages, `README.md`,
+> `TODO.md` and `readme.txt`. Every user-facing string goes through `__()` with
+> the `jotform-bridge` text domain and is written in English — translation is
+> the job of a `.po` file, not of the source.
 
-## Проект
+## The project
 
-Разрабатываем standalone WordPress-плагин:
+We are building a standalone WordPress plugin:
 
 **Jotform Bridge**
 
-Назначение плагина — использовать Jotform как headless backend для WordPress-форм.
+Its purpose is to use Jotform as a headless backend for WordPress forms.
 
-Jotform отвечает за:
+Jotform is responsible for:
 
-* структуру форм;
+* form structure;
 * submissions;
 * email notifications;
 * integrations;
-* хранение данных.
+* storing the data.
 
-WordPress отвечает за:
+WordPress is responsible for:
 
-* frontend HTML;
+* the frontend HTML;
 * custom templates;
 * UX;
-* отправку данных через собственный REST endpoint;
+* sending the data through its own REST endpoint;
 * server-side validation;
-* mapping данных в Jotform.
+* mapping the data into Jotform.
 
-Основной сценарий — полностью кастомная HTML-разметка формы.
+The main scenario is completely custom HTML markup for the form.
 
-В дальнейшем также поддерживается автоматическая генерация формы из Jotform schema.
+Generating a form automatically from the Jotform schema is also supported.
 
 ---
 
-# Минимальные системные требования
+# Minimum requirements
 
-Поддерживаем:
+Supported:
 
 * WordPress >= 6.4
 * PHP >= 8.0
 
-Plugin header должен содержать:
+The plugin header must contain:
 
 ```text
 Requires at least: 6.4
 Requires PHP: 8.0
 ```
 
-Не использовать PHP features, появившиеся после PHP 8.0, если они делают PHP 8.0 несовместимым.
+Do not use PHP features introduced after PHP 8.0 where they would break
+compatibility with PHP 8.0.
 
-Например, не делать обязательными:
+In particular, do not require:
 
 * enums;
 * readonly properties;
 * intersection types;
 * PHP 8.1+ syntax.
 
-Можно использовать возможности PHP 8.0:
+PHP 8.0 features are available:
 
 * typed properties;
 * union types;
 * constructor property promotion;
 * match;
-* nullsafe operator.
+* the nullsafe operator.
 
 ---
 
-# Универсальность
+# Standalone
 
-Плагин должен быть полностью standalone.
+The plugin must be completely standalone.
 
-Он НЕ должен зависеть от:
+It must NOT depend on:
 
 * Sage;
 * Blade;
@@ -91,106 +94,111 @@ Requires PHP: 8.0
 * React;
 * Vue;
 * Laravel;
-* конкретной WordPress-темы;
-* конкретного сайта;
-* Node.js в production;
-* frontend build system сайта.
+* any particular WordPress theme;
+* any particular site;
+* Node.js in production;
+* the site's frontend build system.
 
-Sage и Blade в текущей версии вообще не поддерживаем и не учитываем.
+Sage and Blade are not supported and not taken into account in this version.
 
-Custom templates версии 1 — обычные PHP templates.
+Version 1 custom templates are plain PHP templates.
 
 ---
 
 # Composer
 
-Composer разрешен для разработки и PSR-4 autoloading.
+Composer is allowed for development and for PSR-4 autoloading.
 
-Однако конечный plugin package должен работать после обычной установки WordPress-плагина.
-
-Пользователь не должен выполнять:
+The final plugin package, however, must work after an ordinary WordPress plugin
+installation. The user must not have to run:
 
 ```bash
 composer install
 ```
 
-после установки ZIP.
+after installing the ZIP.
 
-Если используется Composer autoload, production package должен содержать необходимые runtime autoload files.
+If Composer autoloading is used, the production package has to contain the
+runtime autoload files it needs.
 
-Не добавлять сторонние Composer dependencies без реальной необходимости.
-
-Предпочитать WordPress Core API.
+Do not add third-party Composer dependencies without a real need. Prefer the
+WordPress Core API.
 
 ---
 
-# Структура репозитория
+# Repository layout
 
-Код плагина живет в отдельном каталоге в корне репозитория:
+The plugin code lives in its own directory at the repository root:
 
 ```text
 jotform-bridge/
 ```
 
-Все остальное в корне — dev-обвязка, которая в релиз не попадает.
+Everything else at the root is development scaffolding and never ships.
 
-Ориентировочная структура:
+Roughly:
 
 ```text
 .
 ├── AGENTS.md
+├── CLAUDE.md              # imports AGENTS.md; not a second copy
 ├── README.md
 ├── prompts/
-├── composer.json          # dev-зависимости и PSR-4 autoload
+├── composer.json          # dev dependencies and PSR-4 autoload
 ├── phpunit.xml.dist
 ├── tests/
 │   ├── Unit/
 │   └── Fixtures/
-└── jotform-bridge/        # ← это и есть плагин
-    ├── jotform-bridge.php # main plugin file с header
-    ├── uninstall.php      # если нужен
+└── jotform-bridge/        # ← this is the plugin
+    ├── jotform-bridge.php # main plugin file with the header
+    ├── uninstall.php
     ├── src/
     ├── assets/
-    │   └── frontend.js
+    │   ├── frontend.js
+    │   ├── admin.js
+    │   └── admin.css
     ├── languages/
-    ├── readme.txt         # WordPress.org style, этап 6
-    └── vendor/            # только production autoload, если используется
+    ├── readme.txt         # WordPress.org style, stage 6
+    └── vendor/            # production autoload only, if used at all
 ```
 
-Правила:
+Rules:
 
-* main plugin file называется `jotform-bridge.php`;
+* the main plugin file is named `jotform-bridge.php`;
 * plugin slug: `jotform-bridge`;
 * text domain: `jotform-bridge`;
 * namespace root: `JotformBridge\`;
-* PSR-4 маппинг: `JotformBridge\` → `jotform-bridge/src/`;
-* префикс для options/transients/hooks: `jotform_bridge_`;
-* префикс для CSS-классов: `jfb-`.
+* PSR-4 mapping: `JotformBridge\` → `jotform-bridge/src/`;
+* prefix for options, transients and hooks: `jotform_bridge_`;
+* prefix for CSS classes: `jfb-`.
 
-Не размещать PHP-код плагина в корне репозитория.
+Do not put plugin PHP code at the repository root.
 
-Не размещать тесты и fixtures внутри `jotform-bridge/`.
+Do not put tests or fixtures inside `jotform-bridge/`.
 
 ---
 
-# Упаковка релиза
+# Building a release
 
-Релизный ZIP — это содержимое каталога `jotform-bridge/` и ничего больше.
+The release ZIP is the contents of the `jotform-bridge/` directory and nothing
+else.
 
-В ZIP не должно попадать:
+The ZIP must not contain:
 
 ```text
 AGENTS.md
+CLAUDE.md
 prompts/
 tests/
 composer.json
 phpunit.xml.dist
 .codex/
+.claude/
 node_modules/
-dev-зависимости внутри vendor/
+dev dependencies inside vendor/
 ```
 
-После распаковки в `wp-content/plugins/` плагин обязан работать без:
+Unpacked into `wp-content/plugins/`, the plugin has to work without:
 
 ```bash
 composer install
@@ -198,35 +206,36 @@ npm install
 npm run build
 ```
 
-Если для autoload используется Composer, в `jotform-bridge/vendor/` должен лежать
-production autoloader, сгенерированный с `--no-dev`.
+If Composer is used for autoloading, `jotform-bridge/vendor/` must hold a
+production autoloader generated with `--no-dev`.
 
-Если сторонних runtime-зависимостей нет — предпочтительнее собственный простой
-PSR-4 autoloader внутри `src/`, без каталога `vendor/` в релизе вообще.
+If there are no third-party runtime dependencies, a small PSR-4 autoloader of
+our own inside `src/` is preferable, with no `vendor/` directory in the release
+at all.
 
 ---
 
 # Git workflow
 
-Один этап — один осмысленный набор коммитов.
+One stage is one coherent set of commits.
 
-* работать в ветке вида `stage-1-plugin-core`, `stage-2-schema-engine` и т. д.;
-* не коммитить в `main` напрямую;
-* не коммитить секреты, `vendor/` dev-зависимостей, локальные WordPress-файлы;
-* в конце этапа сделать коммит с внятным описанием того, что реализовано;
-* не делать merge/push и не открывать PR без явной просьбы пользователя.
+* work in a branch such as `stage-1-plugin-core`, `stage-2-schema-engine`;
+* do not commit to `main` directly;
+* do not commit secrets, dev dependencies in `vendor/`, or local WordPress files;
+* commit at logical stages, with a message that says what was implemented and why;
+* do not merge, push or open a pull request without being asked to.
 
 ---
 
-# Основная архитектурная идея
+# The central architectural idea
 
-Не привязывать frontend к Jotform Form ID или Question ID.
+Do not tie the frontend to a Jotform Form ID or Question ID.
 
-Публичный код работает через локальную сущность:
+Public code works through a local entity:
 
 **Integration**
 
-Например:
+For example:
 
 ```text
 contact
@@ -234,7 +243,7 @@ consultation
 career
 ```
 
-Integration связывает:
+An Integration binds together:
 
 ```text
 local slug
@@ -246,13 +255,13 @@ rendering mode
 optional custom template
 ```
 
-Theme code не должен содержать Jotform Form ID.
+Theme code must never contain a Jotform Form ID.
 
 ---
 
 # Integration
 
-Integration должна иметь минимум следующие данные:
+An Integration holds at least:
 
 ```text
 Name
@@ -272,11 +281,11 @@ message
 redirect
 ```
 
-`message` — поведение по умолчанию: показать success message в слоте template.
+`message` is the default: show the success message in the template's slot.
 
-`redirect` — после успешного submission выполнить redirect на выбранную страницу.
+`redirect` sends the visitor to the chosen page after a successful submission.
 
-Redirect target выбирается отдельно для каждой Integration.
+The redirect target is chosen per Integration.
 
 Rendering modes:
 
@@ -285,9 +294,7 @@ custom
 auto
 ```
 
-Одна Jotform Form может использоваться несколькими integrations.
-
-Например:
+One Jotform Form may be used by several integrations. For example:
 
 ```text
 Jotform Form:
@@ -298,193 +305,184 @@ consultation
 consultation-popup
 consultation-footer
 ```
-
-Это намеренное требование.
+That is a deliberate requirement.
 
 ---
 
-# Хранение данных
+# Storing data
 
-Не создавать custom database tables без необходимости.
+Do not create custom database tables without a need.
 
-Использовать WordPress options.
-
-Предпочтительно разделить:
+Use WordPress options. Preferably split as:
 
 ```text
 jotform_bridge_settings
 jotform_bridge_integrations
 ```
 
-или аналогичные namespaced options.
+or similarly namespaced options.
 
-Все данные:
+All data is:
 
-* sanitize при сохранении;
-* validate перед использованием.
+* sanitized when saved;
+* validated before use.
 
 ---
 
-# Jotform API
+# The Jotform API
 
-Создать отдельный:
+There is a dedicated:
 
 ```text
 JotformClient
 ```
 
-Он является единственным низкоуровневым слоем взаимодействия с Jotform REST API.
+It is the only low-level layer that talks to the Jotform REST API. No other part
+of the plugin builds HTTP requests to Jotform of its own.
 
-Другие части приложения не должны самостоятельно строить произвольные HTTP-запросы к Jotform.
-
-Использовать:
+Use:
 
 ```php
 wp_remote_get()
 wp_remote_post()
 ```
 
-или соответствующие функции WordPress HTTP API.
+or the corresponding WordPress HTTP API functions. Do not use cURL directly
+without an objective reason.
 
-Не использовать прямой cURL без объективной причины.
-
-JotformClient должен обрабатывать:
+JotformClient has to handle:
 
 * WP_Error;
-* timeout;
-* non-2xx response;
-* malformed response;
-* API error;
-* unavailable service.
+* timeouts;
+* non-2xx responses;
+* malformed responses;
+* API-level errors;
+* an unavailable service.
 
-Не молчать при ошибках.
+Never fail silently.
 
 ---
 
 # Jotform API documentation
 
-Не угадывать формат Jotform REST API.
+Do not guess the shape of the Jotform REST API.
 
-Перед реализацией конкретного API interaction проверить актуальную официальную документацию Jotform.
-
-Особенно важно проверить:
+Before implementing a particular API interaction, check the current official
+Jotform documentation. This matters most for:
 
 * authentication;
-* получение forms;
-* получение questions;
-* submission endpoint;
-* submission payload;
+* fetching forms;
+* fetching questions;
+* the submission endpoint;
+* the submission payload;
 * composite fields;
-* checkbox/radio/select formats.
+* checkbox, radio and select formats.
 
-Jotform MCP НЕ является заменой REST API documentation.
-
-Production plugin использует Jotform REST API.
+The Jotform MCP server is NOT a substitute for the REST API documentation. The
+production plugin uses the Jotform REST API.
 
 ---
 
-# API Key
+# The API key
 
-Jotform API key никогда не должен попадать на frontend и никогда не должен
-попадать в базу данных.
+The Jotform API key must never reach the frontend and must never reach the
+database.
 
-Единственный источник — constant в `wp-config.php`:
+Its only source is a constant in `wp-config.php`:
 
 ```php
 define('JOTFORM_API_KEY', '...');
 ```
 
-WordPress option как источник ключа не используется: в Admin нет поля для
-ввода ключа, `save()` ключ не пишет, а ключ, оставшийся в option от более ранней
-версии, удаляется при upgrade/activation и никогда не читается.
+A WordPress option is not a key source: the admin has no field for entering one,
+`save()` never writes one, and a key left in the option by an earlier version is
+deleted on upgrade or activation and never read.
 
-Если constant не определена:
+If the constant is not defined:
 
-* API-вызовы не выполняются;
-* на screens плагина и в списке плагинов показывается admin notice на английском
-  с той строкой, которую нужно добавить в `wp-config.php`;
-* на settings screen строка API Key показывает ту же инструкцию.
+* no API calls are made;
+* an admin notice on the plugin's screens and on the plugin list gives the exact
+  line to add to `wp-config.php`;
+* the API Key row on the settings screen carries the same instruction.
 
-API key:
+The API key:
 
-* никогда не выводить полностью обратно (только последние 4 символа);
-* не добавлять в frontend HTML;
-* не добавлять в JavaScript;
-* не возвращать через REST API;
-* не писать в debug logs.
+* is never printed back in full — the last four characters at most;
+* never appears in frontend HTML;
+* never appears in JavaScript;
+* is never returned through the REST API;
+* is never written to the debug log.
 
 ---
 
-# Секреты и тестовое окружение
+# Secrets and the test environment
 
-## Где брать credentials
+## Where credentials come from
 
-Агент **не** хранит и **не** запрашивает API key в переписке.
+The agent does **not** store and does **not** ask for an API key in
+conversation.
 
-Порядок:
+In order:
 
-1. локальный `.env` в корне репозитория (в `.gitignore`, в репозиторий не попадает);
-2. переменная окружения `JOTFORM_API_KEY`;
-3. если ни того, ни другого нет — не выдумывать ключ и не просить его прислать
-   сообщением, а выполнить проверки на fixtures/mocks и явно написать в отчете,
-   что live connection не проверялось.
+1. a local `.env` at the repository root (git-ignored, never committed);
+2. the `JOTFORM_API_KEY` environment variable;
+3. if neither exists — do not invent a key and do not ask for one to be pasted
+   into a message. Run the checks against fixtures and mocks instead, and state
+   plainly in the report that the live connection was not exercised.
 
-Шаблон `.env.example` (без значений) держать в репозитории.
+An `.env.example` template, with no values in it, stays in the repository.
 
-Никогда не записывать реальный ключ в:
+Never write a real key into:
 
 * `AGENTS.md`;
 * `README.md`;
 * `prompts/`;
-* тесты и fixtures;
-* любой коммит.
+* tests and fixtures;
+* any commit.
 
-## Тестовая Jotform form
+## The test Jotform form
 
 ```text
-Test form ID:      262215084646053  (форма "Test API")
-Разрешение на live write: <не выдано>
+Test form ID:            262215084646053  (the "Test API" form)
+Permission for live writes: <not granted>
 ```
 
-Ключ и test form ID лежат в локальном `.env` (в репозиторий не попадают).
-Аккаунт находится в EU-регионе: `api.jotform.com` отвечает `responseCode 301`
-с указанием использовать `eu-api.jotform.com`, поэтому в настройках плагина
-для локальных проверок выбирается регион EU.
+The key and the test form ID live in the local `.env` and are not committed.
+The account is in the EU region: `api.jotform.com` answers `responseCode 301`
+telling us to use `eu-api.jotform.com`, so local checks select the EU region in
+the plugin settings.
 
-Live write по-прежнему не разрешен. Пока разрешение не выдано, действует
-безопасный режим:
+Live writes are still not permitted. Until permission is granted, the safe mode
+applies:
 
-* read-only обращения к Jotform допустимы;
-* **никаких** submissions в реальный аккаунт;
-* никаких изменений и удалений форм;
-* end-to-end проверка выполняется до upstream boundary с mock-ом Jotform API;
-* в отчете этапа явно указывается, что live upstream write не выполнялся.
+* read-only calls to Jotform are allowed;
+* **no** submissions into the real account;
+* no changes to forms and no deletions;
+* end-to-end checks run up to the upstream boundary with the Jotform API mocked;
+* the stage report says explicitly that no live upstream write was performed.
 
-Этапы 4, 5 и 6 упоминают live submission как условную возможность. Условие
-считается невыполненным, пока в этом блоке рядом с test form ID не появится
-явное разрешение на live write.
+Stages 4, 5 and 6 mention a live submission as a conditional possibility. The
+condition counts as unmet until an explicit permission for live writes appears
+in this block next to the test form ID.
 
-Production-форму не использовать ни при каких обстоятельствах.
+The production form is not to be used under any circumstances.
 
 ---
 
 # Jotform region
 
-Все API URL должны формироваться централизованно.
+Every API URL is built in one place. Do not hardcode the API base URL in several
+classes.
 
-Не hardcode API base URL в разных классах.
-
-Поддержать настройку региона/base URL через JotformClient configuration.
-
-Архитектура должна позволять поддерживать Standard/EU и другие Jotform environments.
+The region and base URL are part of the JotformClient configuration, and the
+design has to allow Standard, EU and other Jotform environments.
 
 ---
 
 # Schema
 
-Jotform question schema нельзя использовать непосредственно во frontend.
-
-Нужен слой:
+The Jotform question schema cannot be used directly in the frontend. There is a
+layer in between:
 
 ```text
 Jotform Questions
@@ -494,29 +492,25 @@ FieldNormalizer
 Normalized Schema
 ```
 
-Normalized Schema является внутренним контрактом приложения.
+The Normalized Schema is the internal contract of the application.
 
 ---
 
 # Semantic fields
 
-Custom template не должен знать Jotform qid.
-
-Нельзя требовать:
+A custom template must not know a Jotform qid. This must not be required:
 
 ```html
 <input name="q7">
 ```
 
-или:
+nor this:
 
 ```html
 <input data-jotform-field="7">
 ```
 
-Использовать semantic identifiers.
-
-Например:
+Use semantic identifiers instead:
 
 ```html
 <input data-jotform-field="email">
@@ -540,51 +534,47 @@ Address:
 <input data-jotform-field="address.country">
 ```
 
-**Зафиксировано на Этапе 2** из Jotform API, а не придумано:
+**Established in stage 2** from the Jotform API rather than invented:
 
-* Full Name — ключи `sublabels`: `prefix`, `first`, `middle`, `last`, `suffix`;
-  `first` и `last` есть всегда, остальные — только при `prefix|middle|suffix = Yes`.
-* Address — answer/prefill-ключи `addr_line1`, `addr_line2`, `city`, `state`,
-  `postal`, `country`; какие из них присутствуют, определяет свойство `subfields`
-  (токены `st1|st2|city|state|zip|country`).
+* Full Name — `sublabels` keys `prefix`, `first`, `middle`, `last`, `suffix`;
+  `first` and `last` are always present, the rest only when
+  `prefix|middle|suffix = Yes`.
+* Address — answer/prefill keys `addr_line1`, `addr_line2`, `city`, `state`,
+  `postal`, `country`; which of them are present is decided by the `subfields`
+  property (tokens `st1|st2|city|state|zip|country`).
 
-Родительская часть пути — это semantic key самого поля (из Jotform `name`),
-поэтому `address` в примерах выше — иллюстрация, а не фиксированное имя.
+The parent part of the path is the semantic key of the field itself (from the
+Jotform `name`), so `address` in the examples above is an illustration, not a
+fixed name.
 
-Не подгонять нормализацию под примеры из документации проекта.
+Do not bend the normalization to fit the examples in this project's own
+documentation.
 
-Разработчик template не должен знать внутренние Jotform Question IDs.
+A template developer must not need to know internal Jotform Question IDs.
 
 ---
 
 # Semantic key generation
 
-Использовать наиболее стабильный machine-readable identifier, предоставляемый Jotform schema.
+Use the most stable machine-readable identifier the Jotform schema provides. Do
+not rely on the visible label alone: labels change, repeat, contain spaces and
+contain special characters.
 
-Не полагаться только на visible label.
+The raw Jotform qid is kept inside the normalized schema as the authoritative
+mapping.
 
-Labels могут:
+If a semantic key collision cannot be resolved unambiguously:
 
-* изменяться;
-* повторяться;
-* содержать пробелы;
-* содержать special characters.
-
-Raw Jotform qid должен сохраняться внутри normalized schema как authoritative mapping.
-
-Если semantic key collision невозможно разрешить однозначно:
-
-* не угадывать;
-* пометить schema как problematic;
-* показать понятную ошибку administrator.
+* do not guess;
+* mark the schema as problematic;
+* show the administrator a comprehensible error.
 
 ---
 
 # FieldNormalizer
 
-FieldNormalizer преобразует Jotform-specific data во внутренний формат.
-
-Концептуальный пример:
+FieldNormalizer converts Jotform-specific data into the internal format.
+Conceptually:
 
 ```php
 [
@@ -610,7 +600,7 @@ Composite:
 ]
 ```
 
-Поддерживаемые основные типы:
+The main supported types:
 
 * textbox;
 * textarea;
@@ -622,27 +612,26 @@ Composite:
 * radio;
 * checkbox;
 * number;
-* date, если возможно без неправильных предположений.
+* date, where it is possible without wrong assumptions.
 
 Unsupported fields:
 
-* не должны silently corrupt data;
-* должны отмечаться как unsupported;
-* должны быть видны administrator.
+* must not silently corrupt data;
+* must be marked as unsupported;
+* must be visible to the administrator.
 
 ---
 
-# Custom Templates
+# Custom templates
 
-Custom templates располагаются в активной WordPress theme.
+Custom templates live in the active WordPress theme.
 
-Базовый каталог:
-
+The base directory:
 ```text
 /jotform-bridge-templates/
 ```
 
-Пример:
+For example:
 
 ```text
 wp-content/themes/example/
@@ -651,29 +640,27 @@ wp-content/themes/example/
     └── consultation.php
 ```
 
-Поддерживать:
+Supported:
 
-* active theme;
-* child theme;
-* parent theme.
+* the active theme;
+* a child theme;
+* a parent theme.
 
-Child theme имеет приоритет при конфликте template slug.
+The child theme wins when a template slug appears in both.
 
-Предоставить filter:
+A filter is provided:
 
 ```text
 jotform_bridge_template_paths
 ```
 
-чтобы разработчики могли добавлять дополнительные template directories.
+so developers can add further template directories.
 
 ---
 
 # Template metadata
 
-Template обнаруживается по file header.
-
-Пример:
+A template is discovered by its file header:
 
 ```php
 <?php
@@ -683,28 +670,24 @@ Jotform Template Name: Contact Form
 ?>
 ```
 
-Обязательные metadata:
+The required metadata:
 
 ```text
 Jotform Template Name
 ```
 
-Slug шаблона — это имя файла, пропущенное через `sanitize_key()`
-(`jotform-bridge-templates/contact.php` → `contact`). Заголовок
-`Jotform Template Slug` остался только для старых шаблонов: он игнорируется,
-а сканер пишет об этом warning.
+The template slug is the file name passed through `sanitize_key()`
+(`jotform-bridge-templates/contact.php` → `contact`). The
+`Jotform Template Slug` header survives only for older templates: it is ignored,
+and the scanner reports a warning about it.
 
-Jotform Form ID внутри template запрещен.
-
-Неправильно:
+A Jotform Form ID inside a template is forbidden. This is wrong:
 
 ```text
 Jotform Form ID: 123456789
 ```
 
-Template идентифицирует только frontend template.
-
-Связь:
+A template identifies a frontend template and nothing else. The binding:
 
 ```text
 Template
@@ -712,35 +695,35 @@ Template
 Jotform Form
 ```
 
-хранится в Integration configuration.
+lives in the Integration configuration.
 
 ---
 
 # TemplateScanner
 
-TemplateScanner должен:
+TemplateScanner must:
 
-* сканировать только разрешенные directories;
-* находить PHP templates;
-* читать header без исполнения файла;
-* проверять metadata;
-* формировать registry;
-* отклонять duplicate slugs с понятной диагностикой;
-* учитывать child theme priority;
-* предотвращать directory traversal.
+* scan permitted directories only;
+* find PHP templates;
+* read the header without executing the file;
+* check the metadata;
+* build the registry;
+* reject duplicate slugs with a comprehensible diagnostic;
+* honour child theme priority;
+* prevent directory traversal.
 
-Discovery читает только header каждого файла (первые 8 КБ) и выполняется по
-требованию, без кеша и без кнопки Rescan. Причина — см. «Amendment: template
-discovery reads the theme on demand».
+Discovery reads only the header of each file (the first 8 KB) and runs on
+demand, with no cache and no Rescan button. For the reasoning see
+"Amendment: template discovery reads the theme on demand".
 
-Анализ полей шаблона (`fields()`) читает файл целиком и вызывается только
-compatibility-отчётом в админке, никогда на frontend path.
+Analysing a template's fields (`fields()`) reads the whole file and is called
+only by the compatibility report in the admin, never on a frontend path.
 
 ---
 
 # TemplateRegistry
 
-Registry entry концептуально:
+A registry entry, conceptually:
 
 ```php
 [
@@ -750,36 +733,36 @@ Registry entry концептуально:
 ]
 ```
 
-Можно render только file, обнаруженный TemplateScanner и находящийся внутри разрешенного template path.
+Only a file discovered by TemplateScanner, inside a permitted template path, may
+be rendered.
 
-Никогда не render произвольный path, полученный из:
+Never render an arbitrary path that came from:
 
 * $_GET;
 * $_POST;
-* REST request;
-* admin field.
+* a REST request;
+* an admin field.
 
 ---
 
-# Template Validation
+# Template validation
 
-TemplateValidator сравнивает:
+TemplateValidator compares the:
 
 ```text
 data-jotform-field
 ```
 
-из custom template с Normalized Schema Jotform form.
+identifiers in a custom template against the Normalized Schema of the Jotform
+form.
 
-Static semantic identifiers в templates должны быть literal strings.
-
-Например:
+Static semantic identifiers in templates have to be literal strings:
 
 ```html
 data-jotform-field="email"
 ```
 
-TemplateValidator должен определять:
+TemplateValidator has to report:
 
 * required fields present;
 * required fields missing;
@@ -787,7 +770,7 @@ TemplateValidator должен определять:
 * unknown template fields;
 * unsupported schema fields.
 
-Статусы:
+Statuses:
 
 ```text
 Compatible
@@ -795,7 +778,7 @@ Compatible with warnings
 Invalid
 ```
 
-Пример diagnostics:
+Example diagnostics:
 
 ```text
 Email       email        ✓
@@ -805,13 +788,13 @@ Company     company      Missing optional
 Phone       phone        Missing required
 ```
 
-Required field missing:
+A missing required field is an:
 
 ```text
 ERROR
 ```
 
-Optional field missing:
+A missing optional field is a:
 
 ```text
 WARNING
@@ -821,44 +804,42 @@ WARNING
 
 # Schema refresh
 
-Jotform form может измениться вне WordPress.
+A Jotform form can change outside WordPress, so the schema is not to be treated
+as permanent.
 
-Schema не считать вечной.
+Store the normalized schema and its fingerprint/hash in an option with no TTL —
+see "Amendment: manual schema synchronization".
 
-Хранить normalized schema и fingerprint/hash в option без TTL — см. «Amendment:
-manual schema synchronization».
-
-Добавить:
+There is a:
 
 ```text
 Sync Schema
 ```
 
-После sync:
+action. After a sync:
 
-1. получить current Jotform schema;
-2. normalize;
-3. перезаписать сохранённую schema;
-4. пересчитать template compatibility.
+1. fetch the current Jotform schema;
+2. normalize it;
+3. overwrite the stored schema;
+4. recompute template compatibility.
 
-Не обращаться к Jotform API на каждом frontend page view.
+Do not call the Jotform API on every frontend page view.
 
 ---
 
 # Rendering
 
-Поддерживаем два renderer:
+There are two renderers:
 
 ```text
 CustomTemplateRenderer
 AutoRenderer
 ```
 
-Custom Template — основной сценарий.
+The custom template is the main scenario. AutoRenderer was built after the
+custom-template flow already worked.
 
-AutoRenderer реализуется после рабочего custom-template flow.
-
-Renderer должен использовать:
+A renderer uses:
 
 ```text
 Integration
@@ -866,44 +847,40 @@ Integration
 Normalized Schema
 ```
 
-Не обращаться напрямую к Jotform API во время обычного rendering. Если schema
-не синхронизирована — форма не рендерится, а не подгружает её.
+Do not call the Jotform API during ordinary rendering. If the schema has not
+been synced, the form does not render rather than fetching it.
 
 ---
 
-# PHP rendering API
+# The PHP rendering API
 
-Предоставить public helper:
+A public helper is provided:
 
 ```php
 jotform_bridge_render('contact')
 ```
 
-Предпочтительно helper возвращает HTML.
-
-Использование:
+It returns HTML:
 
 ```php
 echo jotform_bridge_render('contact');
 ```
 
-Также предоставить shortcode:
+There is also a shortcode:
 
 ```text
 [jotform_form id="contact"]
 ```
 
-Shortcode и PHP helper используют один и тот же rendering service.
-
-Business logic не дублировать.
+The shortcode and the PHP helper use the same rendering service. Business logic
+is not duplicated between them.
 
 ---
 
-# Custom template context
+# The custom template context
 
-Custom PHP template может получить безопасный context, необходимый для rendering.
-
-Например:
+A custom PHP template receives the safe context it needs in order to render, for
+example:
 
 ```text
 integration
@@ -911,11 +888,8 @@ schema
 endpoint
 ```
 
-Template не должен hardcode integration-specific Jotform ID.
-
-Form markup может использовать runtime integration slug.
-
-Например:
+A template must not hardcode an integration-specific Jotform ID. The form markup
+uses the runtime integration slug:
 
 ```php
 <form
@@ -928,19 +902,14 @@ Form markup может использовать runtime integration slug.
 
 # Frontend JavaScript
 
-Использовать vanilla JavaScript.
-
-Не использовать jQuery.
-
-JS должен работать без build pipeline.
-
-Production plugin содержит готовый:
+Use vanilla JavaScript. Do not use jQuery. The JS has to work with no build
+pipeline, and the production plugin ships a finished:
 
 ```text
 assets/frontend.js
 ```
 
-Основной form marker:
+The form marker:
 
 ```html
 <form
@@ -949,27 +918,27 @@ assets/frontend.js
 >
 ```
 
-Field marker:
+The field marker:
 
 ```html
 data-jotform-field="email"
 ```
 
-JS должен:
+The script has to:
 
-* intercept submit;
-* собирать semantic fields;
-* правильно обрабатывать radio;
+* intercept the submit;
+* collect the semantic fields;
+* handle radio correctly;
 * checkbox;
 * select;
 * multi-value fields;
 * composite fields;
-* блокировать repeated/double submit;
-* отправлять JSON;
-* показывать validation errors;
-* восстанавливать submit state после ошибки.
+* block a repeated or double submit;
+* send JSON;
+* show validation errors;
+* restore the submit state after an error.
 
-Dispatch events:
+It dispatches:
 
 ```text
 jotformbridge:before-submit
@@ -977,17 +946,17 @@ jotformbridge:success
 jotformbridge:error
 ```
 
-Не навязывать popup/animation.
+It imposes no popup and no animation.
 
-Redirect выполняется только тогда, когда он явно настроен в Integration, и
-только по данным, пришедшим в success response. См. `Success redirect`.
+A redirect happens only where one is configured on the Integration, and only
+from the data that came back in the success response. See `Success redirect`.
 
-Theme должна иметь возможность построить собственный UX и отменить
-настроенный redirect через `preventDefault()` на `jotformbridge:success`.
+A theme must be able to build its own UX and to cancel the configured redirect
+by calling `preventDefault()` on `jotformbridge:success`.
 
 ---
 
-# REST API
+# The REST API
 
 Namespace:
 
@@ -995,19 +964,20 @@ Namespace:
 jotform-bridge/v1
 ```
 
-Submission route:
+The submission route:
 
+```text
 ```text
 POST /wp-json/jotform-bridge/v1/submit/{integration}
 ```
 
-Например:
+For example:
 
 ```text
 POST /wp-json/jotform-bridge/v1/submit/contact
 ```
 
-Использовать WordPress REST API:
+Use the WordPress REST API:
 
 ```php
 register_rest_route()
@@ -1016,9 +986,7 @@ WP_REST_Response
 WP_Error
 ```
 
-Frontend отправляет semantic data.
-
-Концептуально:
+The frontend sends semantic data. Conceptually:
 
 ```json
 {
@@ -1030,13 +998,13 @@ Frontend отправляет semantic data.
 }
 ```
 
-Frontend не должен отправлять authoritative:
+The frontend never sends anything authoritative:
 
-* Jotform Form ID;
-* API key;
-* qid.
+* no Jotform Form ID;
+* no API key;
+* no qid.
 
-Backend самостоятельно определяет:
+The backend resolves all of that itself:
 
 ```text
 integration
@@ -1047,23 +1015,21 @@ integration
 
 ---
 
-# Submission Validation
+# Submission validation
 
-Все значения проверять server-side.
+Every value is checked server-side. Frontend validation is UX only.
 
-Frontend validation — только UX.
+The backend checks:
 
-Backend проверяет:
+* the integration exists;
+* a schema is available;
+* the fields are allowed;
+* required fields are present;
+* the field type;
+* the allowed options;
+* the request size.
 
-* integration exists;
-* schema available;
-* allowed fields;
-* required fields;
-* field type;
-* allowed options;
-* request size.
-
-Примеры WordPress sanitization:
+WordPress sanitization, for example:
 
 ```php
 sanitize_text_field()
@@ -1071,21 +1037,19 @@ sanitize_textarea_field()
 sanitize_email()
 ```
 
-Email дополнительно проверять на valid format.
+An email address is additionally checked for a valid format.
 
-Select/radio values проверять по допустимым options, если schema их предоставляет.
+Select and radio values are checked against the permitted options where the
+schema provides them, and so are checkbox and other multi-value fields.
 
-Checkbox/multi-value fields проверять по разрешенным options.
-
-Не доверять field type из frontend request.
+Never trust a field type that came from the frontend request.
 
 ---
 
 # SubmissionMapper
 
-Создать отдельный SubmissionMapper.
-
-Он отвечает только за преобразование:
+There is a separate SubmissionMapper, responsible for one conversion and nothing
+else:
 
 ```text
 semantic fields
@@ -1093,9 +1057,9 @@ semantic fields
 Jotform submission payload
 ```
 
-REST Controller не должен содержать mapping business logic.
+The REST controller contains no mapping business logic.
 
-Особенно внимательно обрабатывать composite fields:
+Composite fields need particular care:
 
 ```text
 name.first
@@ -1104,9 +1068,8 @@ address.city
 ...
 ```
 
-Перед реализацией mapper обязательно проверить актуальный формат Jotform REST API.
-
-Не угадывать payload.
+Check the current Jotform REST API format before implementing the mapper. Do not
+guess the payload.
 
 ---
 
@@ -1121,7 +1084,8 @@ Success:
 }
 ```
 
-Если Integration настроена на redirect, success response дополнительно содержит:
+Where the Integration is configured to redirect, the success response also
+carries:
 
 ```json
 {
@@ -1134,9 +1098,9 @@ Success:
 }
 ```
 
-Ключ `redirect` отсутствует, если redirect не настроен.
+The `redirect` key is absent when no redirect is configured.
 
-Validation failure:
+A validation failure:
 
 ```text
 HTTP 422
@@ -1152,151 +1116,134 @@ HTTP 422
 }
 ```
 
-Upstream/Jotform error:
+An upstream or Jotform error: an appropriate `5xx`.
 
-appropriate `5xx`.
-
-Не возвращать:
+Never return:
 
 * credentials;
 * API keys;
 * internal filesystem paths;
-* raw exception stack;
-* sensitive upstream details.
+* a raw exception stack;
+* sensitive upstream detail.
 
 ---
 
 # Spam protection
 
-Публичный endpoint нельзя считать защищенным WordPress nonce.
+A public endpoint cannot be considered protected by a WordPress nonce. Do not
+use a nonce as the only anti-spam protection on an anonymous form.
 
-Не использовать nonce как единственную anti-spam protection anonymous form.
+The submission pipeline has one extension point — the
+`jotform_bridge_spam_check` filter (`Submission\SpamGuard`). A provider returns
+`true` (allow), `false` (refuse with the default message) or a string (refuse
+with that message), and must respect the verdict of the provider before it: when
+`$allowed !== true`, return it unchanged.
 
-Submission pipeline имеет один extension point — фильтр
-`jotform_bridge_spam_check` (`Submission\SpamGuard`). Провайдер возвращает
-`true` (пропустить), `false` (отказ со стандартным сообщением) или строку
-(отказ с этим сообщением), и обязан уважать вердикт предыдущего: если
-`$allowed !== true`, его надо вернуть как есть.
+The shipped providers register on that same filter, exactly as a third-party one
+would:
 
-Реализованные провайдеры регистрируются на этом же фильтре, ровно как это
-сделал бы сторонний:
-
-| Провайдер | Приоритет | Отсутствие значения | Стоимость |
+| Provider | Priority | Value absent | Cost |
 | --- | --- | --- | --- |
-| `Guards\Honeypot` | 10 | пропускает | нулевая |
-| `Guards\ProofOfWork` | 15 | **отказ** | ~65k SHA-256 в браузере |
-| `Guards\MinimumTime` | 20 | пропускает | нулевая |
-| `Guards\Turnstile` | 30 | **отказ** | внешний запрос + third-party script |
+| `Guards\Honeypot` | 10 | allows | none |
+| `Guards\ProofOfWork` | 15 | **refuses** | ~65k SHA-256 in the browser |
+| `Guards\MinimumTime` | 20 | allows | none |
+| `Guards\Turnstile` | 30 | **refuses** | an outbound request + a third-party script |
 
-Разница в колонке «отсутствие значения» принципиальна и должна сохраняться:
-honeypot и timing — это подсказки в разметке, которых может не быть в старом
-шаблоне, поэтому их отсутствие не повод ломать сайт. Proof of work и Turnstile
-приходят от самого плагина на каждой отрендеренной форме, поэтому прийти без
-них может только тот, кто не исполнял скрипт страницы.
+The difference in the "value absent" column is deliberate and has to be kept.
+The honeypot and the timing check are hints in the markup that an older template
+may not carry, so their absence is no reason to break a site. The proof of work
+and Turnstile come from the plugin itself on every form it renders, so arriving
+without them means the page's script was never executed.
 
-Turnstile регистрируется только при наличии обеих констант: проверка, которая
-всегда fail-open, хуже отсутствия проверки, потому что выглядит как защита.
+Turnstile registers only when both constants are present: a check that always
+fails open is worse than no check, because it looks like protection.
 
-Anti-spam значения передаются в отдельном контейнере `spam`, а не в `fields`:
-валидатор сверяет каждый semantic path со schema и отклоняет неизвестные, так
-что токен, отправленный как поле, ломал бы каждый submission.
+Anti-spam values travel in a separate `spam` container rather than in `fields`:
+the validator checks every semantic path against the schema and rejects the ones
+it does not know, so a token sent as a field would break every submission.
 
 ---
 
 # Success redirect
 
-Каждая Integration может быть настроена на redirect после успешного submission.
+Each Integration can be configured to redirect after a successful submission.
+The redirect is configured per Integration, never globally, so two integrations
+of the same Jotform Form may have different redirect targets.
 
-Redirect настраивается отдельно для каждой Integration, а не глобально.
-
-Две integrations одной Jotform Form могут иметь разные redirect targets.
-
-## Конфигурация
+## Configuration
 
 ```text
 Success Action:   message | redirect
 Redirect Page ID: WordPress page ID
-Redirect Delay:   секунды, 0 по умолчанию
+Redirect Delay:   seconds, 0 by default
 ```
 
-Выбор страницы в Admin UI — существующая WordPress page/post, выбираемая
-из списка (`wp_dropdown_pages()` или аналогичный контролируемый выбор).
-
-Не свободный текстовый URL input в первой версии.
+The admin picks an existing WordPress page or post from a list
+(`wp_dropdown_pages()` or an equivalent controlled choice), not a free-text URL
+input in this version.
 
 ## Authority
 
-Redirect target определяет backend.
+The backend decides the redirect target. The frontend never sends a redirect URL
+in the submission request, and the backend resolves the `Redirect Page ID` into
+a URL at the moment it answers.
 
-Frontend никогда не передает redirect URL в submission request.
+Two reasons:
 
-Backend резолвит `Redirect Page ID` в URL непосредственно в момент ответа.
+* the page URL may change after the Integration was saved;
+* a frontend-provided URL is an open redirect vector.
 
-Причины:
+## Validation
 
-* URL страницы может измениться после сохранения Integration;
-* frontend-provided URL — open redirect vector.
+The redirect URL has to be internal to the site, checked with
+`wp_validate_redirect()` or an equivalent host comparison against `home_url()`.
 
-## Валидация
+If the page is missing, in the trash, or not published:
 
-Redirect URL обязан быть внутренним для сайта.
+* no redirect happens;
+* the behaviour degrades to the ordinary success message;
+* the admin is warned about the invalid redirect target on the Integration
+  screen, in the same way template compatibility is reported.
 
-Проверять через `wp_validate_redirect()` или эквивалентную проверку host против
-`home_url()`.
+A successful submission must never fail because of a broken redirect target.
 
-Если page отсутствует, в trash, или не published:
+## Frontend behaviour
 
-* redirect не выполняется;
-* поведение деградирует до обычного success message;
-* admin получает предупреждение о невалидном redirect target на странице
-  Integration (аналогично Template compatibility).
+When the success response carries a `redirect`, the script navigates after
+dispatching `jotformbridge:success`.
 
-Success submission никогда не должен падать из-за сломанного redirect target.
+The order is mandatory:
 
-## Frontend поведение
-
-При наличии `redirect` в success response JS выполняет переход после dispatch
-`jotformbridge:success`.
-
-Порядок обязателен:
-
-1. success state формы;
-2. dispatch `jotformbridge:success` — форма ещё заполнена, `detail.fields`
-   содержит отправленные значения;
-3. очистка формы (`reset()`, сброс таймера и proof of work);
+1. the form's success state;
+2. dispatch `jotformbridge:success` — the form is still filled in, and
+   `detail.fields` carries the submitted values;
+3. clear the form (`reset()`, restart the timer, drop the proof of work);
 4. redirect.
 
-Очистка идёт после события намеренно: обработчику темы нужны отправленные
-значения, а из очищенной формы их уже не прочитать.
+Clearing happens after the event on purpose: a theme's handler needs the
+submitted values, and they cannot be read out of a form that has been emptied.
 
-Событие `jotformbridge:success` должно быть cancelable в части redirect: если
-theme вызывает `preventDefault()`, redirect не выполняется, и theme строит
-собственный UX.
+The `jotformbridge:success` event has to be cancelable as far as the redirect is
+concerned: if the theme calls `preventDefault()`, no redirect happens and the
+theme builds its own UX. The event's `detail` carries `redirect` so the theme can
+make that decision.
 
-`detail` события содержит `redirect`, чтобы theme могла принять решение.
+The redirect uses `window.location.assign()`. With `delay > 0` it waits, so the
+success message can be read, and the form stays disabled for the whole delay: a
+second submit after a successful one is not acceptable.
 
-Redirect выполняется через `window.location.assign()`.
+## Limits
 
-При `delay > 0` — после соответствующей задержки, чтобы success message успел
-быть прочитан.
-
-Форма остается в disabled state во время задержки: повторный submit после
-успешной отправки недопустим.
-
-## Ограничения
-
-* Redirect применяется только к успешному submission.
-* Validation errors и upstream errors никогда не вызывают redirect.
-* Не добавлять submission data в query string redirect URL.
-* Не передавать persistent identifiers через URL.
+* A redirect applies only to a successful submission.
+* Validation errors and upstream errors never redirect.
+* Do not put submission data in the redirect URL's query string.
+* Do not pass persistent identifiers through the URL.
 
 ---
 
 # AutoRenderer
 
-AutoRenderer строит semantic accessible HTML из Normalized Schema.
-
-Использовать:
+AutoRenderer builds semantic, accessible HTML from the Normalized Schema, using:
 
 ```html
 <label>
@@ -1307,7 +1254,7 @@ AutoRenderer строит semantic accessible HTML из Normalized Schema.
 <legend>
 ```
 
-Добавлять:
+with:
 
 * correct input types;
 * required;
@@ -1315,7 +1262,7 @@ AutoRenderer строит semantic accessible HTML из Normalized Schema.
 * error hooks;
 * predictable CSS classes.
 
-Базовые classes:
+The base classes:
 
 ```text
 .jfb-form
@@ -1325,92 +1272,95 @@ AutoRenderer строит semantic accessible HTML из Normalized Schema.
 .jfb-submit
 ```
 
-Не создавать визуальный form builder.
+Do not build a visual form builder.
 
-Не пытаться копировать дизайн Jotform.
-
-Не добавлять тяжелый frontend CSS framework.
+Do not try to copy Jotform's design.
+Do not add a heavy frontend CSS framework.
 
 ## Admin assets
 
-Никакого inline `<script>` и `<style>` в админских views и в notice-классах.
-CSS и JS живут в `assets/admin.css` и `assets/admin.js` и подключаются через
-`Admin\AdminAssets` только на экранах плагина.
+No inline `<script>` or `<style>` in the admin views or in the notice classes.
+The CSS and JS live in `assets/admin.css` and `assets/admin.js` and are enqueued
+through `Admin\AdminAssets`, on the plugin's own screens only.
 
-Причина не только в кешировании: inline-блок отклоняется любым сайтом с
-Content Security Policy, и админка молча ломается наполовину.
+The reason is not only caching: an inline block is refused outright by any site
+running a Content Security Policy, and the admin then breaks silently and half
+way.
 
-Поведение объявляется в разметке, а не проводом на каждом экране:
+Behaviour is declared in the markup rather than wired up per screen:
 
 ```text
 [data-jfb-toggle="<selector>"] + [data-jfb-toggle-value="<value>"]
 [data-jfb-copy="<text>"] | [data-jfb-copy-from="<selector>"]
 ```
 
-Так значение PHP-константы попадает в HTML-атрибут через `esc_attr()`, а не в
-тело скрипта через `esc_js()`, и новая строка или новая кнопка копирования не
-требуют ни строчки JavaScript.
+That way a PHP constant reaches the HTML through `esc_attr()` in an attribute
+rather than through `esc_js()` in a script body, and a new row or a new copy
+button needs no JavaScript at all.
 
 ---
 
-# Хранение и кеширование
+# Storage and caching
 
-Разделять две вещи, которые легко перепутать:
+Two things that are easy to confuse have to stay apart:
 
-**Сохранённое состояние** — не кеш, не имеет TTL, не истекает само и пишется
-только явным действием администратора:
+**Stored state** — not a cache, no TTL, never expires on its own, and written
+only by an explicit action of the administrator:
 
-* account forms list (`jotform_bridge_forms`, кнопка **Sync with Jotform**);
-* normalized schema (`jotform_bridge_schema_{formId}`, кнопка **Sync Schema**).
+* the account forms list (`jotform_bridge_forms`, the **Sync with Jotform**
+  button);
+* the normalized schema (`jotform_bridge_schema_{formId}`, the **Sync Schema**
+  button).
 
-Ничто не имеет права перезаписать их «по дороге»: ни page view, ни submission,
-ни activation, ни upgrade. См. «Amendment: manual schema synchronization».
+Nothing may overwrite these in passing: not a page view, not a submission, not
+activation, not an upgrade. See "Amendment: manual schema synchronization".
 
-**Дешёвое состояние**, которое можно потерять без последствий, — transients и
-in-request memo:
+**Cheap state**, which can be lost without consequence — transients and
+in-request memos:
 
 * rate limit buckets;
-* duplicate/proof-of-work fingerprints;
-* мемоизация внутри одного запроса (`IntegrationRepository`, `FormRepository`,
+* duplicate and proof-of-work fingerprints;
+* memoization within one request (`IntegrationRepository`, `FormRepository`,
   `TemplateRegistry`, `Settings`).
 
-Template registry намеренно **не** кешируется между запросами — см. «Amendment:
-template discovery reads the theme on demand».
+The template registry is deliberately **not** cached between requests — see
+"Amendment: template discovery reads the theme on demand".
 
-Обычный page request не должен обращаться к Jotform API. Страница без Jotform
-Bridge form не должна инициировать ни Jotform API calls, ни сканирование темы.
+An ordinary page request must not call the Jotform API. A page with no Jotform
+Bridge form on it must trigger neither a Jotform API call nor a scan of the
+theme.
 
 ---
 
 # Debug logging
 
-Debug logging:
+Debug logging is:
 
 ```text
 disabled by default
 ```
 
-Можно включить через plugin settings.
+and can be switched on in the plugin settings.
 
-Разрешено логировать:
+It may log:
 
 * API failure metadata;
 * HTTP status;
 * schema refresh failures;
 * template validation problems;
-* submission technical errors.
+* technical submission errors.
 
-Не логировать:
+It must not log:
 
-* API key;
+* the API key;
 * passwords;
-* полный sensitive submission content без необходимости.
+* full sensitive submission content, absent a real need.
 
 ---
 
 # Admin UI
 
-Создать top-level admin menu:
+There is a top-level admin menu:
 
 ```text
 Jotform Bridge
@@ -1420,10 +1370,10 @@ Jotform Bridge
 
 ## Settings
 
-Минимально:
+At a minimum:
 
 ```text
-API Key (read-only: статус constant или инструкция, как ее задать)
+API Key (read-only: the state of the constant, or how to set it)
 Region
 Connection Status
 Debug Logging
@@ -1439,7 +1389,7 @@ Sync with Jotform
 
 ## Integrations
 
-Integration UI:
+The Integration UI:
 
 ```text
 Name
@@ -1452,10 +1402,10 @@ Redirect Page
 Redirect Delay
 ```
 
-`Redirect Page` и `Redirect Delay` показываются только при
+`Redirect Page` and `Redirect Delay` are shown only when
 `Success Action = redirect`.
 
-Также показывать:
+Also shown:
 
 ```text
 Schema status
@@ -1471,19 +1421,23 @@ Send Test Submission
 Delete
 ```
 
-`Sync Schema` — единственное действие, обращающееся к Jotform за определением
-формы, и всегда для одной integration. `Rescan Templates` не существует:
-шаблоны читаются из темы по требованию.
+`Sync Schema` is the only action that asks Jotform for a form definition, and
+always for one integration at a time. There is no `Rescan Templates`: templates
+are read from the theme on demand.
 
-Не создавать visual form builder.
+The editor's primary action sits beside the page title, not at the foot of the
+screen: the fields it saves are the first thing on the page, and the schema
+table and starter template below them are reference material nobody should have
+to scroll past in order to press Save. The destructive action stays at the
+bottom, away from it.
+
+Do not build a visual form builder.
 
 ---
 
 # Developer diagnostics
 
-На странице Integration показывать normalized schema table.
-
-Пример columns:
+The Integration screen shows the normalized schema as a table. Example columns:
 
 ```text
 Label
@@ -1494,39 +1448,39 @@ Required
 Template Status
 ```
 
-Не заставлять разработчика открывать raw JSON.
-
-Raw response можно добавить только в debug/developer mode при необходимости.
+Do not make a developer open raw JSON. A raw response may be added in a
+debug/developer mode where it is genuinely useful.
 
 ---
 
 # Security
 
-Всегда соблюдать:
+Always observe:
 
-* capability checks в Admin;
-* admin nonces для mutating admin actions;
+* capability checks in the admin;
+* admin nonces for mutating admin actions;
 * sanitization on input;
 * validation;
 * contextual escaping;
 * no arbitrary file include;
 * no path traversal;
-* no API keys on frontend;
+* no API keys on the frontend;
 * no client-trusted Jotform IDs.
 
-Admin settings должны быть доступны только пользователю с подходящей capability, например:
+Admin settings are reachable only by a user with a suitable capability, for
+example:
 
 ```text
 manage_options
 ```
 
-Публичный submission endpoint валидирует всё самостоятельно.
+The public submission endpoint validates everything itself.
 
 ---
 
 # Escaping
 
-Использовать contextual escaping:
+Use contextual escaping:
 
 ```php
 esc_html()
@@ -1534,19 +1488,18 @@ esc_attr()
 esc_url()
 ```
 
-и другие WordPress APIs.
+and the other WordPress APIs.
 
-Не пропускать user-editable admin values как raw HTML.
+Never pass user-editable admin values through as raw HTML.
 
-Custom theme template является trusted developer-controlled PHP file и может формировать собственный HTML.
+A custom theme template is a trusted, developer-controlled PHP file and may
+build its own HTML.
 
 ---
 
 # Code architecture
 
-Предпочитаем современный OO PHP.
-
-Примерные ответственности:
+Modern object-oriented PHP is preferred. Responsibilities, roughly:
 
 ```text
 Api/
@@ -1580,25 +1533,24 @@ Rest/
 Admin/
     SettingsPage
     IntegrationsPage
+    AdminAssets
 ```
 
-Это ориентир, а не требование создавать бессмысленные empty classes.
+That is a guide, not an instruction to create meaningless empty classes.
 
-Не делать:
+Do not build:
 
-* giant god class;
-* giant functions.php-style plugin file;
-* business logic внутри admin views;
+* a giant god class;
+* a giant functions.php-style plugin file;
+* business logic inside admin views;
 * arbitrary static globals;
-* direct `$_POST` внутри domain services.
+* direct `$_POST` access inside domain services.
 
 ---
 
 # WordPress hooks
 
-Добавлять extension points только там, где есть реальная польза.
-
-Потенциальные hooks:
+Add extension points only where they are genuinely useful. The ones that exist:
 
 ```text
 jotform_bridge_template_paths
@@ -1610,23 +1562,23 @@ jotform_bridge_auto_field_html
 jotform_bridge_spam_check
 ```
 
-Не добавлять hooks ради количества.
+Do not add hooks for the sake of the count.
 
 ---
 
 # MCP
 
-Проект может запускаться в двух средах, и набор инструментов в них разный.
-
+The project may run in two environments, and the tools available differ between
+them.
 ## Codex
 
-Project-scoped MCP servers настроены через:
+Project-scoped MCP servers are configured in:
 
 ```text
 .codex/config.toml
 ```
 
-Доступны:
+Available:
 
 ```text
 wordpress-playground
@@ -1636,42 +1588,44 @@ jotform
 
 ## Claude Code
 
-Имена `wordpress-playground`, `playwright`, `jotform` здесь **не** существуют.
-Использовать соответствия:
+Project-scoped MCP servers are configured in `.mcp.json` at the repository root,
+and project settings live in `.claude/settings.json`. The same three servers are
+declared there, so the names `wordpress-playground`, `playwright` and `jotform`
+mean the same thing in both environments.
+
+Two of them still need something from the user, and the agent must not try to
+work around it:
 
 ```text
-Playwright MCP          → встроенный браузер (mcp__Claude_Browser__*)
-                          или mcp__chrome-devtools__*
-WordPress Playground MCP→ прямого аналога нет, см. ниже
-Jotform MCP             → требует OAuth-авторизации коннектора;
-                          без нее недоступен
+Jotform MCP    → needs the connector to be authorised by the user.
+                 Never ask for tokens, codes or a callback URL.
+                 If it is not authorised, say so and continue without it.
+Playwright MCP → needs the browser package; where it is unavailable, the
+                 built-in browser tools (mcp__chrome-devtools__*) serve the
+                 same purpose.
 ```
 
-Замена WordPress Playground:
+If WordPress Playground cannot start, the alternatives, in order:
 
-* локальная установка WordPress, если она есть;
-* `wp-env` / `wp-now` через Bash, если Docker/Node доступны;
-* `@wp-playground/cli` через `npx`, если сеть доступна;
-* если ничего из этого нет — ограничиться unit-тестами и явно указать
-  в отчете, что WordPress runtime verification не выполнялась.
+* a local WordPress installation, if one exists;
+* `wp-env` / `wp-now` through Bash, where Docker or Node are available;
+* `@wp-playground/cli` through `npx`, where the network is available;
+* if none of these exist — stay with the unit tests and state plainly in the
+  report that no WordPress runtime verification was performed.
 
-Jotform MCP в Claude Code требует авторизации коннектора пользователем.
-Агент не должен запрашивать токены, коды или callback URL. Если коннектор
-не авторизован — сказать об этом и продолжить без него.
+## The general rule
 
-## Общее правило
+Tools are used for real verification, not because they happen to be available.
 
-Инструменты используются для реальной verification, а не потому, что они доступны.
-
-Если инструмент недоступен — см. секцию `MCP failure policy`. Никогда не выдавать
-неисполненную проверку за исполненную и не подменять фактическую проверку
-чтением собственного кода.
+If a tool is unavailable, see the `MCP failure policy` section. Never present an
+unperformed check as performed, and never substitute reading your own code for
+actually exercising it.
 
 ---
 
 # WordPress Playground MCP
 
-Использовать для WordPress runtime verification:
+Use it for WordPress runtime verification:
 
 * plugin activation;
 * fatal errors;
@@ -1680,20 +1634,19 @@ Jotform MCP в Claude Code требует авторизации коннект�
 * options;
 * transients;
 * PHP execution;
-* shortcode;
+* the shortcode;
 * rendering;
 * lifecycle;
 * runtime smoke tests.
 
-Если изменение зависит от WordPress runtime, не ограничиваться чтением PHP-кода.
-
-По возможности реально проверить его через WordPress Playground.
+Where a change depends on the WordPress runtime, do not stop at reading the PHP.
+Exercise it in WordPress Playground where that is possible.
 
 ---
 
 # Playwright MCP
 
-Использовать для browser/UI verification:
+Use it for browser and UI verification:
 
 * wp-admin;
 * Settings;
@@ -1701,45 +1654,44 @@ Jotform MCP в Claude Code требует авторизации коннект�
 * selects;
 * buttons;
 * validation messages;
-* frontend form;
-* JS behavior;
+* the frontend form;
+* JS behaviour;
 * REST submission;
-* success/error state;
+* success and error states;
 * double submit prevention.
 
-Если этап затрагивает UI или frontend behavior, выполнить smoke test через Playwright.
+Where a change touches the UI or frontend behaviour, run a smoke test through
+Playwright.
 
 ---
 
 # Jotform MCP
 
-Использовать прежде всего как read/verification tool.
+Use it primarily as a read and verification tool. It is useful for:
 
-Полезно для:
-
-* получения списка test forms;
-* проверки существования формы;
-* проверки submissions;
+* listing test forms;
+* checking that a form exists;
+* checking submissions;
 * end-to-end verification.
 
-Не использовать Jotform MCP как замену официальной REST API documentation.
+Do not use the Jotform MCP server as a substitute for the official REST API
+documentation.
 
-По умолчанию НЕ:
+By default, do NOT:
 
-* удалять формы;
-* изменять production forms;
-* удалять submissions;
-* менять реальные production data.
+* delete forms;
+* modify production forms;
+* delete submissions;
+* change real production data.
 
-Для write-тестов использовать только явно test/development form.
-
-Если такой формы нет, не выполнять live write operation без явного разрешения.
+Use only an explicitly test or development form for write tests. If no such form
+exists, do not perform a live write without explicit permission.
 
 ---
 
 # End-to-end verification
 
-Идеальный E2E flow:
+The ideal E2E flow:
 
 ```text
 Playwright
@@ -1757,32 +1709,32 @@ Jotform
 Jotform MCP verification
 ```
 
-Если live Jotform write нельзя безопасно выполнить:
+Where a live Jotform write cannot be performed safely:
 
-* проверить mapper unit/integration tests;
-* проверить REST validation;
-* использовать fixtures/mocks;
-* явно указать, что live upstream write не проверялся.
+* exercise the mapper's unit and integration tests;
+* exercise the REST validation;
+* use fixtures and mocks;
+* state plainly that no live upstream write was verified.
 
 ---
 
 # MCP failure policy
 
-Если конкретный MCP недоступен:
+If a particular MCP server is unavailable:
 
-* не ломать implementation;
-* выполнить доступную альтернативную проверку;
-* в финальном отчете явно указать, что именно не было проверено.
+* do not break the implementation;
+* run whatever alternative check is available;
+* state explicitly in the final report what was not verified.
 
-Никогда не утверждать, что E2E test прошел, если он не выполнялся.
+Never claim an E2E test passed when it was not run.
 
 ---
 
 # Tests
 
-Критичная domain logic должна быть testable отдельно от WordPress UI.
+Critical domain logic has to be testable separately from the WordPress UI.
 
-Приоритет tests:
+Test priority:
 
 1. FieldNormalizer
 2. semantic key generation
@@ -1792,300 +1744,331 @@ Jotform MCP verification
 6. SubmissionValidator
 7. SubmissionMapper
 
-Использовать fixtures с realistic Jotform API responses.
+Use fixtures with realistic Jotform API responses. Unit tests must not require a
+live Jotform API.
 
-Unit tests не должны требовать live Jotform API.
+## The stack
 
-## Стек
-
-Зафиксировано:
+Fixed:
 
 ```text
 PHPUnit ^9.6
 brain/monkey ^2.6
-mockery/mockery (транзитивно через brain/monkey)
+mockery/mockery (transitively, through brain/monkey)
 ```
 
-PHPUnit 9.x выбран потому, что PHPUnit 10+ требует PHP 8.1+, а проект должен
-поддерживать PHP 8.0.
+PHPUnit 9.x because PHPUnit 10+ requires PHP 8.1+, and this project supports
+PHP 8.0.
 
-Brain Monkey нужен, чтобы мокать WordPress-функции (`get_option`, `wp_remote_get`,
-`sanitize_text_field`, `apply_filters` и т. д.) без загрузки WordPress.
+Brain Monkey is what lets us mock WordPress functions (`get_option`,
+`wp_remote_get`, `sanitize_text_field`, `apply_filters` and so on) without
+loading WordPress.
 
-Все это — **dev-зависимости**. В релизный ZIP они не попадают.
+All of it is a **dev dependency**. None of it ships in the release ZIP.
 
-## Расположение
+## Layout
 
 ```text
 composer.json
 phpunit.xml.dist
 tests/
 ├── bootstrap.php
-├── TestCase.php          # базовый класс с setUp/tearDown Brain Monkey
+├── TestCase.php          # base class with Brain Monkey setUp/tearDown
 ├── Unit/
 │   ├── Forms/
 │   ├── Templates/
 │   ├── Submission/
+│   ├── Admin/
 │   └── Api/
 └── Fixtures/
-    └── Jotform/          # sanitized JSON-ответы Jotform API
+    └── Jotform/          # sanitized Jotform API responses
 ```
 
 Composer PSR-4:
 
 ```text
-JotformBridge\      → jotform-bridge/src/
+JotformBridge\       → jotform-bridge/src/
 JotformBridge\Tests\ → tests/
 ```
 
-## Запуск
+## Running them
 
 ```bash
 composer install
-composer test          # алиас для vendor/bin/phpunit
+composer test          # an alias for vendor/bin/phpunit
 ```
 
-Команда `composer test` должна работать начиная с Этапа 1, даже если тестов
-на тот момент почти нет. Не откладывать настройку до Этапа 2.
+`composer test` has worked since stage 1, even when there was almost nothing to
+run. Setting it up was not deferred.
 
-## Правила написания
+## How to write them
 
-Тесты домена не должны:
+Domain tests must not:
 
-* загружать WordPress;
-* обращаться к сети;
-* писать в файловую систему вне временного каталога;
-* зависеть от порядка выполнения.
+* load WordPress;
+* touch the network;
+* write to the filesystem outside a temporary directory;
+* depend on execution order.
 
-Тесты для `TemplateScanner` могут создавать временные файлы через
-`sys_get_temp_dir()` и обязаны убирать их за собой.
+`TemplateScanner` tests may create temporary files through `sys_get_temp_dir()`
+and must clean up after themselves.
 
-Fixtures Jotform API должны быть sanitized: без реальных API-ключей, email,
-имен и телефонов.
+Jotform API fixtures have to be sanitized: no real API keys, email addresses,
+names or phone numbers.
 
-Если структура ответа Jotform для какого-то типа поля неизвестна — сначала
-свериться с официальной документацией или прочитать реальную schema read-only,
-и только потом создавать fixture. Выдуманный fixture хуже отсутствующего теста,
-потому что он закрепляет неверное предположение.
+Where the shape of a Jotform response for some field type is unknown, check the
+official documentation first, or read a real schema read-only, and only then
+write the fixture. An invented fixture is worse than a missing test, because it
+sets a wrong assumption in stone.
 
 ## Lint
 
-Если настраивается статический анализ, использовать WordPress Coding Standards
-через `squizlabs/php_codesniffer` + `wp-coding-standards/wpcs` как dev-зависимость.
+Where static analysis is set up, use the WordPress Coding Standards through
+`squizlabs/php_codesniffer` + `wp-coding-standards/wpcs` as a dev dependency.
 
-Это желательно, но не блокирует этапы. Тесты приоритетнее линтера.
-
----
-
-# Workflow для изменения
-
-Этапы из `prompts/` завершены, но порядок работы остаётся тем же.
-
-Перед изменением:
-
-1. Прочитать этот `AGENTS.md`, включая разделы `Amendment:` в конце.
-2. Изучить уже существующий код.
-3. Не переписывать работающую архитектуру без объективной необходимости.
-4. Определить минимальный scope текущего этапа.
-5. Реализовать его.
-6. Запустить доступные tests/lint.
-7. Выполнить соответствующий MCP verification.
-8. Исправить найденные проблемы.
-9. Только после этого считать этап завершенным.
+That is desirable but does not block a stage. Tests come before the linter.
 
 ---
 
-# Запрет на преждевременную реализацию
+# Workflow for a change
 
-Если текущий prompt описывает конкретный этап:
+The stages in `prompts/` are finished, but the order of work is unchanged.
 
-* не реализовывать будущие этапы полностью;
-* можно подготовить минимальный extension point;
-* нельзя добавлять большой код "на будущее".
+Before changing anything:
 
-Цель — небольшие проверяемые increments.
+1. Read this `AGENTS.md`, including the `Amendment:` sections at the end.
+2. Study the code that already exists.
+3. Do not rewrite working architecture without an objective need.
+4. Decide the minimum scope of the change at hand.
+5. Implement it.
+6. Run whatever tests and lint are available.
+7. Run the matching MCP verification.
+8. Fix what that turned up.
+9. Only then treat the work as finished.
 
 ---
 
-# Отчет после каждого этапа
+# No premature implementation
 
-После работы предоставить:
+Where the current prompt describes one particular stage:
+
+* do not implement future stages in full;
+* a minimal extension point is fine;
+* a large amount of code "for later" is not.
+
+The goal is small, verifiable increments.
+
+---
+
+# The report after each piece of work
+
+Afterwards, provide:
 
 ```text
-Что реализовано
-Какие файлы изменены
-Какие архитектурные решения приняты
-Какие tests выполнены
-Какие MCP проверки выполнены
-Что не удалось проверить
-Что остается для следующего этапа
+What was implemented
+Which files changed
+Which architectural decisions were taken
+Which tests were run
+Which MCP checks were run
+What could not be verified
+What is left for next time
 ```
 
-Не писать просто:
+Do not write simply:
 
 ```text
 Done
 Implementation complete
 ```
 
-без verification details.
+with no verification detail.
 
 ---
 
-# Главные invariants проекта
+# The project's core invariants
 
-Эти правила нельзя нарушать без явного изменения требований:
+These rules cannot be broken without an explicit change of requirements:
 
 1. WordPress 6.4+.
 2. PHP 8.0+.
-3. Никакого Sage/Blade в текущей версии.
-4. Plugin standalone.
-5. Custom template не знает Jotform Form ID.
-6. Template не знает Jotform qid.
-7. Связь Form ↔ Template хранится в Integration.
-8. Frontend использует semantic `data-jotform-field`.
-9. Backend является authoritative source mapping.
-10. API key существует только server-side и только в constant `wp-config.php`;
-    в базе данных его нет.
-11. Jotform REST API не вызывается на каждом page view.
-12. Все submissions валидируются server-side.
-13. Произвольный filesystem path никогда не renderится.
-14. Одна Jotform Form может иметь несколько integrations/templates.
-15. Custom Template — основной сценарий.
-16. AutoRenderer строится поверх уже готовой Normalized Schema.
-17. Перед использованием Jotform payload format проверяется официальная документация.
-18. MCP используется для реальной verification, когда это возможно.
-19. Redirect target приходит из Integration, резолвится backend и обязан быть
-    внутренним URL; frontend никогда не диктует, куда выполняется redirect.
-20. Schema синхронизируется только вручную, кнопкой Sync Schema и только для
-    одной integration за раз. Никакого TTL, никакого cron, никакого fetch на
-    frontend path: rendering и submission читают сохранённую schema или
-    отказывают. См. «Amendment: manual schema synchronization».
-21. Плагин не хранит submission values, IP-адреса и любые идентификаторы
-    посетителей. Отправленные данные живут в Jotform и больше нигде. Всё, что
-    попадает в options, — это конфигурация, определения форм и обезличенные
-    защитные счётчики (хеш адреса в rate-limit bucket, дневное число отправок).
-22. Плагин не ведёт учёт израсходованной месячной квоты аккаунта и не
-    опрашивает `GET /user/usage`. Предохранитель работает от собственной
-    истории сайта и от прямого отказа Jotform. См. «Amendment: no account
-    usage tracking».
-
+3. No Sage or Blade in this version.
+4. The plugin is standalone.
+5. A custom template does not know the Jotform Form ID.
+6. A template does not know a Jotform qid.
+7. The Form ↔ Template binding lives in the Integration.
+8. The frontend uses semantic `data-jotform-field`.
+9. The backend is the authoritative source of the mapping.
+10. The API key exists server-side only, and only in the `wp-config.php`
+    constant; it is not in the database.
+11. The Jotform REST API is not called on every page view.
+12. Every submission is validated server-side.
+13. An arbitrary filesystem path is never rendered.
+14. One Jotform Form may have several integrations and templates.
+15. The custom template is the main scenario.
+16. AutoRenderer is built on top of the finished Normalized Schema.
+17. The official documentation is checked before relying on a Jotform payload
+    format.
+18. MCP is used for real verification wherever that is possible.
+19. The redirect target comes from the Integration, is resolved by the backend
+    and must be an internal URL; the frontend never dictates where a redirect
+    goes.
+20. The schema is synchronized manually only, by the Sync Schema button, and for
+    one integration at a time. No TTL, no cron, no fetch on a frontend path:
+    rendering and submission read the stored schema or refuse. See "Amendment:
+    manual schema synchronization".
+21. The plugin stores no submission values, no IP addresses and no visitor
+    identifiers of any kind. Submitted data lives in Jotform and nowhere else.
+    What reaches the options table is configuration, form definitions and
+    anonymous defensive counters (a hashed address in a rate-limit bucket, the
+    number of submissions sent today).
+22. The plugin does not track how much of the account's monthly allowance has
+    been spent and does not poll `GET /user/usage`. The circuit breaker works
+    from the site's own history and from Jotform's own refusal. See "Amendment:
+    no account usage tracking".
 
 ---
 
 # Amendment: manual schema synchronization
 
-Уточнение к разделам «Refresh Schema» и «Rendering», принятое после stage 7.
+A clarification to the "Schema refresh" and "Rendering" sections, decided after
+stage 7.
 
-Normalized Schema больше не cache, а сохранённое состояние:
+The Normalized Schema is no longer a cache but stored state:
 
-* хранится в option `jotform_bridge_schema_{formId}` (`autoload = false`), не в
-  transient, и не имеет TTL;
-* пишется единственным действием — **Sync Schema**, отдельной кнопкой для каждой
-  integration (в списке и в редакторе);
-* не пишется ничем другим: ни save integration, ни activation, ни upgrade, ни
-  page view, ни submission;
-* deactivation и upgrade её не удаляют — удаляет только uninstall. Upgrade
-  помечает schema как synced более старой версией плагина и показывает это в
-  админке, но не трогает данные.
+* it lives in the option `jotform_bridge_schema_{formId}` (`autoload = false`),
+  not in a transient, and has no TTL;
+* it is written by exactly one action — **Sync Schema**, a separate button per
+  integration (on the list and in the editor);
+* it is written by nothing else: not by saving an integration, not by
+  activation, not by an upgrade, not by a page view, not by a submission;
+* deactivation and upgrade do not delete it — only uninstall does. An upgrade
+  marks the schema as synced by an older plugin version and shows that in the
+  admin, but does not touch the data.
 
-Следствия, которые обязаны сохраняться:
+The consequences that have to hold:
 
-1. `SchemaRepository::get()` никогда не делает HTTP-запрос. Если schema не
-   синхронизирована — это failure с кодом `schema_not_synced`.
-2. Rendering формы без синхронизированной schema не рендерит ничего (админу
-   показывается причина), а не пытается загрузить schema.
-3. Submission без синхронизированной schema отвечает 503 и не обращается к
-   Jotform.
-4. Account form list подчиняется тому же правилу: option без TTL, обновляется
-   только кнопкой **Sync with Jotform**.
+1. `SchemaRepository::get()` never makes an HTTP request. An unsynced schema is
+   a failure with the code `schema_not_synced`.
+2. Rendering a form with no synced schema renders nothing — the administrator is
+   shown why — rather than trying to fetch one.
+3. A submission with no synced schema answers 503 and does not contact Jotform.
+4. The account form list follows the same rule: an option with no TTL, refreshed
+   only by the **Sync with Jotform** button.
 
-Цена решения принята сознательно: форма, изменённая в Jotform, продолжает
-работать по прежнему определению, пока владелец сайта не нажмёт Sync Schema.
+The price is accepted deliberately: a form edited in Jotform keeps working from
+the previous definition until the site owner presses Sync Schema.
 
 ---
 
 # Amendment: template discovery reads the theme on demand
 
-Уточнение к разделам «TemplateScanner» и «Хранение и кеширование», отменяющее
-требование кешировать registry и кнопку `Rescan Templates`.
+A clarification to the "TemplateScanner" and "Storage and caching" sections that
+overturns the requirement to cache the registry, and the `Rescan Templates`
+button with it.
 
-Registry читается из темы по требованию и мемоизируется только в пределах
-запроса. Кеш между запросами убран сознательно:
+The registry is read from the theme on demand and memoized within one request
+only. The cross-request cache was removed deliberately:
 
-* закешированный registry означал, что разработчик кладёт файл в тему, не видит
-  его в списке и не понимает почему;
-* хуже того, отредактированный шаблон оставлял compatibility-отчёт описывающим
-  предыдущую версию файла — то есть админка врала ровно про то, ради чего этот
-  отчёт и существует;
-* кнопка `Rescan` была лечением симптома: она требовала от человека помнить о
-  существовании кеша, о котором он не просил.
+* a cached registry meant a developer could drop a file into the theme, not see
+  it in the list, and have no way of knowing why;
+* worse, an edited template left the compatibility report describing the
+  previous version of the file — the admin lying about exactly the thing that
+  report exists for;
+* the `Rescan` button treated the symptom: it required a person to remember a
+  cache they never asked for.
 
-Цена принята сознательно и должна оставаться ограниченной:
+The price is accepted deliberately and has to stay bounded:
 
-1. Discovery читает только header каждого файла (`HEADER_BYTES`, 8 КБ) —
-   это `scandir()` двух директорий плюс короткий `fread` на файл.
-2. Полный разбор файла (`TemplateScanner::fields()`) на frontend path не
-   вызывается никогда — только compatibility-отчётом в админке.
-3. Страница без формы плагина не сканирует ничего.
+1. Discovery reads only the header of each file (`HEADER_BYTES`, 8 KB) — a
+   `scandir()` of two directories plus a short `fread` per file.
+2. Parsing a whole file (`TemplateScanner::fields()`) is never called on a
+   frontend path, only by the compatibility report in the admin.
+3. A page with no form of ours on it scans nothing.
 
-Если профилирование покажет, что этого мало, правильный следующий шаг —
-object-cache слой с инвалидацией по mtime директории, а не возврат кнопки
-`Rescan`: админка обязана продолжать читать состояние файлов напрямую.
+If profiling shows that is not enough, the right next step is an object-cache
+layer invalidated by the directory's mtime — not the return of the `Rescan`
+button. The admin has to keep reading the state of the files directly.
 
 ---
 
 # Amendment: no account usage tracking
 
-Отменяет ту часть раздела «Jotform API», которая предполагала чтение
-`GET /user/usage`, и убирает из продукта учёт месячной квоты аккаунта.
+Overturns the part of the "Jotform API" section that assumed reading
+`GET /user/usage`, and removes account monthly-quota tracking from the product.
 
-Что удалено:
+Removed:
 
-* `JotformClient::getUsage()` и снимок израсходованного;
-* настройка `Monthly Submission Allowance`;
-* предупреждение «использовано N из M» в админке;
-* потолок, выводимый из остатка квоты (`REASON_QUOTA`);
-* сам механизм feature-флагов (`Support\Features`), существовавший только ради
-  этой и следующей скрытой функции.
+* `JotformClient::getUsage()` and the snapshot of what had been spent;
+* the `Monthly Submission Allowance` setting;
+* the "used N of M" warning in the admin;
+* the ceiling derived from the remaining allowance (`REASON_QUOTA`);
+* the feature-flag mechanism itself (`Support\Features`), which existed only for
+  this and for the hidden feature in the next amendment.
 
-Причина: Jotform сообщает, сколько потрачено, но не сообщает, сколько положено
-по тарифу. Значит, размер квоты приходится спрашивать у владельца сайта, а
-расход — периодически опрашивать и хранить снимком. Это второй источник правды,
-устаревший по построению, ради предупреждения, которое всё равно менее
-надёжно, чем прямой отказ Jotform.
+The reasoning: Jotform reports how much has been spent but not what the plan
+allows. So the size of the allowance has to be asked of the site owner, and the
+spend has to be polled and kept as a snapshot. That is a second source of truth,
+stale by construction, in service of a warning that is in any case less reliable
+than Jotform's own refusal.
 
-Что осталось и должно остаться:
+What stays, and has to stay:
 
-1. **Дневной потолок** от собственной истории сайта: шестикратная медиана
-   последних семи дней, не ниже `MIN_DAILY`. Не требует знания об аккаунте и не
-   делает ни одного запроса.
-2. **Реакция на отказ Jotform** — `ERROR_FORM_QUOTA` и `ERROR_API_LIMIT`
-   размыкают предохранитель (`REASON_UPSTREAM_QUOTA`,
-   `REASON_UPSTREAM_API_LIMIT`). Это не учёт, а ответ на уже случившийся отказ.
-3. **`limit-left`** из заголовка ответа Jotform: он приходит сам, ничего не
-   стоит и остаётся единственным предупреждением перед тем, как API замолчит.
+1. **The daily ceiling** derived from the site's own history: six times the
+   median of the last seven days, never below `MIN_DAILY`. It needs no knowledge
+   of the account and makes no requests.
+2. **The reaction to Jotform's refusal** — `ERROR_FORM_QUOTA` and
+   `ERROR_API_LIMIT` trip the breaker (`REASON_UPSTREAM_QUOTA`,
+   `REASON_UPSTREAM_API_LIMIT`). That is not tracking; it is answering a refusal
+   that has already happened.
+3. **`limit-left`** from Jotform's own response: it arrives on its own, costs
+   nothing, and is the only warning before the API stops answering.
 
 ---
 
 # Amendment: no submission tally
 
-Убирает per-integration статистику отправок (`Support\Stats`) и связанные с ней
-экраны.
+Removes the per-integration submission statistics (`Support\Stats`) and the
+screens that read them.
 
-Механика была написана, покрыта тестами и спрятана за feature-флагом, но так и
-не была включена. Держать в релизе выключенную функцию — значит платить за неё
-кодом, строками перевода и ветками в шаблонах, ничего не получая взамен.
+The machinery was written, covered by tests and hidden behind a feature flag,
+and was never switched on. Keeping a switched-off feature in a release means
+paying for it in code, in translated strings and in template branches, and
+getting nothing back.
 
-Что удалено:
+Removed:
 
-* класс `Support\Stats` и опция `jotform_bridge_stats`;
-* колонка «Last 7 days» в списке integrations;
-* блок «Submissions» и «Fields visitors get wrong most often» в редакторе;
-* обёртка `SubmissionPipeline::count()`, существовавшая только чтобы считать.
+* the `Support\Stats` class and the `jotform_bridge_stats` option;
+* the "Last 7 days" column on the integrations list;
+* the "Submissions" block and "Fields visitors get wrong most often" in the
+  editor;
+* the `SubmissionPipeline::count()` wrapper, which existed only in order to
+  count.
 
-Задача, которую статистика решала, остаётся нерешённой и признаётся таковой:
-форма, которая тихо отказывает живым людям, выглядит снаружи как работающая.
-Пока единственный способ это увидеть — включить debug logging. Если понадобится
-вернуться к вопросу, возвращать надо не тот же счётчик в options: запись целой
-опции на каждый submission теряет данные при параллельных отправках. См. TODO.
+The problem the statistics addressed remains unsolved, and is acknowledged as
+such: a form that quietly refuses real people looks, from the outside, exactly
+like a working one. For now the only way to see it is to switch on debug
+logging. If the question is revisited, what comes back must not be the same
+counter in an option: writing a whole option on every submission loses data
+under concurrent submissions. See TODO.
+
+---
+
+# Amendment: the elapsed-time guard refuses a forged measurement
+
+A clarification to "Spam protection", recorded because the original wording made
+the bug look intentional.
+
+`Guards\MinimumTime` reads anything outside its plausible range as "not
+measured" and lets it through. That is right above the ceiling — a tab left open
+overnight is not evidence of anything — and wrong below zero: the frontend
+script clamps its own measurement at zero, so a negative number cannot come from
+a browser that ran it.
+
+The two cases are therefore separate:
+
+* `t > MAX_SECONDS` → treated as absent, allowed;
+* `t < 0` → a forgery, refused.
+
+The general rule behind it: "the value is absent" and "the value could not have
+been produced by our own script" are different states, and a guard that conflates
+them can be stepped over with one character.
