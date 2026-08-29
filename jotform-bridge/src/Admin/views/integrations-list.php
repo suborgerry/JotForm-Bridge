@@ -202,7 +202,16 @@ $jfbNewUrl = add_query_arg(['page' => $page, 'view' => 'new'], admin_url('admin.
                 <tr>
                     <td><strong><?php echo esc_html((string) $jfbTemplate['name']); ?></strong></td>
                     <td><code><?php echo esc_html((string) $jfbTemplate['slug']); ?></code></td>
-                    <td><code><?php echo esc_html((string) $jfbTemplate['file']); ?></code></td>
+                    <td>
+                        <?php
+                        // Shown the same way as the scanned directories above: the
+                        // theme name and the directory place the file, and the rest
+                        // of an absolute path only makes the column harder to read.
+                        $jfbFile = (string) $jfbTemplate['file'];
+                        $jfbDir  = dirname($jfbFile);
+                        ?>
+                        <code><?php echo esc_html(basename(dirname($jfbDir)) . '/' . basename($jfbDir) . '/' . basename($jfbFile)); ?></code>
+                    </td>
                 </tr>
             <?php endforeach; ?>
         </tbody>
