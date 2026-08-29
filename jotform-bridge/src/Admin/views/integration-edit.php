@@ -45,7 +45,7 @@ $jfbReport  = $compatibility['report'] instanceof CompatibilityReport ? $compati
 
     <?php require __DIR__ . '/partials/notice.php'; ?>
 
-    <form method="post" action="<?php echo esc_url(admin_url('admin-post.php')); ?>">
+    <form id="jfb-integration-form" method="post" action="<?php echo esc_url(admin_url('admin-post.php')); ?>">
         <input type="hidden" name="action" value="<?php echo esc_attr(IntegrationsPage::ACTION_SAVE); ?>">
         <input type="hidden" name="original_slug" value="<?php echo esc_attr($originalSlug); ?>">
         <?php wp_nonce_field(IntegrationsPage::ACTION_SAVE); ?>
@@ -237,7 +237,6 @@ $jfbReport  = $compatibility['report'] instanceof CompatibilityReport ? $compati
             </tr>
         </table>
 
-        <?php submit_button($isNew ? __('Create Integration', 'jotform-bridge') : __('Save Integration', 'jotform-bridge')); ?>
     </form>
 
     <script>
@@ -287,6 +286,16 @@ $jfbReport  = $compatibility['report'] instanceof CompatibilityReport ? $compati
             color: #fff;
         }
 
+        .jfb-actions-footer {
+            margin-top: 24px;
+            padding-top: 16px;
+            border-top: 1px solid #dcdcde;
+        }
+
+        .jfb-actions-footer .button-primary {
+            margin-right: 8px;
+        }
+
         .jfb-actions .jfb-button-delete:hover,
         .jfb-actions .jfb-button-delete:focus {
             border-color: #8a2424;
@@ -294,50 +303,6 @@ $jfbReport  = $compatibility['report'] instanceof CompatibilityReport ? $compati
             color: #fff;
         }
     </style>
-
-    <h2><?php echo esc_html__('Actions', 'jotform-bridge'); ?></h2>
-    <div class="jfb-actions">
-        <?php if (!$isNew) : ?>
-            <form method="post" action="<?php echo esc_url(admin_url('admin-post.php')); ?>" style="display:inline-block;margin-right:8px;">
-                <input type="hidden" name="action" value="<?php echo esc_attr(IntegrationsPage::ACTION_SYNC); ?>">
-                <input type="hidden" name="integration" value="<?php echo esc_attr($integration->slug()); ?>">
-                <input type="hidden" name="return_view" value="edit">
-                <input type="hidden" name="return_integration" value="<?php echo esc_attr($integration->slug()); ?>">
-                <?php wp_nonce_field(IntegrationsPage::ACTION_SYNC); ?>
-                <?php submit_button(__('Sync Schema', 'jotform-bridge'), 'primary', 'submit', false); ?>
-            </form>
-        <?php endif; ?>
-
-        <?php if (!$isNew && $canTest && $schema !== null) : ?>
-            <form
-                method="post"
-                action="<?php echo esc_url(admin_url('admin-post.php')); ?>"
-                style="display:inline-block;margin-right:8px;"
-                onsubmit="return confirm('<?php echo esc_js(__('This sends a real submission to Jotform. It will appear in your inbox, trigger the form\'s notifications and count towards your monthly allowance. Continue?', 'jotform-bridge')); ?>');"
-            >
-                <input type="hidden" name="action" value="<?php echo esc_attr(IntegrationsPage::ACTION_TEST); ?>">
-                <input type="hidden" name="integration" value="<?php echo esc_attr($integration->slug()); ?>">
-                <input type="hidden" name="return_view" value="edit">
-                <input type="hidden" name="return_integration" value="<?php echo esc_attr($integration->slug()); ?>">
-                <?php wp_nonce_field(IntegrationsPage::ACTION_TEST); ?>
-                <?php submit_button(__('Send Test Submission', 'jotform-bridge'), 'secondary', 'submit', false); ?>
-            </form>
-        <?php endif; ?>
-
-        <?php if (!$isNew) : ?>
-            <form
-                method="post"
-                action="<?php echo esc_url(admin_url('admin-post.php')); ?>"
-                style="display:inline-block;"
-                onsubmit="return confirm('<?php echo esc_js(__('Delete this integration? This cannot be undone.', 'jotform-bridge')); ?>');"
-            >
-                <input type="hidden" name="action" value="<?php echo esc_attr(IntegrationsPage::ACTION_DELETE); ?>">
-                <input type="hidden" name="integration" value="<?php echo esc_attr($integration->slug()); ?>">
-                <?php wp_nonce_field(IntegrationsPage::ACTION_DELETE); ?>
-                <?php submit_button(__('Delete', 'jotform-bridge'), 'button jfb-button-delete', 'submit', false); ?>
-            </form>
-        <?php endif; ?>
-    </div>
 
     <?php if ($stats !== null && $statsToday !== null) : ?>
         <h2><?php echo esc_html__('Submissions', 'jotform-bridge'); ?></h2>
@@ -512,6 +477,35 @@ $jfbReport  = $compatibility['report'] instanceof CompatibilityReport ? $compati
     </p>
 
     <h2><?php echo esc_html__('Schema', 'jotform-bridge'); ?></h2>
+
+    <div class="jfb-actions">
+        <?php if (!$isNew) : ?>
+            <form method="post" action="<?php echo esc_url(admin_url('admin-post.php')); ?>" style="display:inline-block;margin-right:8px;">
+                <input type="hidden" name="action" value="<?php echo esc_attr(IntegrationsPage::ACTION_SYNC); ?>">
+                <input type="hidden" name="integration" value="<?php echo esc_attr($integration->slug()); ?>">
+                <input type="hidden" name="return_view" value="edit">
+                <input type="hidden" name="return_integration" value="<?php echo esc_attr($integration->slug()); ?>">
+                <?php wp_nonce_field(IntegrationsPage::ACTION_SYNC); ?>
+                <?php submit_button(__('Sync Schema', 'jotform-bridge'), 'primary', 'submit', false); ?>
+            </form>
+        <?php endif; ?>
+
+        <?php if (!$isNew && $canTest && $schema !== null) : ?>
+            <form
+                method="post"
+                action="<?php echo esc_url(admin_url('admin-post.php')); ?>"
+                style="display:inline-block;margin-right:8px;"
+                onsubmit="return confirm('<?php echo esc_js(__('This sends a real submission to Jotform. It will appear in your inbox, trigger the form\'s notifications and count towards your monthly allowance. Continue?', 'jotform-bridge')); ?>');"
+            >
+                <input type="hidden" name="action" value="<?php echo esc_attr(IntegrationsPage::ACTION_TEST); ?>">
+                <input type="hidden" name="integration" value="<?php echo esc_attr($integration->slug()); ?>">
+                <input type="hidden" name="return_view" value="edit">
+                <input type="hidden" name="return_integration" value="<?php echo esc_attr($integration->slug()); ?>">
+                <?php wp_nonce_field(IntegrationsPage::ACTION_TEST); ?>
+                <?php submit_button(__('Send Test Submission', 'jotform-bridge'), 'secondary', 'submit', false); ?>
+            </form>
+        <?php endif; ?>
+    </div>
 
     <?php if ($schemaMeta === null || $schemaMeta['synced_at'] === 0) : ?>
         <div class="notice notice-warning inline">
@@ -693,4 +687,31 @@ $jfbReport  = $compatibility['report'] instanceof CompatibilityReport ? $compati
             })();
         </script>
     <?php endif; ?>
+
+    <div class="jfb-actions jfb-actions-footer">
+        <?php
+        /* The button lives outside the form it submits, so it names the form. */
+        submit_button(
+            $isNew ? __('Create Integration', 'jotform-bridge') : __('Save Integration', 'jotform-bridge'),
+            'primary',
+            'submit',
+            false,
+            ['form' => 'jfb-integration-form']
+        );
+        ?>
+
+        <?php if (!$isNew) : ?>
+            <form
+                method="post"
+                action="<?php echo esc_url(admin_url('admin-post.php')); ?>"
+                style="display:inline-block;"
+                onsubmit="return confirm('<?php echo esc_js(__('Delete this integration? This cannot be undone.', 'jotform-bridge')); ?>');"
+            >
+                <input type="hidden" name="action" value="<?php echo esc_attr(IntegrationsPage::ACTION_DELETE); ?>">
+                <input type="hidden" name="integration" value="<?php echo esc_attr($integration->slug()); ?>">
+                <?php wp_nonce_field(IntegrationsPage::ACTION_DELETE); ?>
+                <?php submit_button(__('Delete', 'jotform-bridge'), 'button jfb-button-delete', 'submit', false); ?>
+            </form>
+        <?php endif; ?>
+    </div>
 </div>
