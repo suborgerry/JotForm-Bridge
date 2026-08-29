@@ -17,6 +17,7 @@ declare(strict_types=1);
 use JotformBridge\Admin\ApiKeyNotice;
 use JotformBridge\Admin\SettingsPage;
 use JotformBridge\Api\ConnectionState;
+use JotformBridge\Forms\FormRepository;
 use JotformBridge\Settings\Settings;
 use JotformBridge\Support\Features;
 
@@ -341,14 +342,31 @@ if (!$jfbHasKey) {
                     <th scope="col"><?php echo esc_html__('Title', 'jotform-bridge'); ?></th>
                     <th scope="col"><?php echo esc_html__('Form ID', 'jotform-bridge'); ?></th>
                     <th scope="col"><?php echo esc_html__('Status', 'jotform-bridge'); ?></th>
+                    <th scope="col"><?php echo esc_html__('Actions', 'jotform-bridge'); ?></th>
                 </tr>
             </thead>
             <tbody>
                 <?php foreach ($forms as $jfbForm) : ?>
+                    <?php $jfbFormId = (string) ($jfbForm['id'] ?? ''); ?>
                     <tr>
                         <td><?php echo esc_html((string) ($jfbForm['title'] ?? '')); ?></td>
-                        <td><code><?php echo esc_html((string) ($jfbForm['id'] ?? '')); ?></code></td>
+                        <td><code><?php echo esc_html($jfbFormId); ?></code></td>
                         <td><?php echo esc_html((string) ($jfbForm['status'] ?? '')); ?></td>
+                        <td>
+                            <?php if (strtoupper((string) ($jfbForm['status'] ?? '')) === FormRepository::STATUS_DELETED) : ?>
+                                <?php /* Deleted in Jotform: the row is only noise here, so it can be dropped for good. */ ?>
+                                <form method="post" action="<?php echo esc_url(admin_url('admin-post.php')); ?>">
+                                    <input type="hidden" name="action" value="<?php echo esc_attr(SettingsPage::ACTION_REMOVE); ?>">
+                                    <input type="hidden" name="form_id" value="<?php echo esc_attr($jfbFormId); ?>">
+                                    <?php wp_nonce_field(SettingsPage::ACTION_REMOVE); ?>
+                                    <button type="submit" class="button-link delete">
+                                        <?php echo esc_html__('Remove from list', 'jotform-bridge'); ?>
+                                    </button>
+                                </form>
+                            <?php else : ?>
+                                <span aria-hidden="true">&mdash;</span>
+                            <?php endif; ?>
+                        </td>
                     </tr>
                 <?php endforeach; ?>
             </tbody>

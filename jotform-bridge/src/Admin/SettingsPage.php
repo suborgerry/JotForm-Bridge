@@ -27,6 +27,7 @@ final class SettingsPage
     public const ACTION_SAVE    = 'jotform_bridge_save_settings';
     public const ACTION_TEST    = 'jotform_bridge_test_connection';
     public const ACTION_REFRESH = 'jotform_bridge_refresh_forms';
+    public const ACTION_REMOVE  = 'jotform_bridge_remove_form';
 
     private const NOTICE_ARG = 'jfb_notice';
 
@@ -56,6 +57,7 @@ final class SettingsPage
         add_action('admin_post_' . self::ACTION_SAVE, [$this, 'handleSave']);
         add_action('admin_post_' . self::ACTION_TEST, [$this, 'handleTestConnection']);
         add_action('admin_post_' . self::ACTION_REFRESH, [$this, 'handleRefreshForms']);
+        add_action('admin_post_' . self::ACTION_REMOVE, [$this, 'handleRemoveForm']);
     }
 
     /**
@@ -147,6 +149,26 @@ final class SettingsPage
     }
 
     /**
+     * Drops one form Jotform reports as deleted from the stored list.
+     *
+     * Nothing is sent to Jotform: the form is already in the account trash, and
+     * this only stops the row from following the site around forever.
+     */
+    public function handleRemoveForm(): void
+    {
+        $this->guard(self::ACTION_REMOVE);
+
+        // phpcs:ignore WordPress.Security.NonceVerification.Missing -- verified in guard().
+        $formId = isset($_POST['form_id']) ? sanitize_text_field(wp_unslash((string) $_POST['form_id'])) : '';
+
+        if (!$this->forms->hide($formId)) {
+            $this->redirect('form_not_removed');
+        }
+
+        $this->redirect('form_removed');
+    }
+
+    /**
      * Capability + nonce check shared by every mutating action.
      */
     private function guard(string $action): void
@@ -222,6 +244,20 @@ final class SettingsPage
                 'message' => $formsMeta['error'] !== ''
                     ? $formsMeta['error']
                     : __('Could not load the form list from Jotform.', 'jotform-bridge'),
+            ],
+            'form_removed' => [
+                'type'    => 'success',
+                'message' => __(
+                    'Form removed from the list. It stays in the Jotform trash, and comes back here only if it is restored there.',
+                    'jotform-bridge'
+                ),
+            ],
+            'form_not_removed' => [
+                'type'    => 'error',
+                'message' => __(
+                    'Only a form Jotform reports as deleted can be removed from this list.',
+                    'jotform-bridge'
+                ),
             ],
             'no_key' => [
                 'type'    => 'error',

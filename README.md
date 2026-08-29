@@ -475,7 +475,15 @@ background refresh and no expiry anywhere in the plugin.
 | **Sync Schema** | Integrations list (per row) and integration editor | Reloads **one** form's definition, re-normalizes it, stores it and re-checks compatibility |
 | **Test Connection** | Settings | One read-only `GET /user` call; records the result |
 | **Refresh Forms** | Settings | Reloads the account form list from Jotform |
+| **Remove from list** | Settings, on a form Jotform reports as `DELETED` | Drops that row from the stored list; nothing is sent to Jotform |
 | **Send Test Submission** | Integration editor | Sends one real submission built from the stored schema and shows Jotform's answer verbatim |
+
+**Remove from list** is the one action that touches no API. Jotform keeps
+returning the forms in its trash, so a form deleted there would otherwise sit on
+the settings screen and in the integration editor's select forever. Removing it
+is remembered: the next **Refresh Forms** leaves it out. Restore the form in
+Jotform and it reappears on the next refresh, because it is a form the account
+can use again.
 
 Templates are not on that list. They are read from the theme whenever the plugin
 needs to know what exists — drop a file into `forms/`, and it is in the select.
@@ -634,6 +642,7 @@ values.
 | --- | --- | --- | --- |
 | Normalized schema (one per form) | option `jotform_bridge_schema_{id}` | never | **Sync Schema** |
 | Account form list | option `jotform_bridge_forms` | never | **Refresh Forms** |
+| Trashed forms dismissed by hand | option `jotform_bridge_forms_hidden` | never | **Remove from list** |
 
 The template list is deliberately absent: it is not stored at all. Only the
 header of each file in `forms/` is read, on demand and once per request, which

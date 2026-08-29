@@ -46,6 +46,7 @@ $jfbCleanUpSite = static function (): void {
     delete_transient('jotform_bridge_forms');
 
     delete_option('jotform_bridge_forms_meta');
+    delete_option('jotform_bridge_forms_hidden');
     delete_option('jotform_bridge_schema_meta');
     delete_option('jotform_bridge_templates');
     delete_option('jotform_bridge_connection');

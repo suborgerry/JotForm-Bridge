@@ -141,6 +141,97 @@ final class FormRepositoryTest extends TestCase
         $this->assertNotSame('', $repository->meta()['error']);
     }
 
+    public function testDeletedFormCanBeRemovedAndDoesNotComeBackOnRefresh(): void
+    {
+        $response = $this->httpResponse(200, [
+            'responseCode' => 200,
+            'content'      => [
+                ['id' => '1', 'title' => 'Contact', 'status' => 'ENABLED'],
+                ['id' => '2', 'title' => 'Old', 'status' => 'DELETED'],
+            ],
+        ]);
+        Functions\when('wp_remote_get')->justReturn($response);
+
+        $repository = new FormRepository($this->client());
+        $repository->refresh();
+
+        $this->assertTrue($repository->hide('2'));
+        $this->assertSame(['1'], array_column($repository->all(), 'id'));
+        $this->assertSame(1, $repository->meta()['count']);
+
+        $repository->refresh();
+
+        $this->assertSame(['1'], array_column($repository->all(), 'id'));
+        $this->assertSame(1, $repository->meta()['count']);
+    }
+
+    public function testOnlyDeletedFormsCanBeRemoved(): void
+    {
+        $response = $this->httpResponse(200, [
+            'responseCode' => 200,
+            'content'      => [['id' => '1', 'title' => 'Contact', 'status' => 'ENABLED']],
+        ]);
+        Functions\when('wp_remote_get')->justReturn($response);
+
+        $repository = new FormRepository($this->client());
+        $repository->refresh();
+
+        $this->assertFalse($repository->hide('1'));
+        $this->assertFalse($repository->hide('404'));
+        $this->assertCount(1, $repository->all());
+    }
+
+    public function testRestoringAFormInJotformBringsItBack(): void
+    {
+        Functions\when('wp_remote_get')->justReturn(
+            $this->httpResponse(200, [
+                'responseCode' => 200,
+                'content'      => [['id' => '2', 'title' => 'Old', 'status' => 'DELETED']],
+            ])
+        );
+
+        $repository = new FormRepository($this->client());
+        $repository->refresh();
+        $repository->hide('2');
+
+        Functions\when('wp_remote_get')->justReturn(
+            $this->httpResponse(200, [
+                'responseCode' => 200,
+                'content'      => [['id' => '2', 'title' => 'Old', 'status' => 'ENABLED']],
+            ])
+        );
+
+        $repository->refresh();
+
+        $this->assertSame(['2'], array_column($repository->all(), 'id'));
+        $this->assertSame([], $repository->hidden(), 'A restored form must stop being remembered as removed.');
+    }
+
+    public function testRemovedFormIsForgottenOnceJotformStopsReturningIt(): void
+    {
+        Functions\when('wp_remote_get')->justReturn(
+            $this->httpResponse(200, [
+                'responseCode' => 200,
+                'content'      => [['id' => '2', 'title' => 'Old', 'status' => 'DELETED']],
+            ])
+        );
+
+        $repository = new FormRepository($this->client());
+        $repository->refresh();
+        $repository->hide('2');
+
+        Functions\when('wp_remote_get')->justReturn(
+            $this->httpResponse(200, [
+                'responseCode' => 200,
+                'content'      => [['id' => '1', 'title' => 'Contact', 'status' => 'ENABLED']],
+            ])
+        );
+
+        $repository->refresh();
+
+        $this->assertSame([], $repository->hidden());
+    }
+
     public function testFlushClearsCacheAndMeta(): void
     {
         $response = $this->httpResponse(200, [
