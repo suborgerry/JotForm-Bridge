@@ -630,14 +630,14 @@ Custom templates располагаются в активной WordPress theme.
 Базовый каталог:
 
 ```text
-/forms/
+/jotform-bridge-templates/
 ```
 
 Пример:
 
 ```text
 wp-content/themes/example/
-└── forms/
+└── jotform-bridge-templates/
     ├── contact.php
     └── consultation.php
 ```
@@ -737,7 +737,7 @@ Registry entry концептуально:
 [
     'slug' => 'contact',
     'name' => 'Contact Form',
-    'file' => '/trusted/path/forms/contact.php',
+    'file' => '/trusted/path/jotform-bridge-templates/contact.php',
 ]
 ```
 

@@ -19,8 +19,8 @@ final class TemplateScannerTest extends TestCase
 
         $this->root = sys_get_temp_dir() . '/jfb-scanner-' . uniqid('', true);
 
-        mkdir($this->root . '/child/forms', 0777, true);
-        mkdir($this->root . '/parent/forms', 0777, true);
+        mkdir($this->root . '/child/jotform-bridge-templates', 0777, true);
+        mkdir($this->root . '/parent/jotform-bridge-templates', 0777, true);
 
         Functions\when('get_stylesheet_directory')->justReturn($this->root . '/child');
         Functions\when('get_template_directory')->justReturn($this->root . '/parent');
@@ -36,7 +36,7 @@ final class TemplateScannerTest extends TestCase
     public function testValidHeaderProducesARegistryEntry(): void
     {
         $this->write(
-            'child/forms/contact.php',
+            'child/jotform-bridge-templates/contact.php',
             $this->template('Contact Form', 'contact', '<input data-jotform-field="email">')
         );
 
@@ -46,14 +46,14 @@ final class TemplateScannerTest extends TestCase
         $this->assertSame('Contact Form', $result['templates']['contact']['name']);
         $this->assertSame(TemplateScanner::SOURCE_CHILD_THEME, $result['templates']['contact']['source']);
         $this->assertSame(
-            realpath($this->root . '/child/forms/contact.php'),
+            realpath($this->root . '/child/jotform-bridge-templates/contact.php'),
             $result['templates']['contact']['file']
         );
     }
 
     public function testFileWithoutAnyJotformHeaderIsSilentlyIgnored(): void
     {
-        $this->write('child/forms/helper.php', "<?php\n// Just a theme partial.\n");
+        $this->write('child/jotform-bridge-templates/helper.php', "<?php\n// Just a theme partial.\n");
 
         $result = (new TemplateScanner())->discover();
 
@@ -64,7 +64,7 @@ final class TemplateScannerTest extends TestCase
     public function testMissingNameIsRejected(): void
     {
         $this->write(
-            'child/forms/broken.php',
+            'child/jotform-bridge-templates/broken.php',
             "<?php\n/*\nJotform Template Slug: broken\n*/\n"
         );
 
@@ -78,7 +78,7 @@ final class TemplateScannerTest extends TestCase
     public function testMissingSlugIsRejected(): void
     {
         $this->write(
-            'child/forms/broken.php',
+            'child/jotform-bridge-templates/broken.php',
             "<?php\n/*\nJotform Template Name: Broken\n*/\n"
         );
 
@@ -91,7 +91,7 @@ final class TemplateScannerTest extends TestCase
     public function testSlugWithNoUsableCharactersIsRejected(): void
     {
         $this->write(
-            'child/forms/broken.php',
+            'child/jotform-bridge-templates/broken.php',
             "<?php\n/*\nJotform Template Name: Broken\nJotform Template Slug: ***\n*/\n"
         );
 
@@ -104,7 +104,7 @@ final class TemplateScannerTest extends TestCase
     public function testTemplateDeclaringAJotformFormIdIsRejected(): void
     {
         $this->write(
-            'child/forms/contact.php',
+            'child/jotform-bridge-templates/contact.php',
             "<?php\n/*\nJotform Template Name: Contact\nJotform Template Slug: contact\nJotform Form ID: 240000000000001\n*/\n"
         );
 
@@ -116,8 +116,8 @@ final class TemplateScannerTest extends TestCase
 
     public function testDuplicateSlugInTheSameDirectoryIsReported(): void
     {
-        $this->write('child/forms/a-contact.php', $this->template('First', 'contact', ''));
-        $this->write('child/forms/b-contact.php', $this->template('Second', 'contact', ''));
+        $this->write('child/jotform-bridge-templates/a-contact.php', $this->template('First', 'contact', ''));
+        $this->write('child/jotform-bridge-templates/b-contact.php', $this->template('Second', 'contact', ''));
 
         $result = (new TemplateScanner())->discover();
 
@@ -132,11 +132,11 @@ final class TemplateScannerTest extends TestCase
     public function testChildThemeOverridesTheParentTheme(): void
     {
         $this->write(
-            'parent/forms/contact.php',
+            'parent/jotform-bridge-templates/contact.php',
             $this->template('Parent Contact', 'contact', '<input data-jotform-field="email">')
         );
         $this->write(
-            'child/forms/contact.php',
+            'child/jotform-bridge-templates/contact.php',
             $this->template('Child Contact', 'contact', '<input data-jotform-field="phone">')
         );
 
@@ -154,7 +154,7 @@ final class TemplateScannerTest extends TestCase
 
     public function testParentTemplateIsUsedWhenTheChildDoesNotOverrideIt(): void
     {
-        $this->write('parent/forms/career.php', $this->template('Career', 'career', ''));
+        $this->write('parent/jotform-bridge-templates/career.php', $this->template('Career', 'career', ''));
 
         $result = (new TemplateScanner())->discover();
 
@@ -167,7 +167,7 @@ final class TemplateScannerTest extends TestCase
         mkdir($this->root . '/untrusted', 0777, true);
         $this->write('untrusted/evil.php', $this->template('Evil', 'evil', ''));
 
-        symlink($this->root . '/untrusted/evil.php', $this->root . '/child/forms/evil.php');
+        symlink($this->root . '/untrusted/evil.php', $this->root . '/child/jotform-bridge-templates/evil.php');
 
         $result = (new TemplateScanner())->discover();
 
@@ -192,20 +192,20 @@ final class TemplateScannerTest extends TestCase
         $paths = array_column($result['roots'], 'path');
 
         $this->assertSame(
-            [realpath($this->root . '/child/forms'), realpath($this->root . '/parent/forms')],
+            [realpath($this->root . '/child/jotform-bridge-templates'), realpath($this->root . '/parent/jotform-bridge-templates')],
             $paths
         );
     }
 
     public function testAFilterCanAddAnAdditionalDirectory(): void
     {
-        mkdir($this->root . '/plugin/forms', 0777, true);
-        $this->write('plugin/forms/extra.php', $this->template('Extra', 'extra', ''));
+        mkdir($this->root . '/plugin/jotform-bridge-templates', 0777, true);
+        $this->write('plugin/jotform-bridge-templates/extra.php', $this->template('Extra', 'extra', ''));
 
         Filters\expectApplied('jotform_bridge_template_paths')
             ->once()
             ->andReturnUsing(
-                fn(array $paths): array => array_merge($paths, [$this->root . '/plugin/forms'])
+                fn(array $paths): array => array_merge($paths, [$this->root . '/plugin/jotform-bridge-templates'])
             );
 
         $result = (new TemplateScanner())->discover();
@@ -216,8 +216,8 @@ final class TemplateScannerTest extends TestCase
 
     public function testNestedDirectoriesAreNotScanned(): void
     {
-        mkdir($this->root . '/child/forms/partials', 0777, true);
-        $this->write('child/forms/partials/field.php', $this->template('Partial', 'partial', ''));
+        mkdir($this->root . '/child/jotform-bridge-templates/partials', 0777, true);
+        $this->write('child/jotform-bridge-templates/partials/field.php', $this->template('Partial', 'partial', ''));
 
         $result = (new TemplateScanner())->discover();
 
@@ -227,7 +227,7 @@ final class TemplateScannerTest extends TestCase
     public function testLiteralFieldIdentifiersAreExtracted(): void
     {
         $this->write(
-            'child/forms/contact.php',
+            'child/jotform-bridge-templates/contact.php',
             $this->template(
                 'Contact',
                 'contact',
@@ -251,7 +251,7 @@ final class TemplateScannerTest extends TestCase
     public function testDynamicFieldIdentifiersAreCountedButNotGuessed(): void
     {
         $this->write(
-            'child/forms/contact.php',
+            'child/jotform-bridge-templates/contact.php',
             $this->template(
                 'Contact',
                 'contact',
@@ -275,7 +275,7 @@ final class TemplateScannerTest extends TestCase
     public function testIdentifiersInsidePhpCommentsAreNotHarvested(): void
     {
         $this->write(
-            'child/forms/contact.php',
+            'child/jotform-bridge-templates/contact.php',
             "<?php\n"
             . "/**\n"
             . " * Jotform Template Name: Contact\n"
@@ -303,7 +303,7 @@ final class TemplateScannerTest extends TestCase
     public function testIdentifiersInsideHtmlCommentsAreStillFound(): void
     {
         $this->write(
-            'child/forms/contact.php',
+            'child/jotform-bridge-templates/contact.php',
             $this->template(
                 'Contact',
                 'contact',
@@ -324,7 +324,7 @@ final class TemplateScannerTest extends TestCase
      */
     public function testTemplateWithoutAnyFieldIsStillDiscovered(): void
     {
-        $this->write('child/forms/empty.php', $this->template('Empty', 'empty', '<p>Nothing</p>'));
+        $this->write('child/jotform-bridge-templates/empty.php', $this->template('Empty', 'empty', '<p>Nothing</p>'));
 
         $result = (new TemplateScanner())->discover();
 
@@ -338,7 +338,7 @@ final class TemplateScannerTest extends TestCase
     public function testTheScannerNeverIncludesATemplate(): void
     {
         $this->write(
-            'child/forms/contact.php',
+            'child/jotform-bridge-templates/contact.php',
             "<?php\n/*\nJotform Template Name: Contact\nJotform Template Slug: contact\n*/\n"
             . "define('JFB_TEMPLATE_WAS_EXECUTED', true);\n"
         );

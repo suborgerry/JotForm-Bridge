@@ -32,7 +32,7 @@ in an **integration**, which is a small record in the WordPress admin.
 
 Two rendering modes are available:
 
-* **Custom template** — a plain PHP file in your theme's `/forms/` directory.
+* **Custom template** — a plain PHP file in your theme's `/jotform-bridge-templates/` directory.
   This is the main use case. Templates are read from the theme as you go: add or
   edit a file and it is picked up immediately, with nothing to refresh.
 * **Auto** — markup generated from the Jotform form definition, so an
@@ -158,8 +158,8 @@ templates.
 
 = Where do templates live? =
 
-In a `forms/` directory inside your theme, e.g.
-`wp-content/themes/your-theme/forms/contact.php`. A child theme overrides a
+In a `jotform-bridge-templates/` directory inside your theme, e.g.
+`wp-content/themes/your-theme/jotform-bridge-templates/contact.php`. A child theme overrides a
 parent template with the same slug. Templates are discovered by reading their
 header — they are never executed during discovery.
 

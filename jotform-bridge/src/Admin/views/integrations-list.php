@@ -219,11 +219,18 @@ $jfbNewUrl = add_query_arg(['page' => $page, 'view' => 'new'], admin_url('admin.
         $jfbRoots = [];
 
         foreach ($templates->roots() as $jfbRoot) {
-            $jfbRoots[] = (string) $jfbRoot['path'];
+            // The theme name and the directory are the part anybody recognises;
+            // the rest of an absolute path only makes the line harder to read.
+            $jfbPath    = (string) $jfbRoot['path'];
+            $jfbRoots[] = basename(dirname($jfbPath)) . '/' . basename($jfbPath);
         }
 
         if ($jfbRoots === []) {
-            echo esc_html__('No template directory exists yet. Create a /forms/ directory in your theme.', 'jotform-bridge');
+            printf(
+                /* translators: %s: template directory name */
+                esc_html__('No template directory exists yet. Create a %s directory in your theme.', 'jotform-bridge'),
+                '<code>' . esc_html(TemplateScanner::DIRECTORY) . '</code>'
+            );
         } else {
             printf(
                 /* translators: %s: list of scanned directories */

@@ -22,7 +22,7 @@ final class TemplateRegistryTest extends TestCase
         $this->root    = sys_get_temp_dir() . '/jfb-registry-' . uniqid('', true);
         $this->options = [];
 
-        mkdir($this->root . '/theme/forms', 0777, true);
+        mkdir($this->root . '/theme/jotform-bridge-templates', 0777, true);
 
         Functions\when('get_stylesheet_directory')->justReturn($this->root . '/theme');
         Functions\when('get_template_directory')->justReturn($this->root . '/theme');
@@ -112,7 +112,7 @@ final class TemplateRegistryTest extends TestCase
 
         $this->assertTrue((new TemplateRegistry())->has('contact'));
 
-        unlink($this->root . '/theme/forms/contact.php');
+        unlink($this->root . '/theme/jotform-bridge-templates/contact.php');
 
         $registry = new TemplateRegistry();
 
@@ -179,7 +179,7 @@ final class TemplateRegistryTest extends TestCase
             'encoded traversal'   => ['%2e%2e%2fwp-config'],
             'absolute path'       => ['/etc/passwd'],
             'absolute php file'   => [__FILE__],
-            'the real template'   => ['theme/forms/contact.php'],
+            'the real template'   => ['theme/jotform-bridge-templates/contact.php'],
             'null byte'           => ["contact\0.php"],
             'remote url'          => ['https://evil.test/shell.php'],
             'stream wrapper'      => ['php://input'],
@@ -192,7 +192,7 @@ final class TemplateRegistryTest extends TestCase
 
         $registry = new TemplateRegistry();
 
-        $this->assertSame(realpath($this->root . '/theme/forms/contact.php'), $registry->file('contact'));
+        $this->assertSame(realpath($this->root . '/theme/jotform-bridge-templates/contact.php'), $registry->file('contact'));
     }
 
     public function testAVanishedFileIsNotHandedOutFromTheCache(): void
@@ -202,7 +202,7 @@ final class TemplateRegistryTest extends TestCase
         $registry = new TemplateRegistry();
         $registry->all();
 
-        unlink($this->root . '/theme/forms/contact.php');
+        unlink($this->root . '/theme/jotform-bridge-templates/contact.php');
 
         // The entry is still memoized for this request, but a path that is gone
         // must never be handed to the renderer.
@@ -213,7 +213,7 @@ final class TemplateRegistryTest extends TestCase
     private function write(string $file, string $name, string $slug, string $body): void
     {
         file_put_contents(
-            $this->root . '/theme/forms/' . $file,
+            $this->root . '/theme/jotform-bridge-templates/' . $file,
             "<?php\n/*\nJotform Template Name: {$name}\nJotform Template Slug: {$slug}\n*/\n?>\n{$body}\n"
         );
     }

@@ -36,7 +36,7 @@ final class TemplateScanner
      */
     public const HEADER_FORBIDDEN = 'Jotform Form ID';
 
-    public const DIRECTORY = 'forms';
+    public const DIRECTORY = 'jotform-bridge-templates';
 
     public const SOURCE_CHILD_THEME  = 'child_theme';
     public const SOURCE_PARENT_THEME = 'parent_theme';

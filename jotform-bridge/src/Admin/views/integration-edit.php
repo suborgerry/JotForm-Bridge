@@ -25,6 +25,7 @@ use JotformBridge\Admin\IntegrationsPage;
 use JotformBridge\Integrations\Integration;
 use JotformBridge\Integrations\RedirectTarget;
 use JotformBridge\Templates\CompatibilityReport;
+use JotformBridge\Templates\TemplateScanner;
 
 if (!defined('ABSPATH')) {
     exit;
@@ -153,7 +154,13 @@ $jfbReport  = $compatibility['report'] instanceof CompatibilityReport ? $compati
                     <?php if ($templates === []) : ?>
                         <p>
                             <strong><?php echo esc_html__('No templates registered.', 'jotform-bridge'); ?></strong>
-                            <?php echo esc_html__('Add a template to your theme /forms/ directory and rescan.', 'jotform-bridge'); ?>
+                            <?php
+                            printf(
+                                /* translators: %s: template directory name */
+                                esc_html__('Add a template to your theme %s directory and rescan.', 'jotform-bridge'),
+                                '<code>' . esc_html(TemplateScanner::DIRECTORY) . '</code>'
+                            );
+                            ?>
                         </p>
                     <?php else : ?>
                         <select id="jfb-template" name="jotform_integration[template]">
@@ -635,7 +642,7 @@ $jfbReport  = $compatibility['report'] instanceof CompatibilityReport ? $compati
                     'Built from the schema above. Save it as %s in your theme, then pick it as this integration\'s template — it appears in the select straight away. Restyle it however you like: only the data-jotform-* attributes matter.',
                     'jotform-bridge'
                 ),
-                '<code>' . esc_html('forms/' . $scaffoldFile) . '</code>'
+                '<code>' . esc_html(TemplateScanner::DIRECTORY . '/' . $scaffoldFile) . '</code>'
             );
             ?>
         </p>

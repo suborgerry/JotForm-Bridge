@@ -35,7 +35,7 @@ if (!defined('ABSPATH')) {
 final class TemplateScaffold
 {
     /**
-     * @return string PHP source for `wp-content/themes/<theme>/forms/<slug>.php`.
+     * @return string PHP source for `wp-content/themes/<theme>/jotform-bridge-templates/<slug>.php`.
      */
     public function build(Integration $integration, FormSchema $schema): string
     {

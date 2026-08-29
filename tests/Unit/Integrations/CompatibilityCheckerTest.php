@@ -38,7 +38,7 @@ final class CompatibilityCheckerTest extends TestCase
         $this->options    = [];
         $this->transients = [];
 
-        mkdir($this->root . '/theme/forms', 0777, true);
+        mkdir($this->root . '/theme/jotform-bridge-templates', 0777, true);
 
         Functions\when('get_stylesheet_directory')->justReturn($this->root . '/theme');
         Functions\when('get_template_directory')->justReturn($this->root . '/theme');
@@ -250,7 +250,7 @@ final class CompatibilityCheckerTest extends TestCase
     private function writeTemplate(string $slug, string $body): void
     {
         file_put_contents(
-            $this->root . '/theme/forms/' . $slug . '.php',
+            $this->root . '/theme/jotform-bridge-templates/' . $slug . '.php',
             "<?php\n/*\nJotform Template Name: Contact Form\nJotform Template Slug: {$slug}\n*/\n?>\n{$body}\n"
         );
     }

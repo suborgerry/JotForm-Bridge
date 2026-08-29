@@ -178,11 +178,11 @@ left out rather than half-rendered, and the admin says which ones.
 
 ## Custom templates
 
-Templates live in a `forms/` directory inside the theme:
+Templates live in a `jotform-bridge-templates/` directory inside the theme:
 
 ```text
 wp-content/themes/your-theme/
-└── forms/
+└── jotform-bridge-templates/
     ├── contact.php
     └── consultation.php
 ```
@@ -210,7 +210,7 @@ Adding, renaming or removing a template file takes effect immediately: the theme
 | `Jotform Template Slug` | yes | Identifier the integration stores |
 | `Jotform Form ID` | **rejected** | Binding a template to one form is the integration's job |
 
-A file in `forms/` with neither header is ignored silently — an ordinary theme
+A file in `jotform-bridge-templates/` with neither header is ignored silently — an ordinary theme
 partial in the same directory is not an error. A file with one header and not the
 other is reported as an error, because it was clearly meant to be a template.
 
@@ -311,7 +311,7 @@ from the schema only means the form follows the Jotform form when it changes.
 
 A ready-to-copy template ships with the plugin at
 [`jotform-bridge/examples/contact.php`](jotform-bridge/examples/contact.php).
-Copy it to `your-theme/forms/contact.php`. The short version:
+Copy it to `your-theme/jotform-bridge-templates/contact.php`. The short version:
 
 ```php
 <?php
@@ -486,7 +486,7 @@ Jotform and it reappears on the next refresh, because it is a form the account
 can use again.
 
 Templates are not on that list. They are read from the theme whenever the plugin
-needs to know what exists — drop a file into `forms/`, and it is in the select.
+needs to know what exists — drop a file into `jotform-bridge-templates/`, and it is in the select.
 Edit one, and the compatibility check describes the version on disk. There is
 nothing to press.
 
@@ -645,7 +645,7 @@ values.
 | Trashed forms dismissed by hand | option `jotform_bridge_forms_hidden` | never | **Remove from list** |
 
 The template list is deliberately absent: it is not stored at all. Only the
-header of each file in `forms/` is read, on demand and once per request, which
+header of each file in `jotform-bridge-templates/` is read, on demand and once per request, which
 is cheap enough not to need a cache — and a cache is exactly what used to let an
 edited template keep reporting the fields it declared yesterday.
 
@@ -719,7 +719,7 @@ Common situations:
 | "There is no integration with the slug …" | Typo in the slug, or the integration was renamed |
 | "Schema not synced" | Press Sync Schema on that integration; check the API key and the region |
 | Every API call fails on an EU account | The region is still set to Standard |
-| No template declares this slug | Check the two header lines in the file, and that it sits directly in `forms/` |
+| No template declares this slug | Check the two header lines in the file, and that it sits directly in `jotform-bridge-templates/` |
 | Submission answers 503 | The form was never synced, or the synced schema has errors — open the integration editor to see which |
 | A field is missing from Auto rendering | Its Jotform type is not supported; see the diagnostics |
 
