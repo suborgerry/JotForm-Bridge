@@ -476,3 +476,50 @@ Treat disagreement as information rather than as a verdict: the useful output is
 a place where two independent readings differ, which is a place worth looking at
 by hand.
 
+---
+
+## 15. Work out what Template diagnostics is for, and whether it earns its place
+
+**Problem.** The bottom of the integrations list carries a "Template
+diagnostics" block: a flat `<ul>` of `Error: …` / `Warning: …` / `Notice: …`
+lines from `TemplateScanner`. Nobody has decided who reads it or what they do
+next, and the code shows it.
+
+The evidence that it was never finished:
+
+* `CODE_DYNAMIC_FIELD` and `CODE_NO_FIELDS` are declared as constants and never
+  emitted by anything. Two of the nine codes are decoration.
+* Every diagnostic carries `code`, `file` and `slug`. The view prints `level`
+  and `message` and throws the other three away — so the block can tell you a
+  template is overridden but not offer the path, and cannot be filtered,
+  grouped, or linked to the integration it affects.
+* It renders whenever the scan produces anything, whether or not any integration
+  uses the template concerned. A parent-theme template nobody has bound is a
+  `notice` on a screen about integrations.
+* The three levels are printed with `ucfirst()` and no styling. An `error` that
+  stops a form rendering looks exactly like a `notice` that a child theme is
+  doing the normal thing.
+
+**The question to answer first.** Who is this for? There are two plausible
+readers and they want different things:
+
+* the developer who just added a template file and is asking "why is it not in
+  the select" — wants the file path, the specific reason, and to be looking at
+  it near the template list;
+* the site owner whose form stopped rendering — wants to know which integration
+  is affected, and everything else is noise. That reader is already served
+  better elsewhere: the integration row goes red and says
+  "No theme file named x.php. This form does not render."
+
+**Shape, once that is answered.** Probably: keep the errors and warnings, attach
+them to the template row they concern rather than to a separate list, drop the
+notices or fold them into the Templates table (an overridden template is a fact
+about that row, not an incident), and either emit the two unused codes or delete
+them. If the honest answer turns out to be that the integration rows and the
+Templates table already cover every case a person can act on, then the right
+outcome is to delete the block — which is a good outcome, not a failure.
+
+**Why it is parked.** It is a design question before it is a code change, and
+answering it wrongly means building a second notification surface next to one
+that already works.
+
