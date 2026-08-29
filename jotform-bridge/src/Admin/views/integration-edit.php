@@ -638,7 +638,7 @@ $jfbReport  = $compatibility['report'] instanceof CompatibilityReport ? $compati
             printf(
                 /* translators: %s: file name to create in the theme */
                 esc_html__(
-                    'Built from the schema above. Save it as %s in your theme, then pick it as this integration\'s template — it appears in the select straight away. Restyle it however you like: only the data-jotform-* attributes matter.',
+                    'Built from the schema above. Save it as %s in your theme.',
                     'jotform-bridge'
                 ),
                 '<code>' . esc_html(TemplateScanner::DIRECTORY . '/' . $scaffoldFile) . '</code>'
