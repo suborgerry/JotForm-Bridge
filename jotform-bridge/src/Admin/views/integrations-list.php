@@ -33,15 +33,6 @@ $jfbNewUrl = add_query_arg(['page' => $page, 'view' => 'new'], admin_url('admin.
 
     <?php require __DIR__ . '/partials/notice.php'; ?>
 
-    <p class="description">
-        <?php
-        echo esc_html__(
-            'An integration is the local name your theme uses. Theme code never needs a Jotform form ID.',
-            'jotform-bridge'
-        );
-        ?>
-    </p>
-
     <table class="widefat striped">
         <thead>
             <tr>
