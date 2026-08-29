@@ -17,7 +17,7 @@ if (!defined('ABSPATH')) {
  * "Jotform Bridge → Settings" admin screen and its actions.
  *
  * The screen only reads stored state; Jotform is contacted from the explicit
- * Test Connection and Sync with Jotform actions.
+ * Sync with Jotform action and from nowhere else.
  */
 final class SettingsPage
 {
@@ -25,7 +25,6 @@ final class SettingsPage
     public const CAPABILITY = 'manage_options';
 
     public const ACTION_SAVE    = 'jotform_bridge_save_settings';
-    public const ACTION_TEST    = 'jotform_bridge_test_connection';
     public const ACTION_REFRESH = 'jotform_bridge_refresh_forms';
     public const ACTION_REMOVE  = 'jotform_bridge_remove_form';
 
@@ -55,7 +54,6 @@ final class SettingsPage
     {
         add_action('admin_menu', [$this, 'registerMenu']);
         add_action('admin_post_' . self::ACTION_SAVE, [$this, 'handleSave']);
-        add_action('admin_post_' . self::ACTION_TEST, [$this, 'handleTestConnection']);
         add_action('admin_post_' . self::ACTION_REFRESH, [$this, 'handleRefreshForms']);
         add_action('admin_post_' . self::ACTION_REMOVE, [$this, 'handleRemoveForm']);
     }
@@ -108,33 +106,34 @@ final class SettingsPage
         $this->redirect('saved');
     }
 
-    public function handleTestConnection(): void
+    /**
+     * The one action on this screen that contacts Jotform.
+     *
+     * It answers both questions a site owner has here — "is the key working?"
+     * and "what forms are on the account?" — because they were never separate
+     * in practice: a connection test that is not followed by a sync tells you
+     * nothing you can act on, and a sync that fails is a failed connection test
+     * with extra steps. It used to be two buttons, and the second one silently
+     * depended on the first having been pressed at some point: the account name
+     * shown on this screen came only from the connection test.
+     *
+     * `GET /user` first, because it is the cheaper of the two calls and the one
+     * whose failure explains the other.
+     */
+    public function handleRefreshForms(): void
     {
-        $this->guard(self::ACTION_TEST);
+        $this->guard(self::ACTION_REFRESH);
 
         if (!$this->settings->hasApiKey()) {
             $this->connection->recordFailure(__('No API key configured.', 'jotform-bridge'));
             $this->redirect('no_key');
         }
 
-        $response = $this->client->testConnection();
+        $account = $this->client->testConnection();
 
-        if (!$response->isSuccess()) {
-            $this->connection->recordFailure($response->errorMessage());
+        if (!$account->isSuccess()) {
+            $this->connection->recordFailure($account->errorMessage());
             $this->redirect('connection_failed');
-        }
-
-        $data = $response->data();
-        $this->connection->recordSuccess(isset($data['username']) ? (string) $data['username'] : '');
-        $this->redirect('connected');
-    }
-
-    public function handleRefreshForms(): void
-    {
-        $this->guard(self::ACTION_REFRESH);
-
-        if (!$this->settings->hasApiKey()) {
-            $this->redirect('no_key');
         }
 
         $response = $this->forms->refresh();
@@ -144,7 +143,9 @@ final class SettingsPage
             $this->redirect('forms_failed');
         }
 
-        $this->connection->recordSuccess($this->connection->get()['account']);
+        $data = $account->data();
+
+        $this->connection->recordSuccess(isset($data['username']) ? (string) $data['username'] : '');
         $this->redirect('forms_refreshed');
     }
 
@@ -215,16 +216,6 @@ final class SettingsPage
                 'type'    => 'success',
                 'message' => __('Settings saved.', 'jotform-bridge'),
             ],
-            'connected' => [
-                'type'    => 'success',
-                'message' => $connection['account'] !== ''
-                    ? sprintf(
-                        /* translators: %s: Jotform account username */
-                        __('Connected to Jotform as %s.', 'jotform-bridge'),
-                        $connection['account']
-                    )
-                    : __('Connected to Jotform.', 'jotform-bridge'),
-            ],
             'connection_failed' => [
                 'type'    => 'error',
                 'message' => $connection['message'] !== ''
@@ -233,11 +224,28 @@ final class SettingsPage
             ],
             'forms_refreshed' => [
                 'type'    => 'success',
-                'message' => sprintf(
-                    /* translators: %d: number of forms */
-                    _n('%d form loaded from Jotform.', '%d forms loaded from Jotform.', $formsMeta['count'], 'jotform-bridge'),
-                    $formsMeta['count']
-                ),
+                'message' => $connection['account'] !== ''
+                    ? sprintf(
+                        /* translators: 1: number of forms, 2: Jotform account username */
+                        _n(
+                            '%1$d form loaded from Jotform, connected as %2$s.',
+                            '%1$d forms loaded from Jotform, connected as %2$s.',
+                            $formsMeta['count'],
+                            'jotform-bridge'
+                        ),
+                        $formsMeta['count'],
+                        $connection['account']
+                    )
+                    : sprintf(
+                        /* translators: %d: number of forms */
+                        _n(
+                            '%d form loaded from Jotform.',
+                            '%d forms loaded from Jotform.',
+                            $formsMeta['count'],
+                            'jotform-bridge'
+                        ),
+                        $formsMeta['count']
+                    ),
             ],
             'forms_failed' => [
                 'type'    => 'error',

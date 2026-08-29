@@ -128,8 +128,8 @@ unzipping. The plugin ships its own autoloader.
 
 `define( 'JOTFORM_API_KEY', '...' );`
 
-3. Go to **Jotform Bridge → Settings**, pick the API region and save. Use
-   **Test Connection** to confirm, then **Sync with Jotform**.
+3. Go to **Jotform Bridge → Settings**, pick the API region and save, then press
+   **Sync with Jotform**: it checks the key and loads your form list.
 4. Go to **Jotform Bridge → Integrations**, add an integration, and pick its
    Jotform form and rendering mode.
 

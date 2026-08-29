@@ -75,7 +75,7 @@ the integration and the synced Jotform form definition.
 2. Add the API key to `wp-config.php` (see below). Until it is there, the admin
    screens say so and nothing can talk to Jotform.
 3. **Jotform Bridge → Settings** — choose the API region, save.
-4. Press **Test Connection**, then **Sync with Jotform** to load your account's form
+4. Press **Sync with Jotform**: it checks the key and loads your account's form
    list.
 5. **Jotform Bridge → Integrations → Add Integration** — name it, pick the
    Jotform form and the rendering mode.
@@ -475,8 +475,7 @@ background refresh and no expiry anywhere in the plugin.
 | Action | Where | What it does |
 | --- | --- | --- |
 | **Sync Schema** | Integration editor | Reloads **one** form's definition, re-normalizes it, stores it and re-checks compatibility |
-| **Test Connection** | Settings | One read-only `GET /user` call; records the result |
-| **Sync with Jotform** | Settings | Reloads the account form list from Jotform |
+| **Sync with Jotform** | Settings | Checks the key with a read-only `GET /user`, then reloads the account form list |
 | **Remove from list** | Settings, on a form Jotform reports as `DELETED` | Drops that row from the stored list; nothing is sent to Jotform |
 | **Send Test Submission** | Integration editor | Sends one real submission built from the stored schema and shows Jotform's answer verbatim |
 

@@ -210,8 +210,8 @@ if (!$jfbHasKey) {
         } else {
             printf(
                 '<strong>%s</strong> %s',
-                esc_html__('Not tested yet.', 'jotform-bridge'),
-                esc_html__('Run Test Connection to check the API key.', 'jotform-bridge')
+                esc_html__('Not checked yet.', 'jotform-bridge'),
+                esc_html__('Press Sync with Jotform to check the key and load the form list.', 'jotform-bridge')
             );
         }
         ?>
@@ -229,15 +229,18 @@ if (!$jfbHasKey) {
     <?php endif; ?>
     <div class="jfb-actions">
         <form method="post" action="<?php echo esc_url(admin_url('admin-post.php')); ?>" class="jfb-action-form">
-            <input type="hidden" name="action" value="<?php echo esc_attr(SettingsPage::ACTION_TEST); ?>">
-            <?php wp_nonce_field(SettingsPage::ACTION_TEST); ?>
-            <?php submit_button(__('Test Connection', 'jotform-bridge'), 'secondary', 'submit', false); ?>
-        </form>
-        <form method="post" action="<?php echo esc_url(admin_url('admin-post.php')); ?>" class="jfb-action-form">
             <input type="hidden" name="action" value="<?php echo esc_attr(SettingsPage::ACTION_REFRESH); ?>">
             <?php wp_nonce_field(SettingsPage::ACTION_REFRESH); ?>
-            <?php submit_button(__('Sync with Jotform', 'jotform-bridge'), 'secondary', 'submit', false); ?>
+            <?php submit_button(__('Sync with Jotform', 'jotform-bridge'), 'primary', 'submit', false); ?>
         </form>
+        <p class="description">
+            <?php
+            echo esc_html__(
+                'Checks the API key and reloads the account form list. Nothing on this screen contacts Jotform on its own.',
+                'jotform-bridge'
+            );
+            ?>
+        </p>
     </div>
 
     <h2><?php echo esc_html__('Jotform Forms', 'jotform-bridge'); ?></h2>

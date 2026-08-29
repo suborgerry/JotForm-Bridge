@@ -1383,9 +1383,13 @@ Actions:
 
 ```text
 Save
-Test Connection
 Sync with Jotform
 ```
+
+`Sync with Jotform` is the only action on this screen that contacts Jotform. It
+checks the key with `GET /user` and reloads the account form list in one go: a
+connection test that is not followed by a sync tells the site owner nothing they
+can act on, and a sync that fails is a failed connection test with extra steps.
 
 ## Integrations
 
