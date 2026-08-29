@@ -428,12 +428,6 @@ $jfbReport  = $compatibility['report'] instanceof CompatibilityReport ? $compati
         <?php endif; ?>
     <?php endif; ?>
 
-    <h2><?php echo esc_html__('Redirect target status', 'jotform-bridge'); ?></h2>
-    <p <?php echo RedirectTarget::isBroken($redirect) ? 'class="notice notice-warning inline"' : ''; ?>>
-        <strong><?php echo esc_html((string) $redirect['label']); ?></strong>
-        <?php echo esc_html((string) $redirect['message']); ?>
-    </p>
-
     <h2><?php echo esc_html__('Schema', 'jotform-bridge'); ?></h2>
 
     <div class="jfb-actions">

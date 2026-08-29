@@ -411,9 +411,8 @@ validation.
 
 If the chosen page is deleted, trashed, unpublished, or resolves off-site, the
 submission still succeeds — the answer simply carries no redirect and the form
-shows its success message instead. The Integrations list and the Integration
-screen both report this as **Redirect target status**, next to Schema status and
-Template compatibility, and the reason is written to the debug log when logging
+shows its success message instead. The integration editor says so next to the
+**Redirect Page** field, and the reason is written to the debug log when logging
 is on.
 
 A success answer with a redirect looks like this:

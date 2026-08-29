@@ -538,10 +538,6 @@ msgstr[1] ""
 msgid "A field most people trip over is usually a template that does not say what it wants, not a visitor problem."
 msgstr ""
 
-#: src/Admin/views/integration-edit.php:513
-msgid "Redirect target status"
-msgstr ""
-
 #: src/Admin/views/integration-edit.php:519
 #: src/Admin/views/integrations-list.php:48
 msgid "Schema"
