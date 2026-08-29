@@ -771,16 +771,12 @@ msgstr[1] ""
 msgid "Template diagnostics"
 msgstr ""
 
-#: src/Admin/views/settings-page.php:51
-msgid "Connection"
-msgstr ""
-
 #: src/Admin/views/settings-page.php:57
 msgid "Not configured."
 msgstr ""
 
 #: src/Admin/views/settings-page.php:58
-msgid "Set the JOTFORM_API_KEY constant in wp-config.php; see below."
+msgid "Set the JOTFORM_API_KEY constant in wp-config.php; see above."
 msgstr ""
 
 #: src/Admin/views/settings-page.php:63

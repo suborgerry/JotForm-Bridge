@@ -49,56 +49,6 @@ if (!$jfbHasKey) {
         </div>
     <?php endif; ?>
 
-    <h2><?php echo esc_html__('Connection', 'jotform-bridge'); ?></h2>
-    <p>
-        <?php
-        if (!$jfbHasKey) {
-            printf(
-                '<strong>%s</strong> %s',
-                esc_html__('Not configured.', 'jotform-bridge'),
-                esc_html__('Set the JOTFORM_API_KEY constant in wp-config.php; see below.', 'jotform-bridge')
-            );
-        } elseif ($connection['status'] === ConnectionState::STATUS_CONNECTED) {
-            printf(
-                '<strong>%s</strong> %s',
-                esc_html__('Connected.', 'jotform-bridge'),
-                esc_html(
-                    $connection['account'] !== ''
-                        ? sprintf(
-                            /* translators: %s: Jotform account username */
-                            __('Jotform account: %s', 'jotform-bridge'),
-                            $connection['account']
-                        )
-                        : ''
-                )
-            );
-        } elseif ($connection['status'] === ConnectionState::STATUS_FAILED) {
-            printf(
-                '<strong>%s</strong> %s',
-                esc_html__('Connection failed.', 'jotform-bridge'),
-                esc_html($connection['message'])
-            );
-        } else {
-            printf(
-                '<strong>%s</strong> %s',
-                esc_html__('Not tested yet.', 'jotform-bridge'),
-                esc_html__('Run Test Connection to check the API key.', 'jotform-bridge')
-            );
-        }
-        ?>
-    </p>
-    <?php if ($connection['checked_at'] > 0) : ?>
-        <p class="description">
-            <?php
-            printf(
-                /* translators: %s: human readable time difference, e.g. "5 mins" */
-                esc_html__('Last checked %s ago.', 'jotform-bridge'),
-                esc_html(human_time_diff($connection['checked_at'], time()))
-            );
-            ?>
-        </p>
-    <?php endif; ?>
-
     <form method="post" action="<?php echo esc_url(admin_url('admin-post.php')); ?>">
         <input type="hidden" name="action" value="<?php echo esc_attr(SettingsPage::ACTION_SAVE); ?>">
         <?php wp_nonce_field(SettingsPage::ACTION_SAVE); ?>
@@ -279,6 +229,54 @@ if (!$jfbHasKey) {
     </script>
 
     <h2><?php echo esc_html__('Actions', 'jotform-bridge'); ?></h2>
+    <p>
+        <?php
+        if (!$jfbHasKey) {
+            printf(
+                '<strong>%s</strong> %s',
+                esc_html__('Not configured.', 'jotform-bridge'),
+                esc_html__('Set the JOTFORM_API_KEY constant in wp-config.php; see above.', 'jotform-bridge')
+            );
+        } elseif ($connection['status'] === ConnectionState::STATUS_CONNECTED) {
+            printf(
+                '<strong>%s</strong> %s',
+                esc_html__('Connected.', 'jotform-bridge'),
+                esc_html(
+                    $connection['account'] !== ''
+                        ? sprintf(
+                            /* translators: %s: Jotform account username */
+                            __('Jotform account: %s', 'jotform-bridge'),
+                            $connection['account']
+                        )
+                        : ''
+                )
+            );
+        } elseif ($connection['status'] === ConnectionState::STATUS_FAILED) {
+            printf(
+                '<strong>%s</strong> %s',
+                esc_html__('Connection failed.', 'jotform-bridge'),
+                esc_html($connection['message'])
+            );
+        } else {
+            printf(
+                '<strong>%s</strong> %s',
+                esc_html__('Not tested yet.', 'jotform-bridge'),
+                esc_html__('Run Test Connection to check the API key.', 'jotform-bridge')
+            );
+        }
+        ?>
+    </p>
+    <?php if ($connection['checked_at'] > 0) : ?>
+        <p class="description">
+            <?php
+            printf(
+                /* translators: %s: human readable time difference, e.g. "5 mins" */
+                esc_html__('Last checked %s ago.', 'jotform-bridge'),
+                esc_html(human_time_diff($connection['checked_at'], time()))
+            );
+            ?>
+        </p>
+    <?php endif; ?>
     <div class="jfb-actions">
         <form method="post" action="<?php echo esc_url(admin_url('admin-post.php')); ?>" style="display:inline-block;margin-right:8px;">
             <input type="hidden" name="action" value="<?php echo esc_attr(SettingsPage::ACTION_TEST); ?>">
