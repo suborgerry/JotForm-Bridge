@@ -531,14 +531,6 @@ $jfbReport  = $compatibility['report'] instanceof CompatibilityReport ? $compati
             );
             ?>
         </p>
-        <p class="description">
-            <?php
-            echo esc_html__(
-                'The stored schema never expires and is never refreshed on its own. If the form changed in Jotform, sync it here.',
-                'jotform-bridge'
-            );
-            ?>
-        </p>
     <?php endif; ?>
 
     <?php if ($schemaStale) : ?>
