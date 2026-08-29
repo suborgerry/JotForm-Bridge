@@ -311,7 +311,7 @@ if (!$jfbHasKey) {
         <form method="post" action="<?php echo esc_url(admin_url('admin-post.php')); ?>" style="display:inline-block;">
             <input type="hidden" name="action" value="<?php echo esc_attr(SettingsPage::ACTION_REFRESH); ?>">
             <?php wp_nonce_field(SettingsPage::ACTION_REFRESH); ?>
-            <?php submit_button(__('Refresh Forms', 'jotform-bridge'), 'secondary', 'submit', false); ?>
+            <?php submit_button(__('Sync with Jotform', 'jotform-bridge'), 'secondary', 'submit', false); ?>
         </form>
     </div>
 
@@ -324,7 +324,7 @@ if (!$jfbHasKey) {
             <?php echo esc_html($formsMeta['error']); ?>
         </p>
     <?php elseif ($jfbFormsState === 'needs_refresh') : ?>
-        <p><?php echo esc_html__('Form list has not been loaded yet. Use Refresh Forms.', 'jotform-bridge'); ?></p>
+        <p><?php echo esc_html__('Form list has not been loaded yet. Use Sync with Jotform.', 'jotform-bridge'); ?></p>
     <?php else : ?>
         <p class="description">
             <?php

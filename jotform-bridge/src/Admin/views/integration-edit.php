@@ -103,7 +103,7 @@ $jfbReport  = $compatibility['report'] instanceof CompatibilityReport ? $compati
                     <?php if ($forms === []) : ?>
                         <p>
                             <strong><?php echo esc_html__('No forms stored yet.', 'jotform-bridge'); ?></strong>
-                            <?php echo esc_html__('Use Refresh Forms on the Settings screen first.', 'jotform-bridge'); ?>
+                            <?php echo esc_html__('Use Sync with Jotform on the Settings screen first.', 'jotform-bridge'); ?>
                         </p>
                     <?php else : ?>
                         <select id="jfb-form" name="jotform_integration[form_id]">

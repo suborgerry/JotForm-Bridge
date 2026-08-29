@@ -17,7 +17,7 @@ if (!defined('ABSPATH')) {
  * "Jotform Bridge → Settings" admin screen and its actions.
  *
  * The screen only reads stored state; Jotform is contacted from the explicit
- * Test Connection and Refresh Forms actions.
+ * Test Connection and Sync with Jotform actions.
  */
 final class SettingsPage
 {

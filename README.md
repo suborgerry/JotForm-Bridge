@@ -34,7 +34,7 @@ theme: templates address fields by readable identifiers such as `email` or
 * [Rendering a form](#rendering-a-form)
 * [Success redirect](#success-redirect)
 * [Compatibility validation](#compatibility-validation)
-* [Sync Schema, Refresh Forms](#sync-schema-refresh-forms)
+* [Sync Schema, Sync with Jotform](#sync-schema-sync-with-jotform)
 * [The REST endpoint](#the-rest-endpoint)
 * [JavaScript events](#javascript-events)
 * [Hooks](#hooks)
@@ -75,7 +75,7 @@ the integration and the synced Jotform form definition.
 2. Add the API key to `wp-config.php` (see below). Until it is there, the admin
    screens say so and nothing can talk to Jotform.
 3. **Jotform Bridge → Settings** — choose the API region, save.
-4. Press **Test Connection**, then **Refresh Forms** to load your account's form
+4. Press **Test Connection**, then **Sync with Jotform** to load your account's form
    list.
 5. **Jotform Bridge → Integrations → Add Integration** — name it, pick the
    Jotform form and the rendering mode.
@@ -465,7 +465,7 @@ guessed at — a wrong guess would either hide a real problem or invent one.
 
 ---
 
-## Sync Schema, Refresh Forms
+## Sync Schema, Sync with Jotform
 
 Every call to Jotform is a button somebody pressed. There is no cron job, no
 background refresh and no expiry anywhere in the plugin.
@@ -474,14 +474,14 @@ background refresh and no expiry anywhere in the plugin.
 | --- | --- | --- |
 | **Sync Schema** | Integrations list (per row) and integration editor | Reloads **one** form's definition, re-normalizes it, stores it and re-checks compatibility |
 | **Test Connection** | Settings | One read-only `GET /user` call; records the result |
-| **Refresh Forms** | Settings | Reloads the account form list from Jotform |
+| **Sync with Jotform** | Settings | Reloads the account form list from Jotform |
 | **Remove from list** | Settings, on a form Jotform reports as `DELETED` | Drops that row from the stored list; nothing is sent to Jotform |
 | **Send Test Submission** | Integration editor | Sends one real submission built from the stored schema and shows Jotform's answer verbatim |
 
 **Remove from list** is the one action that touches no API. Jotform keeps
 returning the forms in its trash, so a form deleted there would otherwise sit on
 the settings screen and in the integration editor's select forever. Removing it
-is remembered: the next **Refresh Forms** leaves it out. Restore the form in
+is remembered: the next **Sync with Jotform** leaves it out. Restore the form in
 Jotform and it reappears on the next refresh, because it is a form the account
 can use again.
 
@@ -641,7 +641,7 @@ values.
 | Data | Where | Expires | Written by |
 | --- | --- | --- | --- |
 | Normalized schema (one per form) | option `jotform_bridge_schema_{id}` | never | **Sync Schema** |
-| Account form list | option `jotform_bridge_forms` | never | **Refresh Forms** |
+| Account form list | option `jotform_bridge_forms` | never | **Sync with Jotform** |
 | Trashed forms dismissed by hand | option `jotform_bridge_forms_hidden` | never | **Remove from list** |
 
 The template list is deliberately absent: it is not stored at all. Only the

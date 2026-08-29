@@ -325,7 +325,7 @@ msgid "No forms stored yet."
 msgstr ""
 
 #: src/Admin/views/integration-edit.php:106
-msgid "Use Refresh Forms on the Settings screen first."
+msgid "Use Sync with Jotform on the Settings screen first."
 msgstr ""
 
 #: src/Admin/views/integration-edit.php:110
@@ -901,7 +901,7 @@ msgid "Test Connection"
 msgstr ""
 
 #: src/Admin/views/settings-page.php:288
-msgid "Refresh Forms"
+msgid "Sync with Jotform"
 msgstr ""
 
 #: src/Admin/views/settings-page.php:292
@@ -917,7 +917,7 @@ msgid "Forms unavailable."
 msgstr ""
 
 #: src/Admin/views/settings-page.php:301
-msgid "Form list has not been loaded yet. Use Refresh Forms."
+msgid "Form list has not been loaded yet. Use Sync with Jotform."
 msgstr ""
 
 #. translators: 1: number of forms, 2: human readable time difference

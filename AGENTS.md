@@ -1379,7 +1379,7 @@ Actions:
 ```text
 Save
 Test Connection
-Refresh Forms
+Sync with Jotform
 ```
 
 ## Integrations
@@ -1929,7 +1929,7 @@ Normalized Schema больше не cache, а сохранённое состо�
 3. Submission без синхронизированной schema отвечает 503 и не обращается к
    Jotform.
 4. Account form list подчиняется тому же правилу: option без TTL, обновляется
-   только кнопкой **Refresh Forms**.
+   только кнопкой **Sync with Jotform**.
 
 Цена решения принята сознательно: форма, изменённая в Jotform, продолжает
 работать по прежнему определению, пока владелец сайта не нажмёт Sync Schema.

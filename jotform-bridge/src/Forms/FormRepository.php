@@ -15,7 +15,7 @@ if (!defined('ABSPATH')) {
  * Durable, manually synchronized copy of the Jotform account form list.
  *
  * Like the schema, this is stored rather than cached: Jotform is contacted only
- * by the explicit "Refresh Forms" action on the settings screen, and nothing
+ * by the explicit "Sync with Jotform" action on the settings screen, and nothing
  * expires on its own. An expiring list would silently break the integration
  * editor — the form select would empty itself and saving would start failing —
  * at a moment nobody chose.
@@ -129,7 +129,7 @@ final class FormRepository
      * only make the integration editor lie about what can be connected.
      *
      * The id is remembered, because /user/forms keeps returning trashed forms
-     * and the next Refresh Forms would otherwise put the row straight back.
+     * and the next sync would otherwise put the row straight back.
      *
      * @return bool False when no trashed form with that id is stored.
      */
