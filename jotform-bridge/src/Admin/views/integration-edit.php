@@ -133,7 +133,7 @@ $jfbReport  = $compatibility['report'] instanceof CompatibilityReport ? $compati
                 </td>
             </tr>
 
-            <tr>
+            <tr class="jfb-template-field">
                 <th scope="row">
                     <label for="jfb-template"><?php echo esc_html__('Template', 'jotform-bridge'); ?></label>
                 </th>
@@ -247,27 +247,40 @@ $jfbReport  = $compatibility['report'] instanceof CompatibilityReport ? $compati
     </form>
 
     <script>
-        /* The redirect fields are only meaningful for the redirect action. With
-           JavaScript off both stay visible, which is a usable form, not a broken
-           one: the server ignores them unless the action asks for a redirect. */
+        /* The redirect fields are only meaningful for the redirect action, and the
+           template only for the custom mode. With JavaScript off everything stays
+           visible, which is a usable form, not a broken one: the server ignores
+           the fields the chosen action or mode does not ask for. */
         (function () {
-            var action = document.getElementById('jfb-success-action');
-            var rows = document.querySelectorAll('.jfb-redirect-field');
+            function toggle(control, selector, wanted) {
+                var rows = document.querySelectorAll(selector);
 
-            if (!action) {
-                return;
-            }
-
-            function sync() {
-                var show = action.value === '<?php echo esc_js(Integration::SUCCESS_REDIRECT); ?>';
-
-                for (var i = 0; i < rows.length; i++) {
-                    rows[i].style.display = show ? '' : 'none';
+                if (!control) {
+                    return;
                 }
+
+                function sync() {
+                    var show = control.value === wanted;
+
+                    for (var i = 0; i < rows.length; i++) {
+                        rows[i].style.display = show ? '' : 'none';
+                    }
+                }
+
+                control.addEventListener('change', sync);
+                sync();
             }
 
-            action.addEventListener('change', sync);
-            sync();
+            toggle(
+                document.getElementById('jfb-success-action'),
+                '.jfb-redirect-field',
+                '<?php echo esc_js(Integration::SUCCESS_REDIRECT); ?>'
+            );
+            toggle(
+                document.getElementById('jfb-mode'),
+                '.jfb-template-field',
+                '<?php echo esc_js(Integration::MODE_CUSTOM); ?>'
+            );
         })();
     </script>
 
