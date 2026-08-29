@@ -142,25 +142,6 @@ final class RedirectTarget
     }
 
     /**
-     * The redirect part of a success response, or null when there is none.
-     *
-     * @return array{url:string, delay:int}|null
-     */
-    public function resolve(Integration $integration): ?array
-    {
-        $target = $this->check($integration);
-
-        if ($target['state'] !== self::STATE_OK) {
-            return null;
-        }
-
-        return [
-            'url'   => $target['url'],
-            'delay' => $target['delay'],
-        ];
-    }
-
-    /**
      * The permalink of a page, but only if it stays on this site.
      *
      * wp_validate_redirect() does the host comparison WordPress itself trusts,

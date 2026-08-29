@@ -4,10 +4,6 @@ declare(strict_types=1);
 
 namespace JotformBridge\Submission;
 
-use JotformBridge\Api\ApiResponse;
-use JotformBridge\Api\JotformClient;
-use JotformBridge\Settings\Settings;
-use JotformBridge\Support\Features;
 
 if (!defined('ABSPATH')) {
     exit;
@@ -27,26 +23,20 @@ if (!defined('ABSPATH')) {
  * thousand addresses. This one asks "has this site sent an implausible amount
  * today?" and does not care where any of it came from.
  *
- * Two ceilings, whichever is lower:
+ * The ceiling is derived from the site's own recent history: six times the
+ * median of the last seven days, never below a floor. A sixfold jump is not a
+ * good day, it is an event worth stopping to look at. That needs no knowledge
+ * of the account and makes no requests of its own.
  *
- *  - A rate ceiling derived from the site's own recent history: six times the
- *    median of the last seven days, never below a floor. A sixfold jump is not
- *    a good day, it is an event worth stopping to look at.
- *  - What is left of the monthly allowance, when the site owner has entered
- *    what the allowance is. The spend is read from GET /user/usage, so it
- *    accounts for submissions this plugin knows nothing about, plus everything
- *    recorded here since that snapshot was taken.
+ * The plugin deliberately does not track how much of the account's monthly
+ * allowance is left. Doing so would mean asking the site owner for a number
+ * Jotform does not report, and polling GET /user/usage to keep a snapshot of
+ * the spend — a second source of truth that is stale by construction. What is
+ * kept instead is the reaction to Jotform actually refusing: that is not
+ * tracking, it is answering a refusal that has already happened, and ignoring
+ * it would only send the next visitor into the same wall.
  *
- * Nothing here contacts Jotform. The usage snapshot is refreshed from the admin
- * screens, never from a request a visitor is waiting on — the same rule the
- * schema follows.
- *
- * The allowance half is currently switched off (Features::ACCOUNT_QUOTA): the
- * setting is hidden, the spend is not read, and the ceiling it would impose does
- * not apply. What stays on is the daily rate ceiling, which needs no account
- * knowledge and makes no requests, and the reaction to Jotform actually
- * refusing — that is not tracking, it is answering a refusal that has already
- * happened, and ignoring it would only send the next visitor into the same wall.
+ * Nothing here contacts Jotform.
  */
 final class QuotaGuard
 {
@@ -54,9 +44,6 @@ final class QuotaGuard
 
     /** Refused because the site sent an implausible amount today. */
     public const REASON_DAILY = 'daily_ceiling';
-
-    /** Refused because the monthly allowance is spent or nearly spent. */
-    public const REASON_QUOTA = 'monthly_quota';
 
     /**
      * Jotform itself said the monthly submission allowance is gone.
@@ -90,23 +77,6 @@ final class QuotaGuard
     private const MEDIAN_DAYS  = 7;
 
     /**
-     * Share of the monthly allowance that turns the admin notice into a warning.
-     */
-    public const WARNING_SHARE = 0.9;
-
-    /**
-     * How long a usage snapshot is considered fresh enough, in seconds.
-     */
-    public const USAGE_TTL = 3600;
-
-    private Settings $settings;
-
-    public function __construct(?Settings $settings = null)
-    {
-        $this->settings = $settings ?? new Settings();
-    }
-
-    /**
      * The reason this submission may not be sent, or an empty string.
      *
      * Never contacts Jotform and never writes: it is called on every submission,
@@ -120,16 +90,8 @@ final class QuotaGuard
             return $state['reason'] !== '' ? $state['reason'] : self::REASON_DAILY;
         }
 
-        $remaining = $this->remainingThisMonth($state);
-
-        if ($remaining !== null && $remaining <= 0) {
-            return self::REASON_QUOTA;
-        }
-
         if ($this->countFor($state, $this->today()) >= $this->ceiling($state)) {
-            return $remaining !== null && $remaining <= $this->rateCeiling($state)
-                ? self::REASON_QUOTA
-                : self::REASON_DAILY;
+            return self::REASON_DAILY;
         }
 
         return '';
@@ -152,20 +114,15 @@ final class QuotaGuard
         $state = $this->state();
 
         $state['days'][$this->today()] = $this->countFor($state, $this->today()) + 1;
-        $state['since_check']++;
 
         $state = $this->prune($state);
 
         // Trip on the way past the ceiling rather than on the next request, so
         // the reason is recorded while the numbers that produced it are in hand.
         if ($state['days'][$this->today()] >= $this->ceiling($state)) {
-            $remaining = $this->remainingThisMonth($state);
-
             $state['tripped_at'] = time();
             $state['day']        = $this->today();
-            $state['reason']     = $remaining !== null && $remaining <= $this->rateCeiling($state)
-                ? self::REASON_QUOTA
-                : self::REASON_DAILY;
+            $state['reason']     = self::REASON_DAILY;
         }
 
         $this->save($state);
@@ -232,48 +189,6 @@ final class QuotaGuard
     }
 
     /**
-     * Refreshes the account-wide spend from Jotform.
-     *
-     * Called from the admin screens only. Returns null when the snapshot is
-     * still fresh, so a caller can simply ask on every page load.
-     */
-    public function refreshUsage(JotformClient $client, bool $force = false): ?ApiResponse
-    {
-        if (!Features::enabled(Features::ACCOUNT_QUOTA)) {
-            return null;
-        }
-
-        $state = $this->state();
-
-        if (!$force && $state['usage_checked_at'] > time() - self::USAGE_TTL) {
-            return null;
-        }
-
-        $response = $client->getUsage();
-
-        if (!$response->isSuccess()) {
-            // The previous snapshot is left in place: a stale number is a better
-            // basis for the ceiling than no number at all.
-            return $response;
-        }
-
-        $state['usage_submissions'] = (int) ($response->data()['submissions'] ?? 0);
-        $state['usage_checked_at']  = time();
-        $state['since_check']       = 0;
-
-        $limitLeft = $response->limitLeft();
-
-        if ($limitLeft !== null) {
-            $state['limit_left']    = $limitLeft;
-            $state['limit_seen_at'] = time();
-        }
-
-        $this->save($state);
-
-        return $response;
-    }
-
-    /**
      * Everything the admin screens need to describe the current situation.
      *
      * @return array{
@@ -284,14 +199,8 @@ final class QuotaGuard
      *     tripped_at: int,
      *     reason: string,
      *     day: string,
-     *     usage_submissions: int,
-     *     usage_checked_at: int,
-     *     since_check: int,
      *     limit_left: int,
-     *     limit_seen_at: int,
-     *     monthly_quota: int,
-     *     used: int,
-     *     remaining: int|null
+     *     limit_seen_at: int
      * }
      */
     public function status(): array
@@ -299,30 +208,9 @@ final class QuotaGuard
         $state = $this->state();
 
         return $state + [
-            'ceiling'   => $this->ceiling($state),
-            'median'    => $this->median($state),
-            'used'      => $state['usage_submissions'] + $state['since_check'],
-            'remaining' => $this->remainingThisMonth($state),
+            'ceiling' => $this->ceiling($state),
+            'median'  => $this->median($state),
         ];
-    }
-
-    /**
-     * Whether the account is close enough to its allowance to say so.
-     */
-    public function isNearQuota(): bool
-    {
-        if (!Features::enabled(Features::ACCOUNT_QUOTA)) {
-            return false;
-        }
-
-        $state = $this->state();
-        $quota = $this->settings->monthlyQuota();
-
-        if ($quota <= 0) {
-            return false;
-        }
-
-        return ($state['usage_submissions'] + $state['since_check']) >= (int) floor($quota * self::WARNING_SHARE);
     }
 
     public function isTripped(): bool
@@ -333,33 +221,11 @@ final class QuotaGuard
     }
 
     /**
-     * The effective ceiling for today's count: the rate ceiling, capped by
-     * whatever is left of the monthly allowance.
-     *
-     * The allowance is expressed as "how many more", while the ceiling is
-     * compared against "how many so far", so what is left has to be added to
-     * what today has already spent. Comparing the two directly would charge
-     * every submission twice — once to today's count and once to the remaining
-     * allowance — and halve the real budget.
+     * The ceiling today's count is compared against.
      *
      * @param array<string, mixed> $state
      */
     private function ceiling(array $state): int
-    {
-        $ceiling   = $this->rateCeiling($state);
-        $remaining = $this->remainingThisMonth($state);
-
-        if ($remaining !== null) {
-            $ceiling = min($ceiling, $this->countFor($state, $this->today()) + max(0, $remaining));
-        }
-
-        return $ceiling;
-    }
-
-    /**
-     * @param array<string, mixed> $state
-     */
-    private function rateCeiling(array $state): int
     {
         $ceiling = max(self::MIN_DAILY, self::BURST_FACTOR * $this->median($state));
 
@@ -371,30 +237,6 @@ final class QuotaGuard
          * @param array<string, mixed> $state   Raw guard state.
          */
         return max(1, (int) apply_filters('jotform_bridge_daily_ceiling', $ceiling, $this->median($state), $state));
-    }
-
-    /**
-     * How much of the monthly allowance is left, or null when it is unknown.
-     *
-     * The snapshot plus everything sent since it was taken: the snapshot alone
-     * would be an undercount between refreshes, and an undercount is the
-     * dangerous direction for a safety mechanism.
-     *
-     * @param array<string, mixed> $state
-     */
-    private function remainingThisMonth(array $state): ?int
-    {
-        if (!Features::enabled(Features::ACCOUNT_QUOTA)) {
-            return null;
-        }
-
-        $quota = $this->settings->monthlyQuota();
-
-        if ($quota <= 0 || $state['usage_checked_at'] <= 0) {
-            return null;
-        }
-
-        return $quota - ($state['usage_submissions'] + $state['since_check']);
     }
 
     /**
@@ -476,12 +318,8 @@ final class QuotaGuard
      *     tripped_at: int,
      *     reason: string,
      *     day: string,
-     *     usage_submissions: int,
-     *     usage_checked_at: int,
-     *     since_check: int,
      *     limit_left: int,
-     *     limit_seen_at: int,
-     *     monthly_quota: int
+     *     limit_seen_at: int
      * }
      */
     private function state(): array
@@ -501,17 +339,13 @@ final class QuotaGuard
         }
 
         return [
-            'days'              => $days,
-            'today'             => $days[$this->today()] ?? 0,
-            'tripped_at'        => isset($stored['tripped_at']) ? (int) $stored['tripped_at'] : 0,
-            'reason'            => isset($stored['reason']) ? (string) $stored['reason'] : '',
-            'day'               => isset($stored['day']) ? (string) $stored['day'] : '',
-            'usage_submissions' => isset($stored['usage_submissions']) ? (int) $stored['usage_submissions'] : 0,
-            'usage_checked_at'  => isset($stored['usage_checked_at']) ? (int) $stored['usage_checked_at'] : 0,
-            'since_check'       => isset($stored['since_check']) ? (int) $stored['since_check'] : 0,
-            'limit_left'        => isset($stored['limit_left']) ? (int) $stored['limit_left'] : -1,
-            'limit_seen_at'     => isset($stored['limit_seen_at']) ? (int) $stored['limit_seen_at'] : 0,
-            'monthly_quota'     => $this->settings->monthlyQuota(),
+            'days'          => $days,
+            'today'         => $days[$this->today()] ?? 0,
+            'tripped_at'    => isset($stored['tripped_at']) ? (int) $stored['tripped_at'] : 0,
+            'reason'        => isset($stored['reason']) ? (string) $stored['reason'] : '',
+            'day'           => isset($stored['day']) ? (string) $stored['day'] : '',
+            'limit_left'    => isset($stored['limit_left']) ? (int) $stored['limit_left'] : -1,
+            'limit_seen_at' => isset($stored['limit_seen_at']) ? (int) $stored['limit_seen_at'] : 0,
         ];
     }
 
@@ -523,15 +357,12 @@ final class QuotaGuard
         update_option(
             self::OPTION,
             [
-                'days'              => $state['days'],
-                'tripped_at'        => (int) $state['tripped_at'],
-                'reason'            => (string) $state['reason'],
-                'day'               => (string) $state['day'],
-                'usage_submissions' => (int) $state['usage_submissions'],
-                'usage_checked_at'  => (int) $state['usage_checked_at'],
-                'since_check'       => max(0, (int) $state['since_check']),
-                'limit_left'        => (int) $state['limit_left'],
-                'limit_seen_at'     => (int) $state['limit_seen_at'],
+                'days'          => $state['days'],
+                'tripped_at'    => (int) $state['tripped_at'],
+                'reason'        => (string) $state['reason'],
+                'day'           => (string) $state['day'],
+                'limit_left'    => (int) $state['limit_left'],
+                'limit_seen_at' => (int) $state['limit_seen_at'],
             ],
             false
         );

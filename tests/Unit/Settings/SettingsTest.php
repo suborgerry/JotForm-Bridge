@@ -365,7 +365,6 @@ final class SettingsTest extends TestCase
         $settings->baseUrl();
         $settings->debugEnabled();
         $settings->deletesDataOnUninstall();
-        $settings->monthlyQuota();
 
         $this->assertSame(1, $reads);
     }

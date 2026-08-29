@@ -5,10 +5,7 @@ declare(strict_types=1);
 namespace JotformBridge\Tests\Unit\Submission;
 
 use Brain\Monkey\Functions;
-use JotformBridge\Api\JotformClient;
-use JotformBridge\Settings\Settings;
 use JotformBridge\Submission\QuotaGuard;
-use JotformBridge\Support\Features;
 use JotformBridge\Tests\TestCase;
 
 final class QuotaGuardTest extends TestCase
@@ -81,30 +78,6 @@ final class QuotaGuardTest extends TestCase
      * While the allowance half is hidden, nothing about it may influence a
      * submission: no ceiling from it, no warning, no request to find out.
      */
-    public function testTheAllowanceIsIgnoredWhileItIsHidden(): void
-    {
-        $this->options[Settings::OPTION]   = ['monthly_quota' => 100];
-        $this->options[QuotaGuard::OPTION] = [
-            'days'              => [],
-            'usage_submissions' => 100,
-            'usage_checked_at'  => time(),
-            'since_check'       => 0,
-        ];
-
-        Functions\when('wp_remote_get')->alias(
-            static function (): void {
-                throw new \RuntimeException('A hidden feature must not make requests.');
-            }
-        );
-
-        $guard = $this->guard();
-
-        $this->assertTrue($guard->allows());
-        $this->assertNull($guard->status()['remaining']);
-        $this->assertSame(QuotaGuard::MIN_DAILY, $guard->status()['ceiling']);
-        $this->assertFalse($guard->isNearQuota());
-        $this->assertNull($guard->refreshUsage(new JotformClient('key', 'https://api.jotform.com')));
-    }
 
     public function testAQuietSiteStillGetsTheFloor(): void
     {
@@ -131,105 +104,15 @@ final class QuotaGuardTest extends TestCase
         $this->assertSame($before, $guard->status()['ceiling']);
     }
 
-    public function testTheRemainingAllowanceCapsTheCeiling(): void
-    {
-        $this->enableAccountQuota();
-
-        $this->options[Settings::OPTION] = ['monthly_quota' => 100];
-        $this->options[QuotaGuard::OPTION] = [
-            'days'              => [],
-            'usage_submissions' => 93,
-            'usage_checked_at'  => time(),
-            'since_check'       => 0,
-        ];
-
-        $guard = $this->guard();
-
-        // Seven left, which is far below the daily floor.
-        $this->assertSame(7, $guard->status()['remaining']);
-        $this->assertSame(7, $guard->status()['ceiling']);
-
-        for ($i = 0; $i < 7; $i++) {
-            $this->assertTrue($guard->allows());
-            $guard->record();
-        }
-
-        $this->assertFalse($guard->allows());
-        $this->assertSame(QuotaGuard::REASON_QUOTA, $guard->check());
-    }
-
     /**
      * Submissions sent since the snapshot count too — a stale snapshot alone
      * would undercount, which is the dangerous direction here.
      */
-    public function testSubmissionsSinceTheSnapshotCountTowardsTheAllowance(): void
-    {
-        $this->enableAccountQuota();
-
-        $this->options[Settings::OPTION]   = ['monthly_quota' => 100];
-        $this->options[QuotaGuard::OPTION] = [
-            'days'              => [],
-            'usage_submissions' => 90,
-            'usage_checked_at'  => time(),
-            'since_check'       => 0,
-        ];
-
-        $guard = $this->guard();
-        $guard->record();
-        $guard->record();
-
-        $this->assertSame(92, $guard->status()['used']);
-        $this->assertSame(8, $guard->status()['remaining']);
-    }
-
-    public function testAnExhaustedAllowanceRefusesEverything(): void
-    {
-        $this->enableAccountQuota();
-
-        $this->options[Settings::OPTION]   = ['monthly_quota' => 100];
-        $this->options[QuotaGuard::OPTION] = [
-            'days'              => [],
-            'usage_submissions' => 100,
-            'usage_checked_at'  => time(),
-            'since_check'       => 0,
-        ];
-
-        $this->assertSame(QuotaGuard::REASON_QUOTA, $this->guard()->check());
-    }
 
     /**
      * Without the allowance entered there is nothing to compare against, so the
      * rate ceiling is the only thing left.
      */
-    public function testAnUnknownAllowanceLeavesOnlyTheRateCeiling(): void
-    {
-        $this->options[QuotaGuard::OPTION] = [
-            'days'              => [],
-            'usage_submissions' => 5000,
-            'usage_checked_at'  => time(),
-        ];
-
-        $guard = $this->guard();
-
-        $this->assertNull($guard->status()['remaining']);
-        $this->assertSame(QuotaGuard::MIN_DAILY, $guard->status()['ceiling']);
-    }
-
-    public function testTheWarningFiresBeforeTheAllowanceIsGone(): void
-    {
-        $this->enableAccountQuota();
-
-        $this->options[Settings::OPTION]   = ['monthly_quota' => 100];
-        $this->options[QuotaGuard::OPTION] = [
-            'usage_submissions' => 90,
-            'usage_checked_at'  => time(),
-        ];
-
-        $guard = $this->guard();
-
-        $this->assertTrue($guard->isNearQuota());
-        $this->assertTrue($guard->allows(), 'A warning must not stop submissions on its own.');
-    }
 
     public function testResettingClearsTheTripAndTodaysCount(): void
     {
@@ -297,88 +180,14 @@ final class QuotaGuardTest extends TestCase
         $this->assertLessThanOrEqual(30, count($this->options[QuotaGuard::OPTION]['days']));
     }
 
-    public function testAFreshSnapshotIsNotRefetched(): void
-    {
-        $this->enableAccountQuota();
-
-        $this->options[QuotaGuard::OPTION] = [
-            'usage_submissions' => 12,
-            'usage_checked_at'  => time(),
-        ];
-
-        Functions\when('wp_remote_get')->alias(
-            static function (): void {
-                throw new \RuntimeException('A fresh snapshot must not be refetched.');
-            }
-        );
-
-        $this->assertNull(
-            $this->guard()->refreshUsage(new JotformClient('key', 'https://api.jotform.com'))
-        );
-    }
-
-    public function testARefreshStoresTheSpendAndClearsTheSinceCounter(): void
-    {
-        $this->enableAccountQuota();
-
-        $this->options[QuotaGuard::OPTION] = ['since_check' => 9, 'usage_checked_at' => 0];
-
-        $response = $this->httpResponse(200, ['responseCode' => 200, 'content' => ['submissions' => 42]]);
-
-        Functions\when('wp_remote_get')->justReturn($response);
-
-        $guard  = $this->guard();
-        $result = $guard->refreshUsage(new JotformClient('key', 'https://api.jotform.com'));
-
-        $this->assertNotNull($result);
-        $this->assertTrue($result->isSuccess());
-        $this->assertSame(42, $guard->status()['usage_submissions']);
-        $this->assertSame(0, $guard->status()['since_check']);
-    }
-
     /**
      * A failed refresh must not throw the previous number away: a stale figure
      * is a better basis for the ceiling than none.
      */
-    public function testAFailedRefreshKeepsThePreviousSnapshot(): void
-    {
-        $this->enableAccountQuota();
-
-        $this->options[QuotaGuard::OPTION] = [
-            'usage_submissions' => 42,
-            'usage_checked_at'  => 1,
-        ];
-
-        Functions\when('wp_remote_get')->justReturn(new \WP_Error('http_request_failed', 'down'));
-
-        $guard  = $this->guard();
-        $result = $guard->refreshUsage(new JotformClient('key', 'https://api.jotform.com'));
-
-        $this->assertNotNull($result);
-        $this->assertFalse($result->isSuccess());
-        $this->assertSame(42, $guard->status()['usage_submissions']);
-    }
-
-    /**
-     * The allowance half of the guard is hidden by default, so a test that is
-     * about it has to switch it on.
-     */
-    private function enableAccountQuota(): void
-    {
-        Functions\when('apply_filters')->alias(
-            static function (string $hook, $value, ...$args) {
-                if ($hook === 'jotform_bridge_feature_enabled' && ($args[0] ?? '') === Features::ACCOUNT_QUOTA) {
-                    return true;
-                }
-
-                return $value;
-            }
-        );
-    }
 
     private function guard(): QuotaGuard
     {
-        return new QuotaGuard(new Settings());
+        return new QuotaGuard();
     }
 
     /**

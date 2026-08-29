@@ -10,7 +10,6 @@ use JotformBridge\Integrations\Integration;
 use JotformBridge\Integrations\IntegrationRepository;
 use JotformBridge\Integrations\RedirectTarget;
 use JotformBridge\Support\Logger;
-use JotformBridge\Support\Stats;
 
 if (!defined('ABSPATH')) {
     exit;
@@ -22,14 +21,14 @@ if (!defined('ABSPATH')) {
  * The REST controller owns none of this: it unwraps the HTTP request, calls
  * submit() and serializes the outcome. That keeps the pipeline testable without
  * WordPress and makes the security-relevant order explicit in one place —
- * site-wide rate limit, lookup, activity, per-integration rate limit, quota
- * guard, schema, validation, duplicate check, spam check, mapping, upstream
- * call. Each step is cheaper than the one after it, so the requests worth
- * refusing are refused before the expensive work happens.
+ * site-wide rate limit, lookup, per-integration rate limit, quota guard,
+ * schema, validation, duplicate check, spam check, mapping, upstream call. Each
+ * step is cheaper than the one after it, so the requests worth refusing are
+ * refused before the expensive work happens.
  *
  * Every one of those refusals that is not the visitor's own doing answers
  * identically, so the endpoint cannot be asked which slugs exist. Which of them
- * it was is recorded — in the tally, in the debug log — for the site owner.
+ * it was goes to the debug log for the site owner.
  *
  * The visitor never influences which Jotform form is used: the slug is a lookup
  * key and nothing more.
@@ -68,8 +67,6 @@ final class SubmissionPipeline
 
     private QuotaGuard $quota;
 
-    private Stats $stats;
-
     public function __construct(
         IntegrationRepository $integrations,
         SchemaRepository $schemas,
@@ -80,13 +77,11 @@ final class SubmissionPipeline
         ?Logger $logger = null,
         ?RedirectTarget $redirects = null,
         ?RateLimiter $limiter = null,
-        ?QuotaGuard $quota = null,
-        ?Stats $stats = null
+        ?QuotaGuard $quota = null
     ) {
         $this->redirects = $redirects ?? new RedirectTarget();
         $this->limiter   = $limiter ?? new RateLimiter();
         $this->quota     = $quota ?? new QuotaGuard();
-        $this->stats     = $stats ?? new Stats();
         $this->integrations = $integrations;
         $this->schemas      = $schemas;
         $this->client       = $client;
@@ -113,7 +108,7 @@ final class SubmissionPipeline
         if ($wait > 0) {
             // No integration has been resolved yet, so the slug the request
             // named is not to be trusted as a bucket name.
-            return $this->throttled(Stats::GLOBAL_SCOPE, $slug, $wait);
+            return $this->throttled($slug, $wait);
         }
 
         $integration = $slug === '' ? null : $this->integrations->get($slug);
@@ -123,7 +118,7 @@ final class SubmissionPipeline
                 'integration' => $slug,
             ]);
 
-            return $this->count(Stats::GLOBAL_SCOPE, Stats::UNKNOWN, $this->unavailable());
+            return $this->unavailable();
         }
 
         // The tighter, per-integration budget. Like the site-wide one it needs
@@ -132,7 +127,7 @@ final class SubmissionPipeline
         $wait = $this->limiter->check($slug, $ip);
 
         if ($wait > 0) {
-            return $this->throttled($slug, $slug, $wait);
+            return $this->throttled($slug, $wait);
         }
 
         // The account-wide circuit breaker. It answers before the schema is
@@ -147,17 +142,13 @@ final class SubmissionPipeline
                 'reason'      => $blocked,
             ]);
 
-            return $this->count($slug, Stats::QUOTA, $this->unavailable());
+            return $this->unavailable();
         }
 
         if (!is_array($fields)) {
-            return $this->count(
-                $slug,
-                Stats::EMPTY_BODY,
-                SubmissionOutcome::invalid(
-                    __('Validation failed.', 'jotform-bridge'),
-                    [ValidationResult::FORM_KEY => __('No form data was submitted.', 'jotform-bridge')]
-                )
+            return SubmissionOutcome::invalid(
+                __('Validation failed.', 'jotform-bridge'),
+                [ValidationResult::FORM_KEY => __('No form data was submitted.', 'jotform-bridge')]
             );
         }
 
@@ -172,7 +163,7 @@ final class SubmissionPipeline
                 'error'       => $response->errorCode(),
             ]);
 
-            return $this->count($slug, Stats::NO_SCHEMA, $this->unavailable());
+            return $this->unavailable();
         }
 
         $schema = $response->data()['schema'];
@@ -182,20 +173,13 @@ final class SubmissionPipeline
                 'integration' => $slug,
             ]);
 
-            return $this->count($slug, Stats::NO_SCHEMA, $this->unavailable());
+            return $this->unavailable();
         }
 
         $result = $this->validator->validate($schema, $fields);
 
         if (!$result->isValid()) {
-            // The field names go into the tally, so a validator that is
-            // stricter than the form suggests becomes visible.
-            return $this->count(
-                $slug,
-                Stats::INVALID,
-                SubmissionOutcome::invalid(__('Validation failed.', 'jotform-bridge'), $result->errors()),
-                array_keys($result->errors())
-            );
+            return SubmissionOutcome::invalid(__('Validation failed.', 'jotform-bridge'), $result->errors());
         }
 
         /**
@@ -214,32 +198,24 @@ final class SubmissionPipeline
         $fingerprint = $window > 0 ? $this->fingerprint($slug, $values, $ip) : '';
 
         if ($fingerprint !== '' && get_transient($fingerprint) !== false) {
-            return $this->count(
-                $slug,
-                Stats::DUPLICATE,
-                SubmissionOutcome::error(
-                    429,
-                    __('This form has already been submitted. Please wait a moment before sending it again.', 'jotform-bridge')
-                )
+            return SubmissionOutcome::error(
+                429,
+                __('This form has already been submitted. Please wait a moment before sending it again.', 'jotform-bridge')
             );
         }
 
         $rejection = $this->spam->check($slug, $values, $context);
 
         if ($rejection !== '') {
-            return $this->count($slug, Stats::SPAM, SubmissionOutcome::error(403, $rejection));
+            return SubmissionOutcome::error(403, $rejection);
         }
 
         $params = $this->mapper->map($schema, $values);
 
         if ($params === []) {
-            return $this->count(
-                $slug,
-                Stats::EMPTY_BODY,
-                SubmissionOutcome::invalid(
-                    __('Validation failed.', 'jotform-bridge'),
-                    [ValidationResult::FORM_KEY => __('No form data was submitted.', 'jotform-bridge')]
-                )
+            return SubmissionOutcome::invalid(
+                __('Validation failed.', 'jotform-bridge'),
+                [ValidationResult::FORM_KEY => __('No form data was submitted.', 'jotform-bridge')]
             );
         }
 
@@ -275,10 +251,10 @@ final class SubmissionPipeline
             if ($upstreamTrip !== '') {
                 $this->quota->tripFromUpstream($upstreamTrip);
 
-                return $this->count($slug, Stats::QUOTA, $this->unavailable());
+                return $this->unavailable();
             }
 
-            return $this->count($slug, Stats::UPSTREAM, SubmissionOutcome::error(502, $this->upstreamMessage()));
+            return SubmissionOutcome::error(502, $this->upstreamMessage());
         }
 
         // Only an accepted submission is remembered, so an upstream failure can
@@ -304,34 +280,10 @@ final class SubmissionPipeline
             (string) ($sent->data()['submission_id'] ?? '')
         );
 
-        return $this->count(
-            $slug,
-            Stats::OK,
-            SubmissionOutcome::success(
-                __('Form submitted successfully.', 'jotform-bridge'),
-                $this->redirect($integration)
-            )
+        return SubmissionOutcome::success(
+            __('Form submitted successfully.', 'jotform-bridge'),
+            $this->redirect($integration)
         );
-    }
-
-    /**
-     * Records how a submission ended and hands the answer back unchanged.
-     *
-     * Every exit from submit() goes through here, so the tally cannot drift
-     * away from what the pipeline actually does: a new outcome that forgets to
-     * be counted is a new `return` that does not compile into this shape.
-     *
-     * @param array<int, string> $fieldErrors
-     */
-    private function count(
-        string $bucket,
-        string $outcome,
-        SubmissionOutcome $answer,
-        array $fieldErrors = []
-    ): SubmissionOutcome {
-        $this->stats->record($bucket, $outcome, $fieldErrors);
-
-        return $answer;
     }
 
     /**
@@ -354,21 +306,17 @@ final class SubmissionPipeline
     /**
      * The answer to an address that is sending too much.
      */
-    private function throttled(string $bucket, string $slug, int $wait): SubmissionOutcome
+    private function throttled(string $slug, int $wait): SubmissionOutcome
     {
         $this->note('Submission refused by the rate limit.', [
             'integration' => $slug,
             'retry_after' => $wait,
         ]);
 
-        return $this->count(
-            $bucket,
-            Stats::THROTTLED,
-            SubmissionOutcome::error(
-                429,
-                __('Too many submissions from this device. Please wait a moment and try again.', 'jotform-bridge'),
-                ['Retry-After' => (string) $wait]
-            )
+        return SubmissionOutcome::error(
+            429,
+            __('Too many submissions from this device. Please wait a moment and try again.', 'jotform-bridge'),
+            ['Retry-After' => (string) $wait]
         );
     }
 
@@ -442,10 +390,9 @@ final class SubmissionPipeline
      * not the visitor's doing.
      *
      * Deliberately one answer rather than several. An unknown slug used to be a
-     * 404, a disabled one a 403 and an unsynced one a 503, which meant the
-     * endpoint would confirm, to anybody who asked, exactly which slugs are real
-     * and what state each is in — a map of the site's forms, free, from the
-     * outside.
+     * 404 and an unsynced one a 503, which meant the endpoint would confirm, to
+     * anybody who asked, exactly which slugs are real and what state each is in
+     * — a map of the site's forms, free, from the outside.
      *
      * What cannot be hidden is that a working form is a working form: a valid
      * submission has to be answered differently from an invalid one, so a
@@ -454,9 +401,8 @@ final class SubmissionPipeline
      * cheaper question — "does this name exist at all" — which needs no valid
      * values and no knowledge of the schema.
      *
-     * The real reason is not lost: it goes to the debug log, it is counted per
-     * integration on the admin screens, and an administrator viewing the page
-     * gets it spelled out by the renderer.
+     * The real reason is not lost: it goes to the debug log, and an
+     * administrator viewing the page gets it spelled out by the renderer.
      */
     private function unavailable(): SubmissionOutcome
     {

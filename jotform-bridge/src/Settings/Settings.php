@@ -99,6 +99,10 @@ final class Settings
         // carries one until purgeStoredKey() runs; it is never a key source.
         unset($stored['api_key']);
 
+        // Written by versions that tracked the account's monthly allowance.
+        // The plugin no longer does, so the value is not carried forward.
+        unset($stored['monthly_quota']);
+
         $this->memoGeneration = self::$generation;
 
         return $this->memo = array_merge($this->defaults(), $stored);
@@ -114,7 +118,6 @@ final class Settings
             'base_url'                 => '',
             'debug_logging'            => false,
             'delete_data_on_uninstall' => false,
-            'monthly_quota'            => 0,
         ];
     }
 
@@ -198,19 +201,6 @@ final class Settings
         return self::REGION_URLS[$region];
     }
 
-    /**
-     * The monthly submission allowance of the Jotform plan, or 0 when unknown.
-     *
-     * Jotform reports how much of the allowance has been spent, but not what the
-     * allowance is, so the number has to be entered once. Without it the quota
-     * guard still limits the daily rate — it just cannot tell how close the
-     * account is to having its forms switched off.
-     */
-    public function monthlyQuota(): int
-    {
-        return max(0, (int) $this->all()['monthly_quota']);
-    }
-
     public function debugEnabled(): bool
     {
         return (bool) $this->all()['debug_logging'];
@@ -246,7 +236,6 @@ final class Settings
 
         $clean['debug_logging']            = !empty($input['debug_logging']);
         $clean['delete_data_on_uninstall'] = !empty($input['delete_data_on_uninstall']);
-        $clean['monthly_quota']            = max(0, (int) self::scalar($input, 'monthly_quota'));
 
         self::$generation++;
 

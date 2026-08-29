@@ -138,7 +138,7 @@ $jfbReport  = $compatibility['report'] instanceof CompatibilityReport ? $compati
                             <?php
                             printf(
                                 /* translators: %s: template directory name */
-                                esc_html__('Add a template to your theme %s directory and rescan.', 'jotform-bridge'),
+                                esc_html__('Add a template to your theme %s directory; it is picked up as soon as the file is there.', 'jotform-bridge'),
                                 '<code>' . esc_html(TemplateScanner::DIRECTORY) . '</code>'
                             );
                             ?>
@@ -318,127 +318,6 @@ $jfbReport  = $compatibility['report'] instanceof CompatibilityReport ? $compati
         }
     </style>
 
-    <?php if ($stats !== null && $statsToday !== null) : ?>
-        <h2><?php echo esc_html__('Submissions', 'jotform-bridge'); ?></h2>
-
-        <?php
-        $jfbLabels = [
-            'ok'        => __('Sent to Jotform', 'jotform-bridge'),
-            'invalid'   => __('Failed validation', 'jotform-bridge'),
-            'empty'     => __('Carried no values', 'jotform-bridge'),
-            'duplicate' => __('Sent twice', 'jotform-bridge'),
-            'spam'      => __('Refused as spam', 'jotform-bridge'),
-            'throttled' => __('Refused by the rate limit', 'jotform-bridge'),
-            'quota'     => __('Stopped by the quota guard', 'jotform-bridge'),
-            'no_schema' => __('No usable schema', 'jotform-bridge'),
-            'upstream'  => __('Refused by Jotform', 'jotform-bridge'),
-        ];
-        ?>
-
-        <?php if ($statsHealth === 'broken') : ?>
-            <p class="notice notice-error inline">
-                <strong><?php echo esc_html__('Nothing has got through today.', 'jotform-bridge'); ?></strong>
-                <?php
-                echo esc_html__(
-                    'Submissions are arriving and none of them are reaching Jotform. The table below says why.',
-                    'jotform-bridge'
-                );
-                ?>
-            </p>
-        <?php elseif ($statsHealth === 'noisy') : ?>
-            <p class="notice notice-warning inline">
-                <strong><?php echo esc_html__('Almost everything is being refused today.', 'jotform-bridge'); ?></strong>
-                <?php
-                echo esc_html__(
-                    'That is either a lot of bots or a threshold set too tight. If real people are being turned away, relax the limits.',
-                    'jotform-bridge'
-                );
-                ?>
-            </p>
-        <?php elseif ($statsLastOk > 0) : ?>
-            <p>
-                <?php
-                printf(
-                    /* translators: %s: human readable time difference */
-                    esc_html__('This form is accepting submissions. The last one arrived %s ago.', 'jotform-bridge'),
-                    esc_html(human_time_diff($statsLastOk, time()))
-                );
-                ?>
-            </p>
-        <?php endif; ?>
-
-        <?php if ($stats['attempts'] === 0) : ?>
-            <p class="description">
-                <?php echo esc_html__('Nothing has been submitted in the last seven days.', 'jotform-bridge'); ?>
-            </p>
-        <?php else : ?>
-            <table class="widefat striped" style="max-width:40em;">
-                <thead>
-                    <tr>
-                        <th scope="col"><?php echo esc_html__('Outcome', 'jotform-bridge'); ?></th>
-                        <th scope="col"><?php echo esc_html__('Today', 'jotform-bridge'); ?></th>
-                        <th scope="col"><?php echo esc_html__('7 days', 'jotform-bridge'); ?></th>
-                    </tr>
-                </thead>
-                <tbody>
-                    <?php foreach ($jfbLabels as $jfbKey => $jfbLabel) : ?>
-                        <?php
-                        $jfbWeek = (int) ($stats['counts'][$jfbKey] ?? 0);
-                        $jfbDay  = (int) ($statsToday['counts'][$jfbKey] ?? 0);
-
-                        if ($jfbWeek === 0) {
-                            continue;
-                        }
-                        ?>
-                        <tr>
-                            <td><?php echo esc_html($jfbLabel); ?></td>
-                            <td><?php echo esc_html((string) $jfbDay); ?></td>
-                            <td><?php echo esc_html((string) $jfbWeek); ?></td>
-                        </tr>
-                    <?php endforeach; ?>
-                </tbody>
-            </table>
-
-            <p class="description">
-                <?php
-                echo esc_html__(
-                    'Counts only. No submitted values, no visitor addresses — those live in Jotform and nowhere else.',
-                    'jotform-bridge'
-                );
-                ?>
-            </p>
-        <?php endif; ?>
-
-        <?php if ($statsFields !== []) : ?>
-            <h3><?php echo esc_html__('Fields visitors get wrong most often', 'jotform-bridge'); ?></h3>
-            <ul class="ul-disc">
-                <?php foreach ($statsFields as $jfbPath => $jfbCount) : ?>
-                    <li>
-                        <code><?php echo esc_html((string) $jfbPath); ?></code>
-                        —
-                        <?php
-                        printf(
-                            /* translators: %d: number of failed submissions */
-                            esc_html(
-                                _n('%d submission', '%d submissions', (int) $jfbCount, 'jotform-bridge')
-                            ),
-                            (int) $jfbCount
-                        );
-                        ?>
-                    </li>
-                <?php endforeach; ?>
-            </ul>
-            <p class="description">
-                <?php
-                echo esc_html__(
-                    'A field most people trip over is usually a template that does not say what it wants, not a visitor problem.',
-                    'jotform-bridge'
-                );
-                ?>
-            </p>
-        <?php endif; ?>
-    <?php endif; ?>
-
     <h2><?php echo esc_html__('Schema', 'jotform-bridge'); ?></h2>
 
     <div class="jfb-actions">
@@ -574,9 +453,9 @@ $jfbReport  = $compatibility['report'] instanceof CompatibilityReport ? $compati
             <tbody>
                 <?php foreach ($jfbReport->rows() as $jfbRow) : ?>
                     <?php
-                    /* Everything else the report says is spelled out under
-                       Compatibility above; only the unmappable type belongs
-                       next to the type it is about. */
+                    /* An unmappable type is the one thing worth marking on the
+                       row it belongs to; the rest of the report is already
+                       summarised above the table. */
                     $jfbUnsupported = in_array(
                         (string) $jfbRow['status'],
                         [

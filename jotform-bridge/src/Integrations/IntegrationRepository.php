@@ -157,25 +157,6 @@ final class IntegrationRepository
     }
 
     /**
-     * Every Jotform form ID referenced by at least one integration.
-     *
-     * @return array<int, string>
-     */
-    public function usedFormIds(): array
-    {
-        $ids = [];
-
-        foreach ($this->all() as $integration) {
-            if ($integration->formId() !== '') {
-                $ids[$integration->formId()] = true;
-            }
-        }
-
-        // Numeric string keys come back as integers, so they are cast back.
-        return array_map('strval', array_keys($ids));
-    }
-
-    /**
      * @return array<int, string>
      */
     private function validate(Integration $integration, ?string $originalSlug): array

@@ -109,7 +109,10 @@ final class IntegrationRepositoryTest extends TestCase
         $this->repository->save($this->integration('consultation-popup'));
 
         $this->assertCount(2, $this->repository->all());
-        $this->assertSame(['240000000000001'], $this->repository->usedFormIds());
+        $this->assertSame(
+            '240000000000001',
+            $this->repository->get('consultation-popup')->formId()
+        );
     }
 
     public function testValidationRejectsIncompleteIntegrations(): void

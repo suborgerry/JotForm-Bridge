@@ -67,14 +67,15 @@ final class RedirectTargetTest extends TestCase
         $this->assertSame(RedirectTarget::STATE_DISABLED, $target['state']);
         $this->assertSame('', $target['url']);
         $this->assertFalse(RedirectTarget::isBroken($target), 'No redirect configured is not a problem.');
-        $this->assertNull((new RedirectTarget())->resolve($this->integration(Integration::SUCCESS_MESSAGE)));
     }
 
     public function testAPublishedPageResolvesToItsPermalink(): void
     {
-        $resolved = (new RedirectTarget())->resolve($this->integration());
+        $target = (new RedirectTarget())->check($this->integration());
 
-        $this->assertSame(['url' => 'https://example.com/thanks/', 'delay' => 0], $resolved);
+        $this->assertSame(RedirectTarget::STATE_OK, $target['state']);
+        $this->assertSame('https://example.com/thanks/', $target['url']);
+        $this->assertSame(0, $target['delay']);
     }
 
     public function testThePermalinkIsResolvedOnEveryCallRatherThanRemembered(): void
@@ -172,7 +173,11 @@ final class RedirectTargetTest extends TestCase
     {
         $this->permalinks[self::PAGE_ID] = false;
 
-        $this->assertNull((new RedirectTarget())->resolve($this->integration()));
+        $target = (new RedirectTarget())->check($this->integration());
+
+        $this->assertSame(RedirectTarget::STATE_INVALID_URL, $target['state']);
+        $this->assertSame('', $target['url']);
+        $this->assertTrue(RedirectTarget::isBroken($target));
     }
 
     public function testTheDelayIsCarriedThroughAndClamped(): void

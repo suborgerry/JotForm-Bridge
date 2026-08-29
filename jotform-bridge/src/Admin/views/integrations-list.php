@@ -3,8 +3,7 @@
 /**
  * Integrations list screen.
  *
- * @var array<string, array{integration:\JotformBridge\Integrations\Integration, form_title:string, stats:array<string,int>|null, health:string, last_ok:int}> $rows
- * @var bool                                     $showStats
+ * @var array<string, array{integration:\JotformBridge\Integrations\Integration, form_title:string}> $rows
  * @var \JotformBridge\Templates\TemplateRegistry $templates
  * @var array<string, array<int, \JotformBridge\Integrations\Integration>> $templateUsage
  * @var array<int, array<string, string>>         $diagnostics
@@ -15,6 +14,8 @@
  */
 
 declare(strict_types=1);
+
+use JotformBridge\Templates\TemplateScanner;
 
 if (!defined('ABSPATH')) {
     exit;
@@ -52,9 +53,6 @@ if (!function_exists('jfb_format_datetime')) {
                 <th scope="col"><?php echo esc_html__('Name', 'jotform-bridge'); ?></th>
                 <th scope="col"><?php echo esc_html__('Jotform Form', 'jotform-bridge'); ?></th>
                 <th scope="col"><?php echo esc_html__('Rendering', 'jotform-bridge'); ?></th>
-                <?php if ($showStats) : ?>
-                    <th scope="col"><?php echo esc_html__('Last 7 days', 'jotform-bridge'); ?></th>
-                <?php endif; ?>
                 <th scope="col"><?php echo esc_html__('Shortcode', 'jotform-bridge'); ?></th>
                 <th scope="col"><?php echo esc_html__('Last modified', 'jotform-bridge'); ?></th>
             </tr>
@@ -62,7 +60,7 @@ if (!function_exists('jfb_format_datetime')) {
         <tbody>
             <?php if ($rows === []) : ?>
                 <tr>
-                    <td colspan="<?php echo $showStats ? 6 : 5; ?>">
+                    <td colspan="5">
                         <?php echo esc_html__('No integrations yet. Add one to connect a Jotform form to a template.', 'jotform-bridge'); ?>
                     </td>
                 </tr>
@@ -132,48 +130,7 @@ if (!function_exists('jfb_format_datetime')) {
                             <?php endif; ?>
                         <?php endif; ?>
                     </td>
-                   
-                    <?php if ($showStats) : ?>
-                    <td>
-                        <?php
-                        $jfbStats  = $jfbRow['stats'];
-                        $jfbHealth = (string) $jfbRow['health'];
-                        ?>
-                        <?php if ($jfbStats['attempts'] === 0) : ?>
-                            <span class="description"><?php echo esc_html__('No submissions', 'jotform-bridge'); ?></span>
-                        <?php else : ?>
-                            <?php
-                            printf(
-                                /* translators: 1: accepted submissions, 2: submissions that did not get through */
-                                esc_html__('%1$d sent, %2$d not delivered', 'jotform-bridge'),
-                                (int) $jfbStats['ok'],
-                                (int) $jfbStats['lost']
-                            );
-                            ?>
-                            <?php if ($jfbRow['last_ok'] > 0) : ?>
-                                <p class="description">
-                                    <?php
-                                    printf(
-                                        /* translators: %s: human readable time difference */
-                                        esc_html__('Last one %s ago', 'jotform-bridge'),
-                                        esc_html(human_time_diff((int) $jfbRow['last_ok'], time()))
-                                    );
-                                    ?>
-                                </p>
-                            <?php endif; ?>
-                        <?php endif; ?>
 
-                        <?php if ($jfbHealth === 'broken') : ?>
-                            <p><strong style="color:#b32d2e;">
-                                <?php echo esc_html__('Nothing got through today.', 'jotform-bridge'); ?>
-                            </strong></p>
-                        <?php elseif ($jfbHealth === 'noisy') : ?>
-                            <p><strong style="color:#996800;">
-                                <?php echo esc_html__('Almost everything is being refused today.', 'jotform-bridge'); ?>
-                            </strong></p>
-                        <?php endif; ?>
-                    </td>
-                    <?php endif; ?>
                     <?php $jfbShortcode = '[jotform_form id="' . $jfbIntegration->slug() . '"]'; ?>
                     <td>
                         <button
@@ -186,7 +143,7 @@ if (!function_exists('jfb_format_datetime')) {
                             <span class="jfb-copied"><?php echo esc_html__('Copied', 'jotform-bridge'); ?></span>
                         </button>
                     </td>
-                     <td>
+                    <td>
                         <?php
                         // An integration stored before the timestamps existed
                         // has neither, and the creation time is the closest
@@ -225,7 +182,13 @@ if (!function_exists('jfb_format_datetime')) {
             <?php if ($templates->isEmpty()) : ?>
                 <tr>
                     <td colspan="5">
-                        <?php echo esc_html__('No templates found. Add a PHP file with a Jotform template header to your theme /forms/ directory.', 'jotform-bridge'); ?>
+                        <?php
+                        printf(
+                            /* translators: %s: template directory name */
+                            esc_html__('No templates found. Add a PHP file with a Jotform template header to your theme %s directory.', 'jotform-bridge'),
+                            '<code>' . esc_html(TemplateScanner::DIRECTORY) . '</code>'
+                        );
+                        ?>
                     </td>
                 </tr>
             <?php endif; ?>

@@ -4,8 +4,6 @@ declare(strict_types=1);
 
 namespace JotformBridge\Admin;
 
-use JotformBridge\Api\JotformClient;
-use JotformBridge\Settings\Settings;
 use JotformBridge\Submission\QuotaGuard;
 
 if (!defined('ABSPATH')) {
@@ -21,9 +19,8 @@ if (!defined('ABSPATH')) {
  * carries the button that clears it: a legitimate spike is a thing that happens,
  * and the site owner has to be able to say so.
  *
- * This is also where the account-wide spend is refreshed. Once an hour, on the
- * plugin's own screens only, so the request happens because somebody opened
- * Jotform Bridge — never while a visitor waits for a submission to go through.
+ * Nothing here contacts Jotform: the notice describes state the guard already
+ * holds.
  */
 final class QuotaNotice
 {
@@ -32,15 +29,9 @@ final class QuotaNotice
 
     private QuotaGuard $quota;
 
-    private Settings $settings;
-
-    private JotformClient $client;
-
-    public function __construct(QuotaGuard $quota, Settings $settings, JotformClient $client)
+    public function __construct(QuotaGuard $quota)
     {
-        $this->quota    = $quota;
-        $this->settings = $settings;
-        $this->client   = $client;
+        $this->quota = $quota;
     }
 
     public function register(): void
@@ -54,8 +45,6 @@ final class QuotaNotice
         if (!current_user_can(self::CAPABILITY) || !$this->onPluginScreen()) {
             return;
         }
-
-        $this->refreshUsage();
 
         if ($this->quota->isTripped()) {
             $this->renderTrip();
@@ -103,11 +92,6 @@ final class QuotaNotice
                 'Jotform has refused a request because the account is out of API calls for today. The allowance resets at midnight Eastern time; until then no submission can be forwarded.',
                 'jotform-bridge'
             );
-        } elseif ($status['reason'] === QuotaGuard::REASON_QUOTA) {
-            $reason = __(
-                'The Jotform account is at or near its monthly submission allowance. Sending more would risk switching every form on the account off until the allowance resets.',
-                'jotform-bridge'
-            );
         } else {
             $reason = sprintf(
                 /* translators: 1: submissions sent today, 2: the ceiling that was reached */
@@ -148,6 +132,10 @@ final class QuotaNotice
             || $reason === QuotaGuard::REASON_UPSTREAM_API_LIMIT;
     }
 
+    /**
+     * The one warning left: Jotform's own count of API calls left for today,
+     * which it reports on every answer and costs nothing to carry.
+     */
     private function renderWarning(): void
     {
         $status = $this->quota->status();
@@ -168,26 +156,6 @@ final class QuotaNotice
                 )
             );
         }
-
-        if (!$this->quota->isNearQuota()) {
-            return;
-        }
-
-        printf(
-            '<div class="notice notice-warning is-dismissible"><p><strong>%1$s</strong> %2$s</p></div>',
-            esc_html__('Jotform Bridge:', 'jotform-bridge'),
-            esc_html(
-                sprintf(
-                    /* translators: 1: submissions used, 2: monthly allowance */
-                    __(
-                        'the Jotform account has used %1$d of its %2$d monthly submissions. When the allowance runs out, every form on the account stops accepting submissions until it resets.',
-                        'jotform-bridge'
-                    ),
-                    (int) $status['used'],
-                    (int) $status['monthly_quota']
-                )
-            )
-        );
     }
 
     /**
@@ -207,21 +175,6 @@ final class QuotaNotice
         <?php
 
         return (string) ob_get_clean();
-    }
-
-    /**
-     * Refreshes the account-wide spend, at most once an hour.
-     *
-     * A failure is deliberately silent: the guard falls back to the previous
-     * snapshot, and an unreachable API already has its own notice elsewhere.
-     */
-    private function refreshUsage(): void
-    {
-        if (!$this->settings->hasApiKey()) {
-            return;
-        }
-
-        $this->quota->refreshUsage($this->client);
     }
 
     private function onPluginScreen(): bool

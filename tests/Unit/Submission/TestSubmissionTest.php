@@ -9,7 +9,6 @@ use JotformBridge\Api\JotformClient;
 use JotformBridge\Forms\SchemaBuilder;
 use JotformBridge\Forms\SchemaRepository;
 use JotformBridge\Integrations\Integration;
-use JotformBridge\Settings\Settings;
 use JotformBridge\Submission\QuotaGuard;
 use JotformBridge\Submission\TestSubmission;
 use JotformBridge\Tests\TestCase;
@@ -157,26 +156,26 @@ final class TestSubmissionTest extends TestCase
      * It really does spend one of the month's allowance, and the guard has to
      * know, or its arithmetic goes quietly wrong.
      */
-    public function testAnAcceptedTestIsChargedToTheAllowance(): void
+    public function testAnAcceptedTestIsChargedToTodaysCount(): void
     {
         $this->mockPost(200, ['responseCode' => 200, 'content' => ['submissionID' => '1']]);
 
-        $quota = new QuotaGuard(new Settings());
+        $quota = new QuotaGuard();
 
         $this->service($quota)->send($this->integration());
 
-        $this->assertSame(1, $quota->status()['since_check']);
+        $this->assertSame(1, $quota->status()['today']);
     }
 
     public function testARejectedTestIsNotCharged(): void
     {
         $this->mockPost(500, ['responseCode' => 500, 'message' => 'boom']);
 
-        $quota = new QuotaGuard(new Settings());
+        $quota = new QuotaGuard();
 
         $this->service($quota)->send($this->integration());
 
-        $this->assertSame(0, $quota->status()['since_check']);
+        $this->assertSame(0, $quota->status()['today']);
     }
 
     private function service(?QuotaGuard $quota = null): TestSubmission

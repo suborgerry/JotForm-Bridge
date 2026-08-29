@@ -29,7 +29,6 @@ use JotformBridge\Submission\QuotaGuard;
 use JotformBridge\Submission\SubmissionPipeline;
 use JotformBridge\Submission\TestSubmission;
 use JotformBridge\Support\Logger;
-use JotformBridge\Support\Stats;
 use JotformBridge\Templates\TemplateRegistry;
 
 if (!defined('ABSPATH')) {
@@ -72,8 +71,6 @@ final class Plugin
     private ConnectionState $connection;
 
     private ?QuotaGuard $quota = null;
-
-    private ?Stats $stats = null;
 
     private bool $booted = false;
 
@@ -150,9 +147,8 @@ final class Plugin
         if (is_admin()) {
             (new ApiKeyNotice($this->settings))->register();
 
-            // A tripped circuit breaker has to be visible and clearable, and
-            // this is also the only place the account-wide spend is refreshed.
-            (new QuotaNotice($this->quota(), $this->settings, $this->client()))->register();
+            // A tripped circuit breaker has to be visible and clearable.
+            (new QuotaNotice($this->quota()))->register();
 
             // Says how to switch the challenge on, once, and how to finish the
             // job if only half of it was done.
@@ -166,7 +162,6 @@ final class Plugin
                 $this->templates(),
                 $this->compatibility(),
                 null,
-                $this->stats(),
                 new TestSubmission($this->schemas(), $this->client(), null, null, $this->quota())
             ))->register();
 
@@ -282,18 +277,6 @@ final class Plugin
         return $this->quota;
     }
 
-    /**
-     * The per-integration tally of how submissions ended.
-     */
-    public function stats(): Stats
-    {
-        if ($this->stats === null) {
-            $this->stats = new Stats();
-        }
-
-        return $this->stats;
-    }
-
     public function pipeline(): SubmissionPipeline
     {
         return new SubmissionPipeline(
@@ -306,8 +289,7 @@ final class Plugin
             $this->logger,
             null,
             null,
-            $this->quota(),
-            $this->stats()
+            $this->quota()
         );
     }
 
@@ -394,6 +376,10 @@ final class Plugin
         // Versions up to 0.1.0 cached the template scan. The scan is now read
         // from the theme on demand, so the option is dead weight.
         delete_option('jotform_bridge_templates');
+
+        // The per-integration submission tally was removed with the screens
+        // that read it; nothing writes this option any more.
+        delete_option('jotform_bridge_stats');
     }
 
     /**

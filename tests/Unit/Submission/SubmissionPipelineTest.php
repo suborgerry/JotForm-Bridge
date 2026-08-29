@@ -14,12 +14,9 @@ use JotformBridge\Submission\Guards\Honeypot;
 use JotformBridge\Submission\Guards\ProofOfWork;
 use JotformBridge\Submission\QuotaGuard;
 use JotformBridge\Submission\RateLimiter;
-use JotformBridge\Submission\SubmissionOutcome;
 use JotformBridge\Submission\SubmissionPipeline;
 use JotformBridge\Submission\ValidationResult;
-use JotformBridge\Support\Features;
 use JotformBridge\Support\Logger;
-use JotformBridge\Support\Stats;
 use JotformBridge\Tests\TestCase;
 
 /**
@@ -336,17 +333,9 @@ final class SubmissionPipelineTest extends TestCase
      */
     public function testATrippedQuotaGuardStopsEverySubmission(): void
     {
-        $this->enableAccountQuota();
-
         $this->mockPost(200, ['responseCode' => 200, 'content' => ['submissionID' => '1']]);
 
-        $this->options[Settings::OPTION]   = ['monthly_quota' => 10];
-        $this->options[QuotaGuard::OPTION] = [
-            'days'              => [],
-            'usage_submissions' => 10,
-            'usage_checked_at'  => time(),
-            'since_check'       => 0,
-        ];
+        $this->tripTheBreaker();
 
         $outcome = $this->pipeline()->submit('contact', $this->valid(), ['ip' => '203.0.113.7']);
 
@@ -362,15 +351,7 @@ final class SubmissionPipelineTest extends TestCase
 
     public function testTheQuotaGuardAnswersBeforeTheSchemaIsRead(): void
     {
-        $this->enableAccountQuota();
-
-        $this->options[Settings::OPTION]   = ['monthly_quota' => 10];
-        $this->options[QuotaGuard::OPTION] = [
-            'days'              => [],
-            'usage_submissions' => 10,
-            'usage_checked_at'  => time(),
-            'since_check'       => 0,
-        ];
+        $this->tripTheBreaker();
 
         unset($this->options[SchemaRepository::optionKey(self::FORM_ID)]);
 
@@ -380,26 +361,26 @@ final class SubmissionPipelineTest extends TestCase
         $this->assertArrayNotHasKey('errors', $outcome->body());
     }
 
-    public function testAnAcceptedSubmissionIsChargedToTheAllowance(): void
+    public function testAnAcceptedSubmissionIsChargedToTodaysCount(): void
     {
         $this->mockPost(200, ['responseCode' => 200, 'content' => ['submissionID' => '1']]);
 
         $this->pipeline()->submit('contact', $this->valid(), ['ip' => '203.0.113.7']);
 
-        $this->assertSame(1, (new QuotaGuard(new Settings()))->status()['since_check']);
+        $this->assertSame(1, (new QuotaGuard())->status()['today']);
     }
 
     /**
      * An upstream failure spent no part of the allowance, and charging it here
      * would make an outage look like a flood.
      */
-    public function testAFailedSubmissionIsNotChargedToTheAllowance(): void
+    public function testAFailedSubmissionIsNotChargedToTodaysCount(): void
     {
         $this->mockPost(500, ['responseCode' => 500, 'message' => 'boom']);
 
         $this->pipeline()->submit('contact', $this->valid(), ['ip' => '203.0.113.7']);
 
-        $this->assertSame(0, (new QuotaGuard(new Settings()))->status()['since_check']);
+        $this->assertSame(0, (new QuotaGuard())->status()['today']);
     }
 
     /**
@@ -440,71 +421,6 @@ final class SubmissionPipelineTest extends TestCase
     }
 
     /**
-     * Every exit from the pipeline is counted, so the admin screens describe
-     * what the code did rather than a parallel guess at it.
-     *
-     * @dataProvider countedOutcomes
-     */
-    public function testEveryOutcomeIsCounted(string $expected, callable $arrange): void
-    {
-        $arrange($this);
-
-        $this->pipeline()->submit('contact', $this->valid(), ['ip' => '203.0.113.7']);
-
-        $counts = (new Stats())->summary('contact', 1)['counts'];
-
-        $this->assertSame(1, $counts[$expected] ?? 0, 'Expected one ' . $expected . ' in ' . json_encode($counts));
-    }
-
-    /**
-     * @return array<string, array{0:string, 1:callable}>
-     */
-    public function countedOutcomes(): array
-    {
-        return [
-            'accepted'   => [
-                Stats::OK,
-                static function (self $test): void {
-                    $test->mockPost(200, ['responseCode' => 200, 'content' => ['submissionID' => '1']]);
-                },
-            ],
-            'upstream'   => [
-                Stats::UPSTREAM,
-                static function (self $test): void {
-                    $test->mockPost(500, ['responseCode' => 500, 'message' => 'boom']);
-                },
-            ],
-            'no schema'  => [
-                Stats::NO_SCHEMA,
-                static function (self $test): void {
-                    $test->dropSchema();
-                },
-            ],
-        ];
-    }
-
-    public function testAnUnknownSlugIsCountedInTheSharedBucket(): void
-    {
-        $this->pipeline()->submit('nope', $this->valid(), ['ip' => '203.0.113.7']);
-
-        $this->assertSame(
-            1,
-            (new Stats())->summary(Stats::GLOBAL_SCOPE, 1)['counts'][Stats::UNKNOWN] ?? 0
-        );
-        $this->assertSame(0, (new Stats())->summary('nope', 1)['attempts']);
-    }
-
-    public function testAValidationFailureRecordsWhichFieldsFailed(): void
-    {
-        $fields = $this->valid();
-        unset($fields['email']);
-
-        $this->pipeline()->submit('contact', $fields, ['ip' => '203.0.113.7']);
-
-        $this->assertArrayHasKey('email', (new Stats())->fieldErrors('contact', 1));
-    }
-
-    /**
      * Jotform saying the account is out of allowance is the most authoritative
      * signal there is, and neither condition clears within a request's
      * lifetime. Sending the next visitor at the same wall only wastes time.
@@ -518,7 +434,7 @@ final class SubmissionPipelineTest extends TestCase
         $first = $this->pipeline()->submit('contact', $this->valid(), ['ip' => '203.0.113.7']);
 
         $this->assertSame(503, $first->status());
-        $this->assertSame($reason, (new QuotaGuard(new Settings()))->status()['reason']);
+        $this->assertSame($reason, (new QuotaGuard())->status()['reason']);
 
         // The next one does not even reach the API.
         $second = $this->valid();
@@ -552,7 +468,7 @@ final class SubmissionPipelineTest extends TestCase
         $outcome = $this->pipeline()->submit('contact', $this->valid(), ['ip' => '203.0.113.7']);
 
         $this->assertSame(502, $outcome->status());
-        $this->assertFalse((new QuotaGuard(new Settings()))->isTripped());
+        $this->assertFalse((new QuotaGuard())->isTripped());
     }
 
     public function testTheRemainingApiAllowanceIsRemembered(): void
@@ -564,7 +480,7 @@ final class SubmissionPipelineTest extends TestCase
 
         $this->pipeline()->submit('contact', $this->valid(), ['ip' => '203.0.113.7']);
 
-        $this->assertSame(512, (new QuotaGuard(new Settings()))->status()['limit_left']);
+        $this->assertSame(512, (new QuotaGuard())->status()['limit_left']);
     }
 
     /**
@@ -897,26 +813,23 @@ final class SubmissionPipelineTest extends TestCase
         );
     }
 
-    /**
-     * The allowance half of the guard is hidden by default, so a test that is
-     * about it has to switch it on.
-     */
-    private function enableAccountQuota(): void
-    {
-        Functions\when('apply_filters')->alias(
-            static function (string $hook, $value, ...$args) {
-                if ($hook === 'jotform_bridge_feature_enabled' && ($args[0] ?? '') === Features::ACCOUNT_QUOTA) {
-                    return true;
-                }
-
-                return $value;
-            }
-        );
-    }
-
     public function dropSchema(): void
     {
         unset($this->options[SchemaRepository::optionKey(self::FORM_ID)]);
+    }
+
+    /**
+     * Puts the circuit breaker in the state a real daily-ceiling trip leaves
+     * behind, without having to send a few hundred submissions first.
+     */
+    private function tripTheBreaker(): void
+    {
+        $this->options[QuotaGuard::OPTION] = [
+            'days'       => [],
+            'tripped_at' => time(),
+            'day'        => gmdate('Y-m-d'),
+            'reason'     => QuotaGuard::REASON_DAILY,
+        ];
     }
 
     private function pipeline(): SubmissionPipeline

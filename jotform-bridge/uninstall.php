@@ -51,6 +51,8 @@ $jfbCleanUpSite = static function (): void {
     delete_option('jotform_bridge_templates');
     delete_option('jotform_bridge_connection');
     delete_option('jotform_bridge_quota');
+
+    // Written by versions that kept a per-integration submission tally.
     delete_option('jotform_bridge_stats');
     delete_option('jotform_bridge_version');
 

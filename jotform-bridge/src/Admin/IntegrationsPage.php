@@ -11,8 +11,6 @@ use JotformBridge\Integrations\Integration;
 use JotformBridge\Integrations\IntegrationRepository;
 use JotformBridge\Integrations\RedirectTarget;
 use JotformBridge\Submission\TestSubmission;
-use JotformBridge\Support\Features;
-use JotformBridge\Support\Stats;
 use JotformBridge\Templates\TemplateRegistry;
 use JotformBridge\Templates\TemplateScaffold;
 
@@ -52,8 +50,6 @@ final class IntegrationsPage
 
     private RedirectTarget $redirects;
 
-    private Stats $stats;
-
     /**
      * Null when the page was built without a Jotform client to send with, in
      * which case the action is not registered and the button is not offered.
@@ -67,7 +63,6 @@ final class IntegrationsPage
         TemplateRegistry $templates,
         CompatibilityChecker $compatibility,
         ?RedirectTarget $redirects = null,
-        ?Stats $stats = null,
         ?TestSubmission $tests = null
     ) {
         $this->integrations  = $integrations;
@@ -76,7 +71,6 @@ final class IntegrationsPage
         $this->templates     = $templates;
         $this->compatibility = $compatibility;
         $this->redirects     = $redirects ?? new RedirectTarget();
-        $this->stats         = $stats ?? new Stats();
         $this->tests         = $tests;
     }
 
@@ -158,17 +152,12 @@ final class IntegrationsPage
     {
         $integrations = $this->integrations->all();
         $templates    = $this->templates;
-        $showStats    = Features::enabled(Features::STATS_UI);
         $rows         = [];
 
         foreach ($integrations as $integration) {
             $rows[$integration->slug()] = [
                 'integration' => $integration,
                 'form_title'  => $this->formTitle($integration->formId()),
-                // Counting never stops; only the reading of it is optional.
-                'stats'       => $showStats ? $this->stats->summary($integration->slug(), 7) : null,
-                'health'      => $showStats ? $this->stats->health($integration->slug()) : '',
-                'last_ok'     => $showStats ? $this->stats->lastSuccess($integration->slug()) : 0,
             ];
         }
 
@@ -228,14 +217,8 @@ final class IntegrationsPage
         // exactly when this is most useful.
         $scaffold     = $schema !== null ? (new TemplateScaffold())->build($integration, $schema) : '';
         $scaffoldFile = $schema !== null ? (new TemplateScaffold())->fileName($integration) : '';
-        $showStats     = Features::enabled(Features::STATS_UI) && $integration->slug() !== '';
-        $stats         = $showStats ? $this->stats->summary($integration->slug(), 7) : null;
-        $statsToday    = $showStats ? $this->stats->summary($integration->slug(), 1) : null;
-        $statsFields   = $showStats ? $this->stats->fieldErrors($integration->slug(), 7) : [];
-        $statsHealth   = $showStats ? $this->stats->health($integration->slug()) : 'idle';
-        $statsLastOk   = $showStats ? $this->stats->lastSuccess($integration->slug()) : 0;
-        $notice        = $flash;
-        $page          = self::MENU_SLUG;
+        $notice       = $flash;
+        $page         = self::MENU_SLUG;
 
         require __DIR__ . '/views/integration-edit.php';
     }
@@ -325,9 +308,6 @@ final class IntegrationsPage
         $slug = isset($_POST['integration']) ? sanitize_key((string) wp_unslash($_POST['integration'])) : '';
 
         if ($this->integrations->delete($slug)) {
-            // The tally describes an integration that no longer exists.
-            $this->stats->forget($slug);
-
             $this->flash('success', __('Integration deleted.', 'jotform-bridge'));
         } else {
             $this->flash('error', __('That integration does not exist.', 'jotform-bridge'));
