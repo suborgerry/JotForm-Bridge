@@ -38,7 +38,7 @@ if (!function_exists('jfb_format_datetime')) {
 }
 ?>
 <div class="wrap jfb-integrations">
-    <h1 class="wp-heading-inline"><?php echo esc_html__('Integrations', 'jotform-bridge'); ?></h1>
+    <h2 class="wp-heading-inline"><?php echo esc_html__('Integrations', 'jotform-bridge'); ?></h2>
     <a href="<?php echo esc_url($jfbNewUrl); ?>" class="page-title-action">
         <?php echo esc_html__('Add New', 'jotform-bridge'); ?>
     </a>
