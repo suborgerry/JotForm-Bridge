@@ -449,7 +449,8 @@ document.addEventListener('jotformbridge:success', function (event) {
 ## Compatibility validation
 
 Every integration is checked against the synced schema and the scanned template
-registry, and the result is shown in the integrations list and the editor:
+registry. The result is reported when you press **Sync Schema**; the editor's
+**Schema** table shows the fields it is derived from:
 
 | State | Meaning |
 | --- | --- |
@@ -720,7 +721,7 @@ Common situations:
 | Every API call fails on an EU account | The region is still set to Standard |
 | No template declares this slug | Check the two header lines in the file, and that it sits directly in `jotform-bridge-templates/` |
 | Submission answers 503 | The form was never synced, or the synced schema has errors — open the integration editor to see which |
-| A field is missing from Auto rendering | Its Jotform type is not supported; see the diagnostics |
+| A field is missing from Auto rendering | Its Jotform type is not supported; the Schema table marks it |
 
 ---
 

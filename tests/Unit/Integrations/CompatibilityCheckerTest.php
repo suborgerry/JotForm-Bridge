@@ -119,11 +119,6 @@ final class CompatibilityCheckerTest extends TestCase
         // Auto rendering covers every supported path by construction, so a
         // schema the plugin fully understands can never come back incompatible.
         $this->assertSame(CompatibilityReport::STATUS_COMPATIBLE, $result['report']->status());
-
-        // The schema table says field by field what auto rendering produces,
-        // so the headline stays empty rather than repeating it in numbers.
-        $this->assertSame('', $result['label']);
-        $this->assertSame('', $result['message']);
     }
 
     public function testAutoModeReportsTheFieldsItHasToLeaveOut(): void
@@ -139,7 +134,6 @@ final class CompatibilityCheckerTest extends TestCase
             CompatibilityReport::UNSUPPORTED_OPTIONAL,
             $result['report']->warnings()[0]['status']
         );
-        $this->assertSame('', $result['message']);
     }
 
     public function testAMatchingTemplateIsCompatible(): void

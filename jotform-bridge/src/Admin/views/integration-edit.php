@@ -428,55 +428,6 @@ $jfbReport  = $compatibility['report'] instanceof CompatibilityReport ? $compati
         <?php endif; ?>
     <?php endif; ?>
 
-    <h2><?php echo esc_html__('Compatibility', 'jotform-bridge'); ?></h2>
-    <?php if ((string) $compatibility['label'] !== '' || (string) $compatibility['message'] !== '') : ?>
-        <p>
-            <?php if ((string) $compatibility['label'] !== '') : ?>
-                <strong><?php echo esc_html((string) $compatibility['label']); ?></strong>
-            <?php endif; ?>
-            <?php if ((string) $compatibility['message'] !== '') : ?>
-                <?php echo esc_html((string) $compatibility['message']); ?>
-            <?php endif; ?>
-        </p>
-    <?php endif; ?>
-
-    <?php
-    /**
-     * Everything the template and the Jotform form disagree about, named the
-     * way a developer would go looking for it: the field type, then the exact
-     * identifier to put in data-jotform-field.
-     */
-    $jfbReport   = $compatibility['report'];
-    $jfbMismatch = $jfbReport !== null
-        ? ['error' => $jfbReport->errors(), 'warning' => $jfbReport->warnings()]
-        : ['error' => [], 'warning' => []];
-    ?>
-
-    <?php foreach ($jfbMismatch as $jfbLevel => $jfbRows) : ?>
-        <?php if ($jfbRows !== []) : ?>
-            <h3>
-                <?php
-                echo $jfbLevel === 'error'
-                    ? esc_html__('These stop the form from working', 'jotform-bridge')
-                    : esc_html__('Worth a look', 'jotform-bridge');
-                ?>
-            </h3>
-            <ul class="ul-disc">
-                <?php foreach ($jfbRows as $jfbRow) : ?>
-                    <li>
-                        <code>[<?php echo esc_html((string) $jfbRow['type'] !== '' ? (string) $jfbRow['type'] : '—'); ?>]</code>
-                        <code>[<?php echo esc_html((string) $jfbRow['path'] !== '' ? (string) $jfbRow['path'] : '—'); ?>]</code>
-                        —
-                        <?php echo esc_html(CompatibilityReport::label((string) $jfbRow['status'])); ?>
-                        <?php if ((string) $jfbRow['message'] !== '') : ?>
-                            <span class="description"><?php echo esc_html((string) $jfbRow['message']); ?></span>
-                        <?php endif; ?>
-                    </li>
-                <?php endforeach; ?>
-            </ul>
-        <?php endif; ?>
-    <?php endforeach; ?>
-
     <h2><?php echo esc_html__('Redirect target status', 'jotform-bridge'); ?></h2>
     <p <?php echo RedirectTarget::isBroken($redirect) ? 'class="notice notice-warning inline"' : ''; ?>>
         <strong><?php echo esc_html((string) $redirect['label']); ?></strong>

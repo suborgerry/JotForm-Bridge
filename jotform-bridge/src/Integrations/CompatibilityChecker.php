@@ -48,29 +48,19 @@ final class CompatibilityChecker
      * @return array{
      *     state: string,
      *     report: CompatibilityReport|null,
-     *     label: string,
-     *     message: string,
      *     fingerprint: string
      * }
      */
     public function check(Integration $integration): array
     {
         if ($integration->formId() === '') {
-            return $this->state(
-                self::STATE_NO_FORM,
-                __('No Jotform form selected', 'jotform-bridge'),
-                __('Select a Jotform form for this integration.', 'jotform-bridge')
-            );
+            return $this->state(self::STATE_NO_FORM);
         }
 
         $schema = $this->schemas->stored($integration->formId());
 
         if ($schema === null) {
-            return $this->state(
-                self::STATE_NO_SCHEMA,
-                __('Schema not synced', 'jotform-bridge'),
-                __('Use Sync Schema to load the form definition from Jotform.', 'jotform-bridge')
-            );
+            return $this->state(self::STATE_NO_SCHEMA);
         }
 
         if (!$integration->usesCustomTemplate()) {
@@ -79,29 +69,15 @@ final class CompatibilityChecker
             // not an approximation — it is what the visitor will get.
             $report = $this->validator->validate($schema, $schema->semanticPaths());
 
-            // What auto rendering produces is already spelled out by the
-            // schema table, field by field; a headline saying the same thing
-            // in numbers would only repeat it.
             return [
                 'state'       => self::STATE_AUTO,
                 'report'      => $report,
-                'label'       => '',
-                'message'     => '',
                 'fingerprint' => $schema->fingerprint(),
             ];
         }
 
         if (!$this->templates->has($integration->templateSlug())) {
-            return $this->state(
-                self::STATE_NO_TEMPLATE,
-                __('Template not found', 'jotform-bridge'),
-                sprintf(
-                    /* translators: %s: template slug */
-                    __('No template file in the theme declares the slug "%s". Check its header, or pick another template.', 'jotform-bridge'),
-                    $integration->templateSlug()
-                ),
-                $schema->fingerprint()
-            );
+            return $this->state(self::STATE_NO_TEMPLATE, $schema->fingerprint());
         }
 
         $report = $this->validator->validate(
@@ -113,22 +89,18 @@ final class CompatibilityChecker
         return [
             'state'       => self::STATE_OK,
             'report'      => $report,
-            'label'       => $report->statusLabel(),
-            'message'     => '',
             'fingerprint' => $schema->fingerprint(),
         ];
     }
 
     /**
-     * @return array{state:string, report:null, label:string, message:string, fingerprint:string}
+     * @return array{state:string, report:null, fingerprint:string}
      */
-    private function state(string $state, string $label, string $message, string $fingerprint = ''): array
+    private function state(string $state, string $fingerprint = ''): array
     {
         return [
             'state'       => $state,
             'report'      => null,
-            'label'       => $label,
-            'message'     => $message,
             'fingerprint' => $fingerprint,
         ];
     }

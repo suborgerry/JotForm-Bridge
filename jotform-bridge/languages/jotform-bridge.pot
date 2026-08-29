@@ -538,19 +538,6 @@ msgstr[1] ""
 msgid "A field most people trip over is usually a template that does not say what it wants, not a visitor problem."
 msgstr ""
 
-#: src/Admin/views/integration-edit.php:468
-#: src/Admin/views/integrations-list.php:49
-msgid "Compatibility"
-msgstr ""
-
-#: src/Admin/views/integration-edit.php:493
-msgid "These stop the form from working"
-msgstr ""
-
-#: src/Admin/views/integration-edit.php:494
-msgid "Worth a look"
-msgstr ""
-
 #: src/Admin/views/integration-edit.php:513
 msgid "Redirect target status"
 msgstr ""
@@ -1011,32 +998,6 @@ msgstr ""
 
 #: src/Forms/SchemaRepository.php:102
 msgid "This form has not been synced yet. Open the integration and press Sync Schema."
-msgstr ""
-
-#: src/Integrations/CompatibilityChecker.php:62
-msgid "No Jotform form selected"
-msgstr ""
-
-#: src/Integrations/CompatibilityChecker.php:63
-msgid "Select a Jotform form for this integration."
-msgstr ""
-
-#: src/Integrations/CompatibilityChecker.php:72
-msgid "Schema not synced"
-msgstr ""
-
-#: src/Integrations/CompatibilityChecker.php:73
-msgid "Use Sync Schema to load the form definition from Jotform."
-msgstr ""
-
-#: src/Integrations/CompatibilityChecker.php:101
-msgid "Template not found"
-msgstr ""
-
-#. translators: %s: template slug
-#: src/Integrations/CompatibilityChecker.php:104
-#, php-format
-msgid "No template file in the theme declares the slug \"%s\". Check its header, or pick another template."
 msgstr ""
 
 #: src/Integrations/Integration.php:101
