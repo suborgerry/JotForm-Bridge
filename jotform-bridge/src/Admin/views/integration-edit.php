@@ -280,6 +280,9 @@ $jfbReport  = $compatibility['report'] instanceof CompatibilityReport ? $compati
     <style>
         /* WordPress ships no destructive button style, only the red link class,
            so the delete button borrows the core error colours. */
+        .jfb-actions {
+            margin-bottom: 16px;
+        }
         .jfb-actions .jfb-button-delete {
             border-color: #b32d2e;
             background: #b32d2e;
@@ -522,10 +525,9 @@ $jfbReport  = $compatibility['report'] instanceof CompatibilityReport ? $compati
         <p class="description">
             <?php
             printf(
-                /* translators: 1: human readable time difference, 2: schema fingerprint */
-                esc_html__('Last synced %1$s ago. Fingerprint: %2$s', 'jotform-bridge'),
-                esc_html(human_time_diff($schemaMeta['synced_at'], time())),
-                '<code>' . esc_html(substr($schemaMeta['fingerprint'], 0, 12)) . '</code>'
+                /* translators: %s: human readable time difference */
+                esc_html__('Last synced %s ago.', 'jotform-bridge'),
+                esc_html(human_time_diff($schemaMeta['synced_at'], time()))
             );
             ?>
         </p>
