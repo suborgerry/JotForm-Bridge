@@ -31,7 +31,6 @@ if (!defined('ABSPATH')) {
     exit;
 }
 
-$jfbListUrl = add_query_arg(['page' => $page], admin_url('admin.php'));
 $jfbReport  = $compatibility['report'] instanceof CompatibilityReport ? $compatibility['report'] : null;
 ?>
 <div class="wrap jfb-integration">
@@ -42,9 +41,6 @@ $jfbReport  = $compatibility['report'] instanceof CompatibilityReport ? $compati
             : esc_html__('Edit Integration', 'jotform-bridge');
         ?>
     </h1>
-    <a href="<?php echo esc_url($jfbListUrl); ?>" class="page-title-action">
-        <?php echo esc_html__('Back to list', 'jotform-bridge'); ?>
-    </a>
     <hr class="wp-header-end">
 
     <?php require __DIR__ . '/partials/notice.php'; ?>
