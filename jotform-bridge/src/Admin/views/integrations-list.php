@@ -216,15 +216,6 @@ $jfbNewUrl = add_query_arg(['page' => $page, 'view' => 'new'], admin_url('admin.
 
     <p class="description">
         <?php
-        echo esc_html__(
-            'Read from the theme on every page load. Add, rename or edit a file and it is picked up immediately — there is nothing to refresh.',
-            'jotform-bridge'
-        );
-        ?>
-    </p>
-
-    <p class="description">
-        <?php
         $jfbRoots = [];
 
         foreach ($templates->roots() as $jfbRoot) {

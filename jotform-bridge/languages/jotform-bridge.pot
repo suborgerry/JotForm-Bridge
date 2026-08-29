@@ -305,7 +305,7 @@ msgstr ""
 
 #: src/Admin/views/integration-edit.php:75
 #: src/Admin/views/integrations-list.php:40
-#: src/Admin/views/integrations-list.php:250
+#: src/Admin/views/integrations-list.php:241
 msgid "Slug"
 msgstr ""
 
@@ -347,7 +347,7 @@ msgstr ""
 
 #: src/Admin/views/integration-edit.php:150
 #: src/Admin/views/integrations-list.php:43
-#: src/Admin/views/integrations-list.php:249
+#: src/Admin/views/integrations-list.php:240
 msgid "Template"
 msgstr ""
 
@@ -722,61 +722,57 @@ msgstr ""
 msgid "Templates"
 msgstr ""
 
-#: src/Admin/views/integrations-list.php:219
-msgid "Read from the theme on every page load. Add, rename or edit a file and it is picked up immediately — there is nothing to refresh."
-msgstr ""
-
-#: src/Admin/views/integrations-list.php:235
+#: src/Admin/views/integrations-list.php:226
 msgid "No template directory exists yet. Create a /forms/ directory in your theme."
 msgstr ""
 
 #. translators: %s: list of scanned directories
-#: src/Admin/views/integrations-list.php:239
+#: src/Admin/views/integrations-list.php:230
 #, php-format
 msgid "Scanned directories: %s"
 msgstr ""
 
-#: src/Admin/views/integrations-list.php:251
+#: src/Admin/views/integrations-list.php:242
 msgid "Source"
 msgstr ""
 
-#: src/Admin/views/integrations-list.php:252
+#: src/Admin/views/integrations-list.php:243
 msgid "Fields"
 msgstr ""
 
-#: src/Admin/views/integrations-list.php:253
+#: src/Admin/views/integrations-list.php:244
 msgid "File"
 msgstr ""
 
-#: src/Admin/views/integrations-list.php:260
+#: src/Admin/views/integrations-list.php:251
 msgid "No templates found. Add a PHP file with a Jotform template header to your theme /forms/ directory."
 msgstr ""
 
-#: src/Admin/views/integrations-list.php:272
+#: src/Admin/views/integrations-list.php:263
 msgid "Child theme"
 msgstr ""
 
-#: src/Admin/views/integrations-list.php:273
+#: src/Admin/views/integrations-list.php:264
 msgid "Parent theme"
 msgstr ""
 
-#: src/Admin/views/integrations-list.php:274
+#: src/Admin/views/integrations-list.php:265
 msgid "Theme"
 msgstr ""
 
-#: src/Admin/views/integrations-list.php:275
+#: src/Admin/views/integrations-list.php:266
 msgid "Filter"
 msgstr ""
 
 #. translators: %d: number of dynamic identifiers
-#: src/Admin/views/integrations-list.php:293
+#: src/Admin/views/integrations-list.php:284
 #, php-format
 msgid "+%d dynamic"
 msgid_plural "+%d dynamic"
 msgstr[0] ""
 msgstr[1] ""
 
-#: src/Admin/views/integrations-list.php:312
+#: src/Admin/views/integrations-list.php:303
 msgid "Template diagnostics"
 msgstr ""
 
