@@ -64,8 +64,9 @@ final class Assets
             [
                 'endpoint' => SubmissionController::endpoint(),
                 'messages' => [
-                    'error'   => __('The form could not be submitted. Please try again.', 'jotform-bridge'),
-                    'network' => __('The form could not be sent. Check your connection and try again.', 'jotform-bridge'),
+                    'error'       => __('The form could not be submitted. Please try again.', 'jotform-bridge'),
+                    'network'     => __('The form could not be sent. Check your connection and try again.', 'jotform-bridge'),
+                    'unsupported' => __('This browser cannot send this form. Please update it, or try a different one.', 'jotform-bridge'),
                 ],
             ]
         );

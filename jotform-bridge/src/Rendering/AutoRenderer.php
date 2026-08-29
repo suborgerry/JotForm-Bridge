@@ -124,20 +124,45 @@ final class AutoRenderer
 
         return sprintf(
             '<form class="jfb-form" method="post" action="%1$s" data-jotform-bridge data-jotform-integration="%2$s">'
+            . '%3$s'
             . '<p class="jfb-success" data-jotform-success role="status" aria-live="polite"></p>'
             . '<div class="jfb-error jfb-error--form" data-jotform-errors role="alert" aria-live="assertive"></div>'
-            . '%3$s'
             . '%4$s'
-            . '<div class="jfb-actions"><button type="submit" class="jfb-submit">%5$s</button></div>'
+            . '%5$s'
+            . '<div class="jfb-actions"><button type="submit" class="jfb-submit">%6$s</button></div>'
             . '</form>',
             esc_url($endpoint),
             esc_attr($slug),
+            self::noscript(),
             implode('', $parts),
             // Every automatically rendered form carries the decoy, and the
             // challenge widget when one is configured. A custom template decides
             // for itself, through $honeypot and $turnstile in its context.
             Honeypot::markup($prefix) . Turnstile::markup(),
             esc_html__('Submit', 'jotform-bridge')
+        );
+    }
+
+    /**
+     * What a visitor without JavaScript is told.
+     *
+     * The form is sent by the plugin's script: the inputs carry semantic
+     * identifiers rather than `name` attributes, so a browser submitting this
+     * form on its own posts an empty body to the REST endpoint and lands on a
+     * JSON error page. Saying so first is the difference between a form that
+     * cannot work here and a form that looks broken.
+     *
+     * Public so a custom template can print the same line — it is in the
+     * rendering context as `$noscript`.
+     */
+    public static function noscript(): string
+    {
+        return sprintf(
+            '<noscript><p class="jfb-noscript">%s</p></noscript>',
+            esc_html__(
+                'This form needs JavaScript to be sent. Please enable it and reload the page.',
+                'jotform-bridge'
+            )
         );
     }
 

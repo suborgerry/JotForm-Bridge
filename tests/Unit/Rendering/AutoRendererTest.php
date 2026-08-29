@@ -33,6 +33,26 @@ final class AutoRendererTest extends TestCase
         $this->assertStringContainsString('<button type="submit" class="jfb-submit"', $html);
     }
 
+    /**
+     * The inputs carry semantic identifiers, not `name` attributes, so a
+     * browser submitting this form on its own posts an empty body and lands on
+     * a JSON error page. The visitor has to be told before that happens.
+     */
+    public function testAVisitorWithoutJavaScriptIsToldRatherThanLeftToPostAnEmptyBody(): void
+    {
+        $html = $this->render();
+
+        $this->assertStringContainsString('<noscript>', $html);
+        $this->assertStringContainsString('needs JavaScript', $html);
+
+        // Before the fields, so it is read before the button is pressed.
+        $this->assertLessThan(
+            strpos($html, 'data-jotform-field'),
+            strpos($html, '<noscript>'),
+            'The notice belongs above the inputs.'
+        );
+    }
+
     public function testEverySupportedSemanticPathBecomesAnInput(): void
     {
         $schema = $this->schema();

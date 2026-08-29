@@ -163,6 +163,21 @@ final class FormRendererTest extends TestCase
         $this->assertStringContainsString('company:0;', $html);
     }
 
+    /**
+     * A custom template gets the same ready-made line the auto renderer prints,
+     * so a theme does not have to invent its own wording for the one state in
+     * which the form cannot work at all.
+     */
+    public function testTheContextCarriesTheNoScriptNotice(): void
+    {
+        $this->writeTemplate('contact', '<?php echo $noscript; ?>');
+
+        $html = $this->renderer()->render('contact');
+
+        $this->assertStringContainsString('<noscript>', $html);
+        $this->assertStringContainsString('needs JavaScript', $html);
+    }
+
     public function testAnAutoIntegrationRendersWithoutAnyTemplate(): void
     {
         $this->storeIntegration('', 'auto');

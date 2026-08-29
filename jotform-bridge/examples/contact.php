@@ -24,6 +24,7 @@
  *   $integration  ['slug' => string, 'name' => string, 'template' => string]
  *   $schema       ['fields' => array<string, field>, 'required' => string[]]
  *   $endpoint      string  REST URL this form submits to
+ *   $noscript      string  ready-made notice for visitors without JavaScript
  *
  * Each `$schema['fields']` entry is:
  *
@@ -94,6 +95,9 @@ $required = static function (string $key) use ($fields): bool {
     data-jotform-integration="<?php echo esc_attr($integration['slug']); ?>"
     novalidate
 >
+    <?php // This form is sent by the plugin's script; say so before the button. ?>
+    <?php echo $noscript; // phpcs:ignore WordPress.Security.EscapeOutput.OutputNotEscaped ?>
+
     <p class="contact-form__success" data-jotform-success role="status" aria-live="polite"></p>
     <div class="contact-form__errors" data-jotform-errors role="alert" aria-live="assertive"></div>
 

@@ -702,6 +702,16 @@
         clearErrors(form);
         showSuccess(form, '');
 
+        // Without fetch there is no way to send this form, and letting the
+        // browser submit it natively would post an empty body to the REST
+        // endpoint and replace the page with a JSON error. Say so instead.
+        if (typeof window.fetch !== 'function') {
+            showErrors(form, message('unsupported'), {});
+            focusFirstError(form);
+
+            return;
+        }
+
         if (!dispatch(form, 'jotformbridge:before-submit', { integration: integration, fields: fields })) {
             return;
         }

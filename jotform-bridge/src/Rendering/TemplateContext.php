@@ -29,7 +29,8 @@ final class TemplateContext
      *     schema: array<string, mixed>,
      *     endpoint: string,
      *     honeypot: string,
-     *     turnstile: string
+     *     turnstile: string,
+     *     noscript: string
      * }
      */
     public static function build(Integration $integration, FormSchema $schema, string $endpoint): array
@@ -52,6 +53,10 @@ final class TemplateContext
             // Empty unless the site configured a challenge, so a template can
             // print it unconditionally.
             'turnstile'   => Turnstile::markup(),
+            // A form marked for this plugin is sent by its script and by
+            // nothing else, so a visitor without JavaScript deserves to be told
+            // rather than left pressing a button that posts an empty body.
+            'noscript'    => AutoRenderer::noscript(),
         ];
     }
 
