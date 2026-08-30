@@ -1,0 +1,134 @@
+# Continuous integration.
+#
+# There are 453 tests and a ruleset, and until this file existed the only thing
+# that ran either of them was somebody remembering to. The three jobs below are
+# the three claims this repository makes about itself:
+#
+#   tests   — the suite passes, on every PHP version the plugin header promises
+#             to support and not only on whatever the author has installed;
+#   lint    — the code matches phpcs.xml.dist, so the phpcs:ignore annotations
+#             in src/ keep meaning something;
+#   package — the release ZIP still assembles, and still contains only what it
+#             is supposed to.
+#
+# Every job runs the same command a person runs locally: composer test,
+# composer lint, bin/build-zip.sh. Nothing is defined here that cannot be
+# reproduced on a laptop.
+
+name: CI
+
+on:
+  push:
+    branches:
+      - main
+      - 'feature-**'
+      - 'stage-**'
+  pull_request:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  tests:
+    name: Tests (PHP ${{ matrix.php }})
+    runs-on: ubuntu-latest
+
+    strategy:
+      fail-fast: false
+      matrix:
+        # The plugin header says "Requires PHP: 8.0". 8.0 is the floor that
+        # promise has to hold at; the rest is the range a real site might run.
+        php: ['8.0', '8.1', '8.2', '8.3', '8.4']
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up PHP
+        uses: shivammathur/setup-php@v2
+        with:
+          php-version: ${{ matrix.php }}
+          coverage: none
+          tools: composer:v2
+
+      - name: Install dependencies
+        uses: ramsey/composer-install@v3
+
+      - name: Run the test suite
+        run: composer test
+
+  lint:
+    name: Coding standards
+    runs-on: ubuntu-latest
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up PHP
+        uses: shivammathur/setup-php@v2
+        with:
+          # One version is enough: the ruleset checks the source, not the
+          # runtime. 8.0 is chosen so a sniff can never pass here by relying on
+          # syntax the plugin's own floor does not allow.
+          php-version: '8.0'
+          coverage: none
+          tools: composer:v2
+
+      - name: Install dependencies
+        uses: ramsey/composer-install@v3
+
+      - name: Check the coding standards
+        run: composer lint
+
+  package:
+    name: Release package
+    runs-on: ubuntu-latest
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Build the ZIP
+        run: bin/build-zip.sh
+
+      - name: Check what is inside it
+        run: |
+          set -euo pipefail
+          archive="$(find dist -name 'jotform-bridge-*.zip' -print -quit)"
+
+          if [[ -z "${archive}" ]]; then
+            echo "error: bin/build-zip.sh produced no archive" >&2
+            exit 1
+          fi
+
+          contents="$(unzip -Z1 "${archive}")"
+
+          # Everything must live under the plugin directory, so the ZIP
+          # unpacks into wp-content/plugins/ as one folder.
+          if grep -qv '^jotform-bridge/' <<<"${contents}"; then
+            echo "error: the archive has entries outside jotform-bridge/" >&2
+            grep -v '^jotform-bridge/' <<<"${contents}" >&2
+            exit 1
+          fi
+
+          # Development scaffolding must never ship. AGENTS.md lists these by
+          # name; a person reading a diff would not notice one creeping back in.
+          forbidden='^jotform-bridge/(tests/|vendor/|node_modules/|composer\.(json|lock)$|package\.json$|phpunit)'
+
+          if grep -qE "${forbidden}" <<<"${contents}"; then
+            echo "error: the archive ships development files" >&2
+            grep -E "${forbidden}" <<<"${contents}" >&2
+            exit 1
+          fi
+
+          echo "Archive contents verified: $(wc -l <<<"${contents}") entries."
+
+      - name: Keep the archive for inspection
+        uses: actions/upload-artifact@v4
+        with:
+          name: jotform-bridge-zip
+          path: dist/*.zip
+          retention-days: 7

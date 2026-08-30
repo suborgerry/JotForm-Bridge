@@ -45,6 +45,19 @@
     <config name="minimum_wp_version" value="6.4"/>
 
     <!--
+        There is deliberately no PHPCompatibility rule here. The plugin header
+        says "Requires PHP: 8.0", and checking that statically would be the
+        obvious way to hold the promise — but the stable release,
+        PHPCompatibility 9.3.5, is from December 2019 and predates PHP 8.0
+        entirely. Pointed at a file using readonly properties and
+        array_is_list() it reports nothing, at any testVersion. A check that
+        cannot fail is worse than no check, because it reads as proof.
+
+        The floor is held by the CI matrix instead, which runs the suite on 8.0
+        itself. Revisit when PHPCompatibility 10 is released.
+    -->
+
+    <!--
         The point of the exercise: the sniffs that the source suppresses by
         name, plus the rest of the WordPress security set.
     -->
