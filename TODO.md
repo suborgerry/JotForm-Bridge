@@ -62,35 +62,7 @@ the outbox.
 
 ---
 
-## 3. Interfaces, so the storage can be replaced
-
-**Problem.** `IntegrationRepository` and `SchemaRepository` are `final` and read
-their own options directly. Behaviour is adjustable through fifteen filters, but
-neither can be swapped for a different implementation.
-
-**Why it might matter.** One concrete scenario, not a general wish for
-flexibility: keeping integrations and schemas **in code** rather than in the
-database. A developer who wants staging and production to be provably identical,
-wants the configuration to go through review, and does not want a deployment to
-require clicking "Sync Schema" on every environment by hand, currently cannot —
-the option in the database is the only source there is. It is the same argument
-that already put the API key in `wp-config.php`, applied to the rest of the
-configuration.
-
-**Shape.** An interface for each of the two, a filter on the composition root in
-`Plugin` so a site can substitute its own, and a file-backed implementation to
-prove the interface is actually usable.
-
-**Why it is parked.** The usual argument for interfaces — testability — does not
-apply here: Brain Monkey stubs `get_option`, and the suite runs against the real
-classes without complaint. That leaves only the scenario above, and until
-somebody actually wants configuration in code, an interface with a single
-implementation is an extra file and a false promise of flexibility. Worth doing
-properly when the need is real; not worth doing speculatively.
-
----
-
-## 4. No way to update the plugin
+## 3. No way to update the plugin
 
 **Problem.** The plugin is not on wordpress.org, carries no `Update URI` header
 and ships no updater. Every install is a manual ZIP upload. On one site that is
@@ -111,7 +83,7 @@ build when the three version strings — plugin header,
 
 ---
 
-## 5. The rate limiter writes to `wp_options` and counts non-atomically
+## 4. The rate limiter writes to `wp_options` and counts non-atomically
 
 **Problem.** `Submission\RateLimiter` keeps its buckets in transients, and both
 properties of that storage are wrong under load rather than merely imperfect.
@@ -195,7 +167,7 @@ hourly window is availability protection, not only spam protection.
 
 ---
 
-## 6. No integration tests
+## 5. No integration tests
 
 **Problem.** 453 tests, and every one of them is a unit test. Nothing exercises
 a REST request end to end, nothing exercises an `admin_post` action, and nothing
@@ -232,7 +204,7 @@ the one that would have caught the defects that actually got through.
 
 ---
 
-## 7. PHPStan, or a decision that PHPCS is enough
+## 6. PHPStan, or a decision that PHPCS is enough
 
 **Where this came from.** The continuous integration entry named PHPStan with
 `szepeviktor/phpstan-wordpress` as the obvious static analysis candidate. CI was
@@ -266,7 +238,7 @@ result. Run it once before deciding.
 
 ---
 
-## 8. No accessibility audit against WCAG
+## 7. No accessibility audit against WCAG
 
 **Problem.** This is a plugin whose entire output is forms, and forms are where
 accessibility is most often got wrong and most keenly felt. The markup was
@@ -298,7 +270,7 @@ this file it is the item most likely to be affecting real people right now.
 
 ---
 
-## 9. No check against current web standards
+## 8. No check against current web standards
 
 **Problem.** The output has never been validated. The plugin generates HTML from
 a schema it does not control, and Jotform allows labels and option values that
@@ -321,7 +293,7 @@ not evidence of much.
 
 ---
 
-## 10. Second review pass with a different model
+## 9. Second review pass with a different model
 
 **Problem.** The August 2026 review, the removals that followed it and the fixes
 in this file were all produced in one long session by one model. That is a
@@ -339,7 +311,7 @@ argument for the code. Worth pointing at specifically:
 * the submission pipeline's ordering and its single-answer refusal policy;
 * the proof-of-work guard, which is home-grown crypto in the security path and
   was reviewed by nobody;
-* the rate limiter trade-off recorded in item 5, including the option that was
+* the rate limiter trade-off recorded in item 4, including the option that was
   rejected there.
 
 Treat disagreement as information rather than as a verdict: the useful output is
@@ -348,7 +320,7 @@ by hand.
 
 ---
 
-## 11. Sweep for hardcoding and over-engineering
+## 10. Sweep for hardcoding and over-engineering
 
 **Problem.** Nobody has read the plugin looking specifically for two opposite
 faults: a value that should have been derived or configurable but was typed in,
@@ -401,7 +373,7 @@ none of the three has not been resolved, only visited.
 
 ---
 
-## 12. Consider storing only the forms actually used, fetched by ID
+## 11. Consider storing only the forms actually used, fetched by ID
 
 **The idea.** Instead of pulling the whole account form list and keeping it,
 keep a record only for the forms integrations actually reference, resolved one
@@ -413,7 +385,7 @@ every form on the account — a shared agency account can be hundreds — and re
 that option on every admin screen that shows a form title. It also brings its own
 problems along:
 
-* the pagination defect in item 11: `limit=1000` with no paging, so a large
+* the pagination defect in item 10: `limit=1000` with no paging, so a large
   account is silently truncated and the missing forms never reach the select;
 * `jotform_bridge_forms_hidden` and the whole **Remove from list** action exist
   only because the stored list carries forms nobody wants to see. Under a
@@ -440,7 +412,7 @@ question:
    all. The smallest storage, no truncation, no hidden-forms feature — and the
    worst first-run experience, since the site owner has to go and find the ID.
 3. **A searchable, paged picker.** Best at scale, most work, and it needs the
-   paging that item 11 says is missing anyway.
+   paging that item 10 says is missing anyway.
 
 **Also to settle.** Sync with Jotform currently does double duty — it checks the
 API key with `GET /user` and records the account name. If the account list stops
