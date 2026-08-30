@@ -4,8 +4,14 @@
 # that ran either of them was somebody remembering to. The three jobs below are
 # the three claims this repository makes about itself:
 #
-#   tests   — the suite passes, on every PHP version the plugin header promises
-#             to support and not only on whatever the author has installed;
+#   tests   — the unit suite passes, on every PHP version the plugin header
+#             promises to support and not only on whatever the author has
+#             installed;
+#   integration
+#           — the plugin boots inside a real WordPress and its seams still
+#             hold: the REST route, the admin-post and admin-ajax handlers,
+#             template rendering from a theme directory, and the once-per-site
+#             lifecycle nobody ever runs by hand;
 #   lint    — the code matches phpcs.xml.dist, so the phpcs:ignore annotations
 #             in src/ keep meaning something, HOOKS.md still describes the
 #             hooks the source actually fires, and the three version strings
@@ -14,8 +20,8 @@
 #             is supposed to.
 #
 # Every job runs the same command a person runs locally: composer test,
-# composer lint, bin/build-zip.sh. Nothing is defined here that cannot be
-# reproduced on a laptop.
+# composer test:integration, composer lint, bin/build-zip.sh. Nothing is
+# defined here that cannot be reproduced on a laptop.
 
 name: CI
 
@@ -62,6 +68,43 @@ jobs:
 
       - name: Run the test suite
         run: composer test
+
+  integration:
+    name: Integration suite (PHP ${{ matrix.php }})
+    runs-on: ubuntu-latest
+
+    strategy:
+      fail-fast: false
+      matrix:
+        # The floor the plugin header promises, and a current release. The
+        # suite loads WordPress itself, so this is also the only job that would
+        # notice the plugin failing to boot at all.
+        php: ['8.0', '8.4']
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up PHP
+        uses: shivammathur/setup-php@v2
+        with:
+          php-version: ${{ matrix.php }}
+          # The suite runs WordPress on SQLite: no database service, no Docker.
+          extensions: pdo_sqlite, sqlite3
+          coverage: none
+          tools: composer:v2
+
+      - name: Install dependencies
+        uses: ramsey/composer-install@v3
+
+      # Downloads the current WordPress and the SQLite drop-in into .wordpress/.
+      # Deliberately not pinned: a core release that breaks this plugin is
+      # something we would rather learn here than from a site owner. Set
+      # JFB_WP_VERSION to pin it while a break is being fixed.
+      - name: Install WordPress
+        run: bin/install-wp.sh
+
+      - name: Run the integration suite
+        run: vendor/bin/phpunit -c phpunit.integration.xml.dist
 
   lint:
     name: Coding standards

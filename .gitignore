@@ -31,6 +31,12 @@ wp-config.php
 /wp-content/
 /wordpress/
 
+# The WordPress the integration suite runs against. Downloaded by
+# bin/install-wp.sh, never committed: it is 40 MB of somebody else's code plus
+# a SQLite database, and the plugin is symlinked into it rather than copied, so
+# there is nothing in here that is not reproducible from one command.
+/.wordpress/
+
 # OS and editors
 .DS_Store
 Thumbs.db

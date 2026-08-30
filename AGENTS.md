@@ -1786,7 +1786,8 @@ All of it is a **dev dependency**. None of it ships in the release ZIP.
 
 ```text
 composer.json
-phpunit.xml.dist
+phpunit.xml.dist                # the unit suite
+phpunit.integration.xml.dist    # the integration suite
 tests/
 ├── bootstrap.php
 ├── TestCase.php          # base class with Brain Monkey setUp/tearDown
@@ -1796,8 +1797,17 @@ tests/
 │   ├── Submission/
 │   ├── Admin/
 │   └── Api/
+├── Integration/
+│   ├── bootstrap.php     # loads WordPress and checks the plugin booted
+│   ├── config.php        # the constants both processes have to agree on
+│   ├── install.php       # installs the site once, in its own process
+│   ├── Runtime.php       # one fresh request per test
+│   ├── TestCase.php      # base class: no network, wp_die() and redirects throw
+│   ├── Admin/
+│   ├── Rest/
+│   └── Templates/
 └── Fixtures/
-    └── Jotform/          # sanitized Jotform API responses
+    └── Jotform/          # sanitized Jotform API responses, shared by both
 ```
 
 Composer PSR-4:
@@ -1811,11 +1821,68 @@ JotformBridge\Tests\ → tests/
 
 ```bash
 composer install
-composer test          # an alias for vendor/bin/phpunit
+composer test              # the unit suite; no WordPress, no network
+composer test:integration  # the integration suite; downloads WordPress once
 ```
 
 `composer test` has worked since stage 1, even when there was almost nothing to
 run. Setting it up was not deferred.
+
+## Two suites
+
+The unit suite stubs WordPress with Brain Monkey and asserts about one class at
+a time. It cannot see the seams *between* classes, and that is exactly where the
+defects of August 2026 were: a hidden field read unconditionally from `$_POST`,
+two admin screens describing a directory and a button that no longer existed, an
+auto-rendered form posting an empty body. Each of those is invisible to a test
+that constructs one class and calls one method, so there is a second suite
+beside the first.
+
+The two cannot share a process — one defines `get_option()` as a stub, the other
+loads the real one — which is why the second has a configuration of its own
+rather than another `<testsuite>` entry in the first.
+
+The integration suite runs WordPress core on the official SQLite drop-in:
+
+* `bin/install-wp.sh` downloads both into `.wordpress/`, which is git-ignored,
+  and symlinks the plugin into `wp-content/plugins/` so the suite always tests
+  the working tree and never a copy of it;
+* `tests/Integration/install.php` installs the site once, in its own process
+  (WP_INSTALLING cannot be switched off again), and the result is kept as a
+  pristine database every later run is restored from;
+* the plugin is active in the options table, so `wp-settings.php` includes it
+  the way a site does, through its own autoloader;
+* `Runtime::newRequest()` gives each test a new request: the plugin's storage is
+  emptied, the callbacks bound to the previous services are removed, the
+  composition root is discarded and the plugin is booted again. The repositories
+  memoize within a request — correctly, since nothing else writes their storage
+  inside one — so a suite that kept the first request's objects would be
+  asserting against answers cached before it set anything up.
+
+No database server, no Docker, no `wp-env`: `composer test:integration` is the
+whole thing, on a laptop and in CI alike.
+
+What the suite has to keep proving:
+
+1. the REST route through `WP_REST_Request` against the registered route —
+   the permission callback, the JSON body, the status codes and the headers,
+   not the pipeline called directly;
+2. the `admin_post_` and `wp_ajax_` handlers, with and without a valid nonce and
+   with and without the capability, asserting that the guard actually fires and
+   that a refused action changed nothing;
+3. a template rendered from a real theme directory, child theme priority
+   included, and a path outside the roots refusing to resolve;
+4. activation, upgrade and uninstall against a real options table — the legacy
+   purges above all, because they run once per site and therefore never run on a
+   developer's machine;
+5. the admin screens rendered, asserting they do not describe features the
+   plugin no longer has. Three stale instructions reached users that way, and
+   none of the three was a bug in any class.
+
+The network is unreachable from it. `WP_HTTP_BLOCK_EXTERNAL` is defined and any
+request a test did not answer through `mockHttp()` throws, so the upstream
+boundary is always a fixture: a live Jotform write cannot happen by accident,
+whatever the local `.env` contains.
 
 ## How to write them
 

@@ -187,62 +187,76 @@ hourly window is availability protection, not only spam protection.
 
 ---
 
-## 5. No integration tests
+## 5. ~~No integration tests~~ — done
 
-**Problem.** 463 tests, and every one of them is a unit test. Nothing exercises
-a REST request end to end, nothing exercises an `admin_post` or `wp_ajax_`
-action, and nothing renders a template from an actual file through the actual
-registry.
+Built in August 2026. There is a second suite, `tests/Integration/`, with 70
+tests beside the 463 unit tests, and a CI job of its own.
 
-That is not a coverage statistic — it is where the bugs were. Of the defects
-found in the August 2026 review, the ones that mattered lived precisely in the
-seams no unit test looks at: settings saving reset a stored value because a
-hidden field was read unconditionally from `$_POST`; the admin screens carried
-two stale instructions naming a directory and a button that no longer existed;
-the auto-rendered form posted an empty body to the REST endpoint with no
-JavaScript. Each of those is invisible to a test that constructs one class and
-calls one method.
+**What it runs on.** WordPress core on the official SQLite drop-in, driven by
+plain PHPUnit: no database server, no Docker, no `wp-env`. `bin/install-wp.sh`
+downloads both into `.wordpress/` (git-ignored) and symlinks the plugin into
+`wp-content/plugins/`, so the suite tests the working tree rather than a copy.
+`tests/Integration/install.php` installs the site once and keeps a pristine
+database; every run is restored from it, so nothing an earlier run left behind
+can make a test pass. `composer test:integration` is the whole command, and
+`.github/workflows/ci.yml` runs it on PHP 8.0 and 8.4.
 
-**The class of defect has since repeated, which is the argument for this entry.**
-Removing the account form list later the same month left a third stale
-instruction behind — the integrations list still offered "Not in the stored form
-list" for a form with no title, naming a list that had just ceased to exist. It
-was found by opening the screen in a browser, not by the suite, and the suite
-stayed green throughout. That is now three of this exact kind, all in admin
-markup, all invisible to a unit test.
+Two decisions in there are worth not rediscovering:
 
-**The debt grew in the same change.** `IntegrationsPage::handleConnectForm()` is
-a new handler with a capability check and a nonce check, answering over
-admin-ajax, and nothing automated touches it. It was verified by hand — a good
-nonce, a forged one, no session at all, a malformed ID, and the live upstream
-path — through `@wp-playground/cli`, which proves these seams are perfectly
-testable. But a verification done by hand runs once. Nobody who edits that method
-next will be told what they broke.
+* the plugin is *active in the options table*, so `wp-settings.php` includes it
+  the way a site does. A bootstrap that required the plugin file would not have
+  noticed it failing to load at all;
+* each test gets a fresh request (`Runtime::newRequest()`): storage emptied,
+  the callbacks bound to the previous services removed, the composition root
+  discarded and booted again. `IntegrationRepository`, `Settings`,
+  `FormRepository` and `TemplateRegistry` all memoize within a request, which
+  is right on a site and wrong across fifty tests in one process.
 
-**Shape.** A second suite, separate from `tests/Unit/`, that boots enough of
-WordPress to be honest:
+**What it covers**, which is what this entry asked for:
 
-* the REST route, exercised through `WP_REST_Request` against the registered
-  route rather than by calling the pipeline directly — including the permission
-  callback, the JSON body and the response headers;
-* the `admin_post` handlers *and* the `wp_ajax_jotform_bridge_connect_form`
-  route, exercised with and without a valid nonce and with and without the
-  capability, asserting that the guard actually fires;
-* rendering a real template file through `TemplateRegistry`, including a file
-  that resolves outside its root;
-* activation, upgrade and uninstall against a real options table — including the
-  legacy-option purges, which are the part of the lifecycle that only ever runs
-  once per site and therefore never runs on a developer's machine.
+* the REST route through `WP_REST_Request` against the registered route — the
+  permission callback, the JSON body, 200/403/413/422/429/502/503, the
+  `Retry-After` and `Cache-Control` headers, the redirect in the success body,
+  and the mapped payload that reaches the upstream boundary;
+* the `admin_post_` handlers and `wp_ajax_jotform_bridge_connect_form`, each
+  with and without a valid nonce and with and without the capability, asserting
+  that a refused action changed nothing;
+* a template rendered from a real theme directory — the shipped
+  `examples/contact.php`, so the documented example is checked too — child theme
+  priority, a symlink leaving its root, and a path that resolves outside;
+* activation, upgrade, deactivation and uninstall against a real options table,
+  including every legacy purge and the stored API key an old version left
+  behind;
+* the admin screens rendered, asserting they do not describe features that were
+  removed. That is the defect class this entry was mostly about, and it is now
+  a failing test rather than a thing somebody notices in a browser.
 
-`wp-env` or `wp-phpunit` is the usual way to get there, and `@wp-playground/cli`
-is now a demonstrated third option: it booted WordPress on PHP 8.0 with the
-plugin mounted, from a plain `npx`, with no Docker. The precondition this entry
-had — continuous integration, so that a suite nobody runs does not rot — is met:
-`.github/workflows/ci.yml` runs the existing suite on every push. A second suite
-needs a job of its own beside it.
+**What it found immediately.** `Settings::region()` validated a stored value
+against `regions()`, which translates, so every admin request called `__()` on
+`plugins_loaded` — a `_doing_it_wrong` notice about loading the text domain too
+early, on WordPress 6.7 and later. The region slugs are now a list of their own
+and the labels stay in the view. Nothing in three hundred unit tests could see
+it, because nothing there loads WordPress.
 
-**Why it is parked.** It is the largest piece of work in this file, and it is
-the one that would have caught the defects that actually got through.
+**What is still not covered, and is not pretending to be:**
+
+* `assets/frontend.js`. The suite computes the proof of work in PHP, so it
+  proves the server's half of the contract and not that the browser computes the
+  same thing — the two copies of `BITS = 16` in item 10 are still unguarded by
+  anything but a person opening the page. Double submit, the events and the
+  redirect are still Playwright by hand;
+* multisite. `Plugin::eachSite()` and the network-activation path have no test:
+  the installed site is single;
+* the admin screens are rendered by constructing the page object, not through
+  `admin.php` — there is no `current_screen`, and the submenu order is not
+  asserted;
+* the HTTP status beside a `wp_send_json` answer. WordPress only sets it when
+  `headers_sent()` is false, and by the first PHPUnit dot it is true. The body
+  is asserted; the status is not;
+* WordPress 6.4, the floor in the plugin header. CI runs whatever is current;
+  `JFB_WP_VERSION=6.4` pins it for a one-off check;
+* a live Jotform call, deliberately. Outbound HTTP is blocked and an unmocked
+  request fails the test, so the boundary is always a fixture.
 
 ---
 

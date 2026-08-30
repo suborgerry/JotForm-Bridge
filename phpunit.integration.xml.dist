@@ -1,0 +1,29 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!--
+    The integration suite: the same PHPUnit, a different bootstrap.
+
+    It is a separate configuration rather than a second <testsuite> in
+    phpunit.xml.dist because the two cannot share a process. The unit suite
+    stubs WordPress functions with Brain Monkey; this one loads WordPress and
+    defines the real ones. Whichever ran second would find the other's
+    definitions already in place.
+-->
+<phpunit xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+         xsi:noNamespaceSchemaLocation="https://schema.phpunit.de/9.6/phpunit.xsd"
+         bootstrap="tests/Integration/bootstrap.php"
+         colors="true"
+         beStrictAboutTestsThatDoNotTestAnything="false"
+         convertDeprecationsToExceptions="false"
+         failOnRisky="true"
+         failOnWarning="true">
+    <testsuites>
+        <testsuite name="integration">
+            <directory suffix="Test.php">tests/Integration</directory>
+        </testsuite>
+    </testsuites>
+    <coverage>
+        <include>
+            <directory suffix=".php">jotform-bridge/src</directory>
+        </include>
+    </coverage>
+</phpunit>

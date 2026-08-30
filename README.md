@@ -842,17 +842,30 @@ The repository is the plugin plus its dev harness. Only `jotform-bridge/` ships.
 │       ├── Autoloader.php   # own PSR-4 loader, so no vendor/ in the release
 │       ├── Plugin.php       # composition root
 │       └── api.php          # jotform_bridge_render() and friends
-├── tests/                   # PHPUnit, WordPress stubbed with Brain Monkey
+├── tests/
+│   ├── Unit/                # PHPUnit, WordPress stubbed with Brain Monkey
+│   └── Integration/         # PHPUnit against a real WordPress on SQLite
+├── bin/install-wp.sh        # downloads that WordPress into .wordpress/
 ├── bin/build-zip.sh         # builds the release ZIP
 ├── AGENTS.md                # architectural specification
 └── prompts/                 # the staged prompts this was built from
 ```
 
 ```bash
-composer install          # dev dependencies (PHPUnit, Brain Monkey)
-vendor/bin/phpunit        # the whole suite; no WordPress needed
-bin/build-zip.sh          # dist/jotform-bridge-<version>.zip
+composer install           # dev dependencies (PHPUnit, Brain Monkey)
+composer test              # unit suite; no WordPress, no network
+composer test:integration  # integration suite; downloads WordPress once
+composer check             # lint, hooks, versions, unit suite
+bin/build-zip.sh           # dist/jotform-bridge-<version>.zip
 ```
+
+The integration suite loads a real WordPress — a real options table, a real REST
+server, a real nonce — running on the official SQLite drop-in, so it needs
+neither a database server nor Docker. `bin/install-wp.sh` puts it in
+`.wordpress/` (git-ignored) and symlinks the plugin into it, which
+`composer test:integration` does for you the first time. It never contacts
+Jotform: outbound HTTP is blocked, and any request a test did not answer from a
+fixture fails that test.
 
 Regenerating the translation template:
 
