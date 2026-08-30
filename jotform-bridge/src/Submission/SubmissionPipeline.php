@@ -369,7 +369,6 @@ final class SubmissionPipeline
      * same values. Only a hash is stored — never the values themselves.
      *
      * @param array<string, string|array<int, string>> $values
-     * @param array<string, mixed>                     $context
      */
     private function fingerprint(string $slug, array $values, string $ip): string
     {

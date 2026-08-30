@@ -671,9 +671,18 @@ final class IntegrationsPage
     }
 
     /**
+     * Answers the request and ends it. Every guard clause on this screen leans
+     * on that: the code after one reads its value as still set, because a
+     * missing one has already left the process.
+     *
+     * `never` is a docblock rather than a native return type because the plugin
+     * supports PHP 8.0, where the type does not exist.
+     *
      * @param array<string, string> $args
+     *
+     * @return never
      */
-    private function redirect(array $args): void
+    private function redirect(array $args)
     {
         wp_safe_redirect(
             add_query_arg(

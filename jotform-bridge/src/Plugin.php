@@ -274,7 +274,7 @@ final class Plugin
     public function quota(): QuotaGuard
     {
         if ($this->quota === null) {
-            $this->quota = new QuotaGuard($this->settings);
+            $this->quota = new QuotaGuard();
         }
 
         return $this->quota;

@@ -31,12 +31,18 @@ if (!defined('ABSPATH')) {
  *  - the header scan, which answers "what exists" and "which file is this slug";
  *  - the field analysis, which reads a whole file and is asked for only by the
  *    compatibility report on an admin screen.
+ *
+ * @phpstan-type Registry array{
+ *     templates: array<string, array<string, mixed>>,
+ *     diagnostics: array<int, array<string, string>>,
+ *     roots: array<int, array{path:string, source:string}>
+ * }
  */
 final class TemplateRegistry
 {
     private TemplateScanner $scanner;
 
-    /** @var array<string, mixed>|null In-request memo of the header scan. */
+    /** @var Registry|null In-request memo of the header scan. */
     private ?array $discovered = null;
 
     /**
@@ -176,11 +182,7 @@ final class TemplateRegistry
     }
 
     /**
-     * @return array{
-     *     templates: array<string, array<string, mixed>>,
-     *     diagnostics: array<int, array<string, string>>,
-     *     roots: array<int, array{path:string, source:string}>
-     * }
+     * @return Registry
      */
     private function load(): array
     {
@@ -188,11 +190,13 @@ final class TemplateRegistry
             return $this->discovered;
         }
 
-        $this->discovered = $this->normalize($this->scanner->discover());
+        $registry = $this->normalize($this->scanner->discover());
 
-        $this->report($this->discovered['diagnostics']);
+        $this->discovered = $registry;
 
-        return $this->discovered;
+        $this->report($registry['diagnostics']);
+
+        return $registry;
     }
 
     /**
@@ -245,11 +249,7 @@ final class TemplateRegistry
     /**
      * @param array<string, mixed> $registry
      *
-     * @return array{
-     *     templates: array<string, array<string, mixed>>,
-     *     diagnostics: array<int, array<string, string>>,
-     *     roots: array<int, array{path:string, source:string}>
-     * }
+     * @return Registry
      */
     private function normalize(array $registry): array
     {

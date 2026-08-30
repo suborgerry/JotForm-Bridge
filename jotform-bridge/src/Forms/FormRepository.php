@@ -33,6 +33,8 @@ if (!defined('ABSPATH')) {
  * its own, and no page view or submission ever writes it. A record is a *name*
  * for an ID — the ID itself, the authoritative part, lives on the Integration —
  * so a stale title is cosmetic and a missing one costs nothing but a label.
+ *
+ * @phpstan-type ConnectedForm array{id:string, title:string, status:string, updated:string, connected_at:int}
  */
 final class FormRepository
 {
@@ -63,7 +65,7 @@ final class FormRepository
      * In-request memo. The integrations list asks for a title once per row, and
      * the answer cannot change within one request.
      *
-     * @var array<int|string, array<string, string|int>>|null
+     * @var array<int|string, ConnectedForm>|null
      */
     private ?array $memo = null;
 
@@ -81,7 +83,7 @@ final class FormRepository
      * code iterating this should read `$form['id']`, which is a string by
      * construction, rather than the key it arrived under.
      *
-     * @return array<int|string, array{id:string, title:string, status:string, updated:string, connected_at:int}>
+     * @return array<int|string, ConnectedForm>
      */
     public function all(): array
     {
@@ -115,7 +117,7 @@ final class FormRepository
     }
 
     /**
-     * @return array{id:string, title:string, status:string, updated:string, connected_at:int}|null
+     * @return ConnectedForm|null
      */
     public function get(string $formId): ?array
     {
@@ -220,7 +222,7 @@ final class FormRepository
     }
 
     /**
-     * @param array<int|string, array<string, string|int>> $forms
+     * @param array<int|string, ConnectedForm> $forms
      */
     private function save(array $forms): void
     {
@@ -238,7 +240,7 @@ final class FormRepository
     /**
      * @param array<string, mixed> $record
      *
-     * @return array{id:string, title:string, status:string, updated:string, connected_at:int}
+     * @return ConnectedForm
      */
     private static function normalize(string $formId, array $record): array
     {

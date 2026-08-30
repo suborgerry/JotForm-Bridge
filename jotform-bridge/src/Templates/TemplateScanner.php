@@ -529,6 +529,9 @@ final class TemplateScanner
      * The `@` is likewise deliberate: a file that vanished between scandir()
      * and here, or one the process may not read, is an ordinary outcome that
      * the return values below handle. A warning in the log would be noise.
+     *
+     * @param positive-int $bytes fread() raises a ValueError below 1, and the
+     *                            `@` does not suppress an exception.
      */
     private function read(string $file, int $bytes): string
     {
