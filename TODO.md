@@ -7,35 +7,16 @@ rediscovering the reasoning.
 Not a backlog of everything imaginable — things that were considered and
 rejected are not here, and should not be added back without a new decision.
 
-**Next up** is what is left of the toolchain. The other four items in it — a
-PHPCS ruleset, `composer.lock`, continuous integration and a generated hook
-reference — were done together in August 2026, because each of them was a claim
-nobody could check and none of them was worth much alone. **Later** is the rest,
-in no particular order.
-
----
-
-# Next up
-
-## 1. Check the request size before the body is parsed
-
-**Problem.** `SubmissionController::handle()` compares
-`strlen($request->get_body())` against `MAX_BODY_BYTES` — after WordPress has
-already read and JSON-decoded the body. The memory the cap exists to bound has
-been spent by the time the cap is consulted.
-
-**Shape.** Refuse on `Content-Length` before dispatch, on `rest_pre_dispatch` or
-equivalent.
-
-**Size.** Small, and honestly the least important item in this file: PHP's own
-`post_max_size` is the real bound, and this cap is a second, tighter one. Worth
-fixing because a limit that runs after the thing it limits is misleading to
-anybody reading it.
+The toolchain section that used to head this file is gone: the PHPCS ruleset,
+`composer.lock`, continuous integration and the generated hook reference were
+done together in August 2026, and the request-size check that remained was
+examined and dropped — see `SubmissionController::MAX_BODY_BYTES`, where the
+reasoning now lives beside the code it is about. What follows is in no
+particular order.
 
 ---
 
 # Later
-
 
 ## 1. An outbox for submissions that never reached Jotform
 

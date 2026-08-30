@@ -31,10 +31,22 @@ final class SubmissionController
     public const ROUTE     = '/submit/(?P<integration>[A-Za-z0-9_-]+)';
 
     /**
-     * Hard cap on the raw request body, checked before the body is looked at.
+     * Hard cap on the raw request body, refusing it before it is decoded.
      *
-     * The validator has its own, tighter limit on the values it accepts; this one
-     * exists so an oversized body is refused as early as we can refuse it.
+     * Not the earliest possible check, and deliberately not. By the time any of
+     * our code runs, WordPress has already read the whole body from php://input;
+     * what this saves is the JSON decode of something we were going to refuse.
+     * The bound that actually protects the server is PHP's own post_max_size,
+     * which acts before PHP code runs at all.
+     *
+     * Checking Content-Length on rest_pre_dispatch would run earlier still, and
+     * was considered and rejected: the header is supplied by the client, and a
+     * chunked request carries none, so the check below would have to stay
+     * anyway. Two checks, and the earlier one only ever catches the honest
+     * caller — which is not the case worth defending against.
+     *
+     * The validator has its own, tighter limit on the values it accepts. This
+     * one is the coarse outer rail: a body this size is not a form submission.
      */
     public const MAX_BODY_BYTES = 262144;
 
