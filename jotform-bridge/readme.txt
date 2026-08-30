@@ -4,7 +4,7 @@ Tags: jotform, forms, contact form, headless, custom form
 Requires at least: 6.4
 Tested up to: 6.8
 Requires PHP: 8.0
-Stable tag: 0.1.0
+Stable tag: 0.2.0
 License: GPL-2.0-or-later
 License URI: https://www.gnu.org/licenses/gpl-2.0.html
 
@@ -191,6 +191,20 @@ double click cannot create two Jotform submissions.
 3. The settings screen: API key, region and diagnostics.
 
 == Changelog ==
+
+= 0.2.0 =
+* Forms are connected one at a time by ID instead of the whole account form list
+  being stored. The integration editor has a **Jotform Form ID** field and a
+  **Connect form** button in place of the form dropdown.
+* **Sync with Jotform** on the settings screen became **Check Connection**: it
+  checks the API key and nothing else. The Jotform Forms table and the
+  **Remove from list** action are gone with the list they belonged to.
+* Saving an integration whose form ID has not been connected warns instead of
+  refusing.
+* Fixes a defect where an account with more than a thousand forms was silently
+  truncated and the missing forms could not be selected at all.
+* Upgrading removes the stored account form list; integrations, settings and
+  synced schemas are untouched.
 
 = 0.1.0 =
 * First release: integrations, custom templates, automatic rendering, server-side

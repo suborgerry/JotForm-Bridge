@@ -32,8 +32,27 @@ if (!defined('DAY_IN_SECONDS')) {
 }
 
 // Normally defined by the main plugin file, which is not loaded in unit tests.
+//
+// Read out of the plugin header rather than written down again. SchemaRepository
+// compares a stored schema's version against this constant to decide whether to
+// report it as synced by an older release, and LifecycleTest exercises the
+// upgrade path — so a literal here that had drifted from the real version would
+// leave those tests asserting against a number no release ever carried.
+// bin/version.php keeps the three shipped copies agreeing; this is the fourth,
+// and the only one that can be derived cheaply, because it is read once per
+// suite rather than once per request.
 if (!defined('JOTFORM_BRIDGE_VERSION')) {
-    define('JOTFORM_BRIDGE_VERSION', '0.1.0');
+    $jfbHeader = (string) file_get_contents(__DIR__ . '/../jotform-bridge/jotform-bridge.php');
+
+    if (preg_match('/^\s*\*\s*Version:\s*(\S+)$/m', $jfbHeader, $jfbMatches) !== 1) {
+        fwrite(STDERR, "error: no Version: header in jotform-bridge/jotform-bridge.php\n");
+
+        exit(1);
+    }
+
+    define('JOTFORM_BRIDGE_VERSION', $jfbMatches[1]);
+
+    unset($jfbHeader, $jfbMatches);
 }
 
 if (!defined('JOTFORM_BRIDGE_URL')) {

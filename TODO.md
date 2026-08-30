@@ -82,10 +82,24 @@ previous copy gets a button that does nothing at all. Less severe — it costs o
 admin a confusing minute rather than a visitor a lost submission — but it is the
 second file whose staleness is a functional bug rather than a cosmetic one.
 
-**Shape.** `Update URI` plus a small update server, or `plugin-update-checker`
-against GitHub Releases. Whichever it is, a release checklist that fails the
-build when the three version strings — plugin header,
-`JOTFORM_BRIDGE_VERSION`, `Stable tag` — disagree.
+**What is done.** The version-consistency half, in August 2026.
+`bin/version.php` reads the three strings, `--check` fails when they disagree,
+and `--set X.Y.Z` writes all three at once. It runs as `composer version:check`,
+inside `composer check`, and as a step in the CI lint job. `tests/bootstrap.php`
+no longer carries a fourth copy: it reads the version out of the plugin header.
+
+A single source of truth was considered and is not available. WordPress parses
+`Version:` out of the raw file with a regular expression and wordpress.org does
+the same to `Stable tag:`, so neither can be an expression. The constant could be
+derived from the header at runtime, but it builds the asset URLs on every
+request, and a file read plus a regex per page load is a bad price for removing
+one literal. One command that writes all three, plus a check that proves they
+agree, is as close as this gets.
+
+**What is left.** The delivery channel: `Update URI` plus a small update server,
+or `plugin-update-checker` against GitHub Releases. Until that exists, every
+install is still a manual ZIP upload, which is the actual problem this entry
+opened with.
 
 ---
 

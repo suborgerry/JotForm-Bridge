@@ -29,9 +29,12 @@
         "lint:fix": "phpcbf",
         "hooks": "php bin/generate-hooks.php",
         "hooks:check": "php bin/generate-hooks.php --check",
+        "version": "php bin/version.php",
+        "version:check": "php bin/version.php --check",
         "check": [
             "@lint",
             "@hooks:check",
+            "@version:check",
             "@test"
         ]
     },
