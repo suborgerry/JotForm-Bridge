@@ -44,6 +44,7 @@ final class SpamGuard
          * @param array<string, string|array<int, string>> $values  Sanitized values.
          * @param array<string, mixed>                     $context Request metadata.
          */
+        // phpcs:ignore WordPress.NamingConventions.PrefixAllGlobals.DynamicHooknameFound -- self::FILTER is the literal 'jotform_bridge_spam_check'.
         $allowed = apply_filters(self::FILTER, true, $integrationSlug, $values, $context);
 
         if ($allowed === true) {

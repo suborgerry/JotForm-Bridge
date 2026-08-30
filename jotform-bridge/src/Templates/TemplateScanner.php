@@ -487,6 +487,7 @@ final class TemplateScanner
 
         // The source may be a truncated tail of a longer file, so a warning
         // about an unterminated token is expected rather than exceptional.
+        // phpcs:ignore WordPress.PHP.NoSilencedErrors.Discouraged -- an unterminated token is the normal case here, and the return value is checked below.
         $tokens = @token_get_all($source);
 
         if (!is_array($tokens) || $tokens === []) {
@@ -517,17 +518,31 @@ final class TemplateScanner
 
     /**
      * Reads at most $bytes from a file. The file is never included or evaluated.
+     *
+     * WP_Filesystem is deliberately not used. It exists so a site can write
+     * through FTP or SSH when the web server cannot write directly, and it
+     * initialises a whole abstraction — sometimes prompting for credentials —
+     * to do it. This is a bounded read of a theme file the process can already
+     * see, on a path the admin asks for on demand, and the amendment in
+     * AGENTS.md that removed the registry cache depends on it staying cheap.
+     *
+     * The `@` is likewise deliberate: a file that vanished between scandir()
+     * and here, or one the process may not read, is an ordinary outcome that
+     * the return values below handle. A warning in the log would be noise.
      */
     private function read(string $file, int $bytes): string
     {
+        // phpcs:ignore WordPress.WP.AlternativeFunctions.file_system_operations_fopen, WordPress.PHP.NoSilencedErrors.Discouraged -- see the docblock above.
         $handle = @fopen($file, 'rb');
 
         if ($handle === false) {
             return '';
         }
 
+        // phpcs:ignore WordPress.WP.AlternativeFunctions.file_system_operations_fread, WordPress.PHP.NoSilencedErrors.Discouraged -- see the docblock above.
         $contents = @fread($handle, $bytes);
 
+        // phpcs:ignore WordPress.WP.AlternativeFunctions.file_system_operations_fclose -- see the docblock above.
         fclose($handle);
 
         return is_string($contents) ? $contents : '';

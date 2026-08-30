@@ -122,6 +122,7 @@ final class QuotaNotice
             esc_html__('Jotform Bridge has stopped sending submissions.', 'jotform-bridge'),
             esc_html($reason),
             esc_html($advice),
+            // phpcs:ignore WordPress.Security.EscapeOutput.OutputNotEscaped -- markup built by this class, escaped as it is written.
             $this->resetButton()
         );
     }
@@ -173,7 +174,6 @@ final class QuotaNotice
             </button>
         </form>
         <?php
-
         return (string) ob_get_clean();
     }
 

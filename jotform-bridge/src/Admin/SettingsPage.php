@@ -92,9 +92,12 @@ final class SettingsPage
     {
         $this->guard(self::ACTION_SAVE);
 
+        // The nonce and the capability are checked by guard() above, and every
+        // value is sanitized by Settings::save().
         // phpcs:ignore WordPress.Security.NonceVerification.Missing -- verified in guard().
         $raw = isset($_POST['jotform_bridge']) && is_array($_POST['jotform_bridge'])
-            ? wp_unslash($_POST['jotform_bridge']) // phpcs:ignore WordPress.Security.ValidatedSanitizedInput
+            // phpcs:ignore WordPress.Security.NonceVerification.Missing, WordPress.Security.ValidatedSanitizedInput.InputNotSanitized -- verified in guard(); sanitized in save().
+            ? wp_unslash($_POST['jotform_bridge'])
             : [];
 
         $this->settings->save($raw);

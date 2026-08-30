@@ -49,10 +49,14 @@ final class Assets
         );
 
         if (Turnstile::isConfigured()) {
+            // A script on Cloudflare's CDN. Appending a version of ours would
+            // be a query string on somebody else's file: it would not describe
+            // what is served, and would only defeat their caching.
             wp_register_script(
                 self::TURNSTILE_HANDLE,
                 Turnstile::SCRIPT_URL,
                 [],
+                // phpcs:ignore WordPress.WP.EnqueuedResourceParameters.MissingVersion -- third-party URL, versioned by Cloudflare.
                 null,
                 ['strategy' => 'defer', 'in_footer' => true]
             );

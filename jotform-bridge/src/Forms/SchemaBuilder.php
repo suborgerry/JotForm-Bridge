@@ -125,7 +125,7 @@ final class SchemaBuilder
         // Sort by key so a reordered form yields the same fingerprint.
         ksort($significant);
 
-        return hash('sha256', (string) json_encode($significant));
+        return hash('sha256', (string) wp_json_encode($significant));
     }
 
     /**

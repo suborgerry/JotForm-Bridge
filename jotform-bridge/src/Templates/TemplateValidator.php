@@ -144,12 +144,13 @@ final class TemplateValidator
                 ? CompatibilityReport::UNSUPPORTED_REQUIRED
                 : CompatibilityReport::UNSUPPORTED_OPTIONAL;
             $row['message'] = sprintf(
-                /* translators: 1: field label, 2: semantic key */
                 $meta['required']
+                    /* translators: 1: field label, 2: semantic key */
                     ? __(
                         'The required field "%1$s" (%2$s) uses a Jotform type this plugin cannot map yet.',
                         'jotform-bridge'
                     )
+                    /* translators: 1: field label, 2: semantic key */
                     : __(
                         'The optional field "%1$s" (%2$s) uses a Jotform type this plugin cannot map yet.',
                         'jotform-bridge'
@@ -169,9 +170,10 @@ final class TemplateValidator
             ? CompatibilityReport::MISSING_REQUIRED
             : CompatibilityReport::MISSING_OPTIONAL;
         $row['message'] = sprintf(
-            /* translators: 1: field label, 2: semantic key */
             $meta['required']
+                /* translators: 1: field label, 2: semantic key */
                 ? __('The template is missing the required field "%1$s" (data-jotform-field="%2$s").', 'jotform-bridge')
+                /* translators: 1: field label, 2: semantic key */
                 : __('The template is missing the optional field "%1$s" (data-jotform-field="%2$s").', 'jotform-bridge'),
             (string) $meta['label'],
             $path

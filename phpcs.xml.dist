@@ -1,0 +1,136 @@
+<?xml version="1.0"?>
+<ruleset name="Jotform Bridge">
+
+    <description>
+        The WordPress sniffs that check correctness and safety, run against the
+        shipped plugin.
+
+        This file exists because the source was annotated as though a checker
+        were watching it: every `phpcs:ignore` in `src/` names a sniff, and
+        until this ruleset existed not one of those claims could be checked.
+        Nothing proved the sniff would have fired, and nothing would notice a
+        suppression that had stopped being needed — or started hiding something
+        real.
+
+        Deliberately NOT the full `WordPress` standard. That standard carries
+        the house formatting style along with the security sniffs — tabs,
+        `foo( $bar )`, `array()`, snake_case methods — and this plugin is
+        written the way AGENTS.md asks for instead: PSR-4, modern
+        object-oriented PHP, short arrays, camelCase methods. Pulling in the
+        whole standard produced sixteen thousand findings, of which about
+        twenty were about anything that can break. A linter whose output has to
+        be ignored teaches people to ignore linter output, so what is enabled
+        here is only what can catch a defect.
+
+        Style is not unchecked either — it is checked against PSR-12, which is
+        the style the code is actually written in.
+    </description>
+
+    <!--
+        Only the plugin is checked. The rest of the repository is development
+        scaffolding that never ships, and the tests answer to PHPUnit's
+        conventions rather than to WordPress's.
+    -->
+    <file>jotform-bridge/</file>
+
+    <exclude-pattern>*/vendor/*</exclude-pattern>
+    <exclude-pattern>*/node_modules/*</exclude-pattern>
+
+    <arg name="basepath" value="."/>
+    <arg name="extensions" value="php"/>
+    <arg name="colors"/>
+    <arg name="parallel" value="8"/>
+    <arg value="sp"/>
+
+    <config name="minimum_wp_version" value="6.4"/>
+
+    <!--
+        The point of the exercise: the sniffs that the source suppresses by
+        name, plus the rest of the WordPress security set.
+    -->
+    <rule ref="WordPress.Security"/>
+    <rule ref="WordPress.DB"/>
+    <rule ref="WordPress.CodeAnalysis"/>
+    <rule ref="WordPress.PHP.DevelopmentFunctions"/>
+    <rule ref="WordPress.PHP.DiscouragedPHPFunctions"/>
+    <rule ref="WordPress.PHP.NoSilencedErrors"/>
+    <rule ref="WordPress.WP.AlternativeFunctions"/>
+    <rule ref="WordPress.WP.DeprecatedFunctions"/>
+    <rule ref="WordPress.WP.DeprecatedParameters"/>
+    <rule ref="WordPress.WP.EnqueuedResourceParameters"/>
+    <rule ref="WordPress.WP.GlobalVariablesOverride"/>
+
+    <!-- Every user-facing string goes through the plugin's own text domain. -->
+    <rule ref="WordPress.WP.I18n">
+        <properties>
+            <property name="text_domain" type="array">
+                <element value="jotform-bridge"/>
+            </property>
+        </properties>
+    </rule>
+
+    <!--
+        Options, transients, hooks, functions and constants carry the project
+        prefix, so a second plugin on the same site cannot collide with this
+        one.
+    -->
+    <rule ref="WordPress.NamingConventions.PrefixAllGlobals">
+        <properties>
+            <property name="prefixes" type="array">
+                <element value="jotform_bridge"/>
+                <element value="JOTFORM_BRIDGE"/>
+                <element value="JotformBridge"/>
+            </property>
+        </properties>
+    </rule>
+
+    <!--
+        An admin view, a form template and uninstall.php look like global
+        scope to a static checker, and are not: WordPress includes
+        uninstall.php inside uninstall_plugin(), and a view or a template is
+        required inside the method that renders it. Their variables are
+        function-local and cannot collide with anything.
+    -->
+    <rule ref="WordPress.NamingConventions.PrefixAllGlobals.NonPrefixedVariableFound">
+        <exclude-pattern>jotform-bridge/src/Admin/views/*</exclude-pattern>
+        <exclude-pattern>jotform-bridge/uninstall.php</exclude-pattern>
+        <exclude-pattern>jotform-bridge/examples/*</exclude-pattern>
+    </rule>
+
+    <!--
+        The style the code is written in. PSR-12 rather than WordPress-Core,
+        for the reason given at the top of this file.
+    -->
+    <rule ref="PSR12">
+        <!-- Namespaced files declare strict_types on the line after <?php. -->
+        <exclude name="PSR12.Files.FileHeader.SpacingAfterBlock"/>
+
+        <!--
+            Every file in the plugin opens with the ABSPATH guard before it
+            declares anything. PSR-1 calls that a side effect; WordPress calls
+            it the way you stop a file being requested directly, and it is not
+            optional here.
+        -->
+        <exclude name="PSR1.Files.SideEffects"/>
+
+        <!--
+            The lines over 120 characters are almost all a single translatable
+            sentence inside __(). Breaking one up means concatenation, which
+            hands the translator fragments instead of a sentence — a worse
+            outcome than a long line. The code around them already wraps.
+        -->
+        <exclude name="Generic.Files.LineLength"/>
+    </rule>
+
+    <!--
+        An admin view is a PHP template: it opens and closes tags around markup,
+        which is what the mixed-content rules exist to forbid in a class file.
+    -->
+    <rule ref="PSR12.Files.FileHeader">
+        <exclude-pattern>jotform-bridge/src/Admin/views/*</exclude-pattern>
+    </rule>
+    <rule ref="Squiz.PHP.EmbeddedPhp">
+        <exclude-pattern>jotform-bridge/src/Admin/views/*</exclude-pattern>
+    </rule>
+
+</ruleset>

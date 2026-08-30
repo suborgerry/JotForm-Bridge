@@ -139,6 +139,7 @@ final class AutoRenderer
              * @param array<string, mixed> $field       Normalized field; its text is raw.
              * @param string               $integration Integration slug.
              */
+            // phpcs:ignore WordPress.NamingConventions.PrefixAllGlobals.DynamicHooknameFound -- self::FILTER_FIELD_HTML is the literal 'jotform_bridge_auto_field_html'.
             $parts[] = (string) apply_filters(self::FILTER_FIELD_HTML, $html, $field, $slug);
         }
 

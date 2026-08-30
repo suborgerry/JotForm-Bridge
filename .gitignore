@@ -1,17 +1,18 @@
-# Composer
+# Composer. composer.lock is deliberately NOT ignored: this repository is an
+# application, not a library, so the versions the suite runs against are part
+# of the record.
 /vendor/
 /jotform-bridge/vendor/
-composer.lock
 
-# Node (только dev-инструменты, в production не требуется)
+# Node (dev tooling only, never required in production)
 /node_modules/
 
-# Тесты и покрытие
+# Tests and coverage
 /.phpunit.result.cache
 /coverage/
 /tests/_output/
 
-# Секреты и локальная конфигурация
+# Secrets and local configuration
 .env
 .env.*
 !.env.example
@@ -19,17 +20,17 @@ composer.lock
 secrets.json
 /.local/
 
-# Сборка релиза
+# Release build
 /build/
 /dist/
 *.zip
 
-# WordPress runtime (если рядом окажется локальная установка)
+# WordPress runtime (in case a local installation ends up alongside)
 wp-config.php
 /wp-content/
 /wordpress/
 
-# ОС и редакторы
+# OS and editors
 .DS_Store
 Thumbs.db
 .idea/

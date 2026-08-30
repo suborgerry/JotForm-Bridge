@@ -116,12 +116,14 @@ final class IntegrationsPage
     private function menuIcon(): string
     {
         $path = JOTFORM_BRIDGE_DIR . 'assets/menu-icon.svg';
+        // phpcs:ignore WordPress.WP.AlternativeFunctions.file_get_contents_file_get_contents -- a file shipped inside this plugin, not a URL.
         $svg  = is_readable($path) ? file_get_contents($path) : false;
 
         if ($svg === false || $svg === '') {
             return 'dashicons-feedback';
         }
 
+        // phpcs:ignore WordPress.PHP.DiscouragedPHPFunctions.obfuscation_base64_encode -- the encoding a data: URI requires, not obfuscation.
         return 'data:image/svg+xml;base64,' . base64_encode($svg);
     }
 
@@ -226,13 +228,17 @@ final class IntegrationsPage
     {
         $this->guard(self::ACTION_SAVE);
 
+        // The nonce and the capability are checked by guard() above, and every
+        // value is sanitized field by field in Integration::fromInput().
         // phpcs:ignore WordPress.Security.NonceVerification.Missing -- verified in guard().
         $raw = isset($_POST['jotform_integration']) && is_array($_POST['jotform_integration'])
-            ? wp_unslash($_POST['jotform_integration']) // phpcs:ignore WordPress.Security.ValidatedSanitizedInput
+            // phpcs:ignore WordPress.Security.NonceVerification.Missing, WordPress.Security.ValidatedSanitizedInput.InputNotSanitized -- verified in guard(); sanitized in fromInput().
+            ? wp_unslash($_POST['jotform_integration'])
             : [];
 
         // phpcs:ignore WordPress.Security.NonceVerification.Missing -- verified in guard().
         $originalSlug = isset($_POST['original_slug'])
+            // phpcs:ignore WordPress.Security.NonceVerification.Missing -- verified in guard().
             ? sanitize_key((string) wp_unslash($_POST['original_slug']))
             : '';
 
@@ -241,7 +247,8 @@ final class IntegrationsPage
 
         // The template select is populated from the registry, so anything else
         // is either a stale form or a forged request.
-        if ($integration->usesCustomTemplate()
+        if (
+            $integration->usesCustomTemplate()
             && $integration->templateSlug() !== ''
             && !$this->templates->has($integration->templateSlug())
         ) {
@@ -458,6 +465,7 @@ final class IntegrationsPage
 
         // phpcs:ignore WordPress.Security.NonceVerification.Missing -- verified in guard().
         $slug = isset($_POST['return_integration'])
+            // phpcs:ignore WordPress.Security.NonceVerification.Missing -- verified in guard().
             ? sanitize_key((string) wp_unslash($_POST['return_integration']))
             : '';
 

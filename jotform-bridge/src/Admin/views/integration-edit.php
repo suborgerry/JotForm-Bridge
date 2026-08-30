@@ -214,8 +214,10 @@ $jfbReport  = $compatibility['report'] instanceof CompatibilityReport ? $compati
                         [
                             'id'                => 'jfb-redirect-page',
                             'name'              => 'jotform_integration[redirect_page_id]',
+                            // phpcs:ignore WordPress.Security.EscapeOutput.OutputNotEscaped -- redirectPageId() returns int, and the walker escapes it.
                             'selected'          => $integration->redirectPageId(),
-                            'show_option_none'  => __('— Select a page —', 'jotform-bridge'),
+                            // wp_dropdown_pages() interpolates show_option_none without escaping it.
+                            'show_option_none'  => esc_html__('— Select a page —', 'jotform-bridge'),
                             'option_none_value' => '0',
                             'post_status'       => 'publish',
                         ]
@@ -372,8 +374,8 @@ $jfbReport  = $compatibility['report'] instanceof CompatibilityReport ? $compati
             <?php if ($jfbUnsupported > 0) : ?>
                 <?php
                 printf(
-                    /* translators: %d: number of fields left out */
                     esc_html(
+                        /* translators: %d: number of fields left out */
                         _n(
                             '%d Jotform field is not supported and is left out.',
                             '%d Jotform fields are not supported and are left out.',
