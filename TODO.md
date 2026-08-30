@@ -131,6 +131,49 @@ page load, and WordPress collects the expired ones daily through
 `wp_scheduled_delete`. What is left is table size, bounded by roughly a day of
 traffic.
 
+**The threshold, so it does not have to be worked out again.** Arithmetic from
+the code, not a measurement.
+
+A key is scope + address + window length + window start, so one address writes
+a bucket per wall-clock minute it submits in and one per hour, in each of two
+scopes. Each transient is two `wp_options` rows. One ordinary visitor
+submitting once therefore costs four transients, **eight rows**.
+
+The cost is per *unique address*, not per request: a refused attempt writes
+nothing at all — `RateLimiter::consume()` returns before `set_transient()` when
+any window is already full — so a flood from one address stops growing the
+table the moment it hits the limit.
+
+| Unique addresses per day | Rows per day |
+| --- | --- |
+| ~1,000 | ~8,000 — invisible |
+| ~10,000 | ~80,000 — visible in table size, harmless |
+| ~100,000 | ~800,000 — this is where it hurts |
+
+Which means genuine traffic essentially never gets there. Reaching 100,000 rows
+honestly needs on the order of 12,000 submissions a day from distinct people.
+The scenario that does reach it is a botnet rotating addresses — 100 requests a
+second from unique addresses is roughly three million rows an hour — and that
+is precisely the distributed flood this class does not defend against anyway
+(see its docblock; `QuotaGuard` is what that is for). In that scenario the
+limiter is not protecting anything and is still filling the table.
+
+Two second-order effects worth remembering: `delete_expired_transients()` is
+itself a load spike when it has a million rows to remove, and it runs on
+WP-Cron, which only fires when somebody visits — so on a quiet site the cleanup
+lags.
+
+Non-atomic counting scales differently: the overshoot is bounded by how many
+requests from one address are in flight at once, never by volume. It needs a
+deliberate parallel burst, and the next batch reads the updated count.
+
+**How to tell the moment has arrived:**
+
+```sql
+SELECT COUNT(*) FROM wp_options
+WHERE option_name LIKE '\_transient\_jotform\_bridge\_rate\_%';
+```
+
 **Shape, when it matters.** Two independent moves, in this order:
 
 1. With a persistent object cache, count with `wp_cache_incr()` — atomic, and no
