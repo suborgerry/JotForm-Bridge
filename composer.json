@@ -9,8 +9,11 @@
     "require-dev": {
         "brain/monkey": "^2.6",
         "dealerdirect/phpcodesniffer-composer-installer": "^1.0",
+        "phpstan/extension-installer": "^1.4",
+        "phpstan/phpstan": "^2.1",
         "phpunit/phpunit": "^9.6",
         "squizlabs/php_codesniffer": "^3.9",
+        "szepeviktor/phpstan-wordpress": "^2.0",
         "wp-coding-standards/wpcs": "^3.1"
     },
     "autoload": {
@@ -31,6 +34,7 @@
         ],
         "wp:install": "bin/install-wp.sh",
         "lint": "phpcs",
+        "analyse": "phpstan analyse --memory-limit=1G",
         "lint:fix": "phpcbf",
         "hooks": "php bin/generate-hooks.php",
         "hooks:check": "php bin/generate-hooks.php --check",
@@ -38,6 +42,7 @@
         "version:check": "php bin/version.php --check",
         "check": [
             "@lint",
+            "@analyse",
             "@hooks:check",
             "@version:check",
             "@test"
@@ -48,15 +53,17 @@
         "test:integration": "Run the integration suite against a real WordPress, downloading it first if needed.",
         "wp:install": "Download the WordPress the integration suite runs against into .wordpress/.",
         "lint": "Check the plugin against phpcs.xml.dist.",
+        "analyse": "Check the plugin against phpstan.neon.dist. Types across call boundaries, which phpcs cannot see.",
         "lint:fix": "Apply the fixes phpcs can make on its own.",
         "hooks": "Regenerate HOOKS.md from the docblocks in src/.",
         "hooks:check": "Fail if HOOKS.md no longer matches the source.",
-        "check": "Lint, hooks, versions, then the unit suite. The integration suite is a separate command because it downloads WordPress."
+        "check": "Lint, static analysis, hooks, versions, then the unit suite. The integration suite is a separate command because it downloads WordPress."
     },
     "config": {
         "sort-packages": true,
         "allow-plugins": {
-            "dealerdirect/phpcodesniffer-composer-installer": true
+            "dealerdirect/phpcodesniffer-composer-installer": true,
+            "phpstan/extension-installer": true
         }
     }
 }

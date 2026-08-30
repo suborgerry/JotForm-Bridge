@@ -13,15 +13,16 @@
 #             template rendering from a theme directory, and the once-per-site
 #             lifecycle nobody ever runs by hand;
 #   lint    — the code matches phpcs.xml.dist, so the phpcs:ignore annotations
-#             in src/ keep meaning something, HOOKS.md still describes the
-#             hooks the source actually fires, and the three version strings
+#             in src/ keep meaning something; it also passes phpstan.neon.dist,
+#             which reads the types phpcs cannot; HOOKS.md still describes the
+#             hooks the source actually fires; and the three version strings
 #             still agree with each other;
 #   package — the release ZIP still assembles, and still contains only what it
 #             is supposed to.
 #
 # Every job runs the same command a person runs locally: composer test,
-# composer test:integration, composer lint, bin/build-zip.sh. Nothing is
-# defined here that cannot be reproduced on a laptop.
+# composer test:integration, composer lint, composer analyse, bin/build-zip.sh.
+# Nothing is defined here that cannot be reproduced on a laptop.
 
 name: CI
 
@@ -128,6 +129,12 @@ jobs:
 
       - name: Check the coding standards
         run: composer lint
+
+      # The other half of the analysis, and it overlaps the first barely at
+      # all: phpcs reads the shape of the source, phpstan reads types across
+      # call boundaries. See the reasoning at the top of phpstan.neon.dist.
+      - name: Run static analysis
+        run: composer analyse
 
       - name: Check HOOKS.md matches the source
         run: composer hooks:check

@@ -852,10 +852,12 @@ The repository is the plugin plus its dev harness. Only `jotform-bridge/` ships.
 ```
 
 ```bash
-composer install           # dev dependencies (PHPUnit, Brain Monkey)
+composer install           # dev dependencies (PHPUnit, Brain Monkey, PHPStan)
 composer test              # unit suite; no WordPress, no network
 composer test:integration  # integration suite; downloads WordPress once
-composer check             # lint, hooks, versions, unit suite
+composer lint              # coding standards (phpcs.xml.dist)
+composer analyse           # static analysis (phpstan.neon.dist)
+composer check             # lint, analysis, hooks, versions, unit suite
 bin/build-zip.sh           # dist/jotform-bridge-<version>.zip
 ```
 

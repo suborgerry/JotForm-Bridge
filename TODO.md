@@ -260,37 +260,69 @@ it, because nothing there loads WordPress.
 
 ---
 
-## 6. PHPStan, or a decision that PHPCS is enough
+## 6. ~~PHPStan, or a decision that PHPCS is enough~~ — done
 
-**Where this came from.** The continuous integration entry named PHPStan with
-`szepeviktor/phpstan-wordpress` as the obvious static analysis candidate. CI was
-built without it, deliberately: PHPCS had landed in the same session and had its
-own first-run triage to work through, and adding a second analyser in the same
-breath would have meant neither of them was read.
+Run once before deciding, as this entry asked, in August 2026. The answer was
+yes, narrowly: `phpstan.neon.dist` at level 8, `composer analyse`, and a step in
+the CI lint job beside `composer lint`.
 
-**What the two would actually do.** They do not overlap much, which is the
-argument for having both:
+**What the first run found** on 12,349 lines — four real defects, none of which
+PHPCS or any of the 533 tests could see:
 
-* PHPCS checks the shape of the source — escaping, nonces, prefixes, the text
-  domain, the style. It does not know what a variable holds.
-* PHPStan checks types across call boundaries: a method that can return `null`
-  into a parameter that cannot take it, an array key that is not always set, a
-  docblock that no longer describes the code under it. This codebase declares
-  types everywhere and carries a lot of `array<string, mixed>` shapes in
-  docblocks, which is exactly the material PHPStan reads and nothing else
-  currently checks.
+* `Plugin::quota()` still passed `Settings` to a `QuotaGuard` whose constructor
+  had been deleted along with the account quota tracking. PHP discards an
+  argument to a class that has no constructor without a word, so nothing failed
+  and nothing could have. Every other call site, the tests included, already
+  said `new QuotaGuard()` — which is exactly why no test could notice;
+* `SubmissionPipeline::fingerprint()` documented a `$context` parameter it does
+  not have;
+* `FormRepository` wrote the connected-form record shape into four docblocks
+  and `TemplateRegistry` wrote the registry shape into three. In both classes
+  the memo property had drifted looser than the method that fills and returns
+  it. Each now has one `@phpstan-type` alias, so the copies cannot disagree
+  again.
 
-**Shape.** `phpstan.neon.dist` at level 5 or 6 to begin with, plus
-`szepeviktor/phpstan-wordpress` so WordPress's own function signatures are
-known, and a `composer analyse` script wired into the CI lint job. A baseline
-file is acceptable to get started, but it has to shrink: a baseline nobody
-empties is a list of accepted defects.
+Two smaller things came with them: `TemplateScanner::read()` now documents that
+`fread()` raises a `ValueError` below one byte and the `@` does not suppress it,
+and `IntegrationsPage::redirect()` is annotated `@return never` — the invariant
+every guard clause on that screen already leaned on, written down. That one
+annotation removed seven findings.
 
-**Why it is parked rather than dropped.** The honest possibility is that the
-answer is no. If a first run produces mostly complaints about WordPress's own
-loose signatures and about docblock array shapes that are correct in practice,
-then a second analyser is cost without a finding, and recording that is a
-result. Run it once before deciding.
+**What it got wrong, which is the more useful result.** Eleven of the
+twenty-seven findings were redundant `is_array()` and `is_string()` guards, and
+every one of them sat on a trust boundary: `apply_filters()`, `get_sites()`, a
+Jotform API payload. `phpstan-wordpress` types the return of `apply_filters()`
+from the `@param` tags above the call — tags this project requires, because
+`bin/generate-hooks.php` reads them — and those describe what the plugin passes
+*in*. What comes back is whatever a third-party callback returned. So the
+analyser reads the only defence against another plugin's mistake as dead code,
+fed the wrong answer by our own convention.
+
+`function.alreadyNarrowedType` and `instanceof.alwaysTrue` are therefore off,
+with that argument written into `phpstan.neon.dist` beside them. The price is
+one genuinely redundant check, on `token_get_all()`, which is left alone.
+
+Two suppressions more, both narrow: `variable.undefined` inside
+`src/Admin/views/`, because a view is included in the scope of the method that
+renders it and no static analyser can see that; and PHPStan's own wrong
+signature for `str_contains()` and `str_ends_with()`, which declares the
+haystack `non-empty-string` when an empty one is legal and answers `false` —
+measured at every `phpVersion` from 8.0 to 8.4, not assumed.
+
+**Level 8 rather than the 5 or 6 this entry proposed.** The array shapes are
+checked at 8 and not at 6, and half the real findings were array shapes — at
+level 6 this would have bought two findings instead of four. Level 9 was
+measured and rejected: 310 findings, overwhelmingly about the `mixed`
+WordPress hands back by definition.
+
+**No baseline file.** This entry warned that a baseline nobody empties is a
+list of accepted defects; none was needed, because four fixes and four
+documented suppressions reach zero. Keep it that way: a new suppression has to
+carry its argument, the way the four there do.
+
+The cost, measured: 3 seconds cold, under one warm, 64 MB of dev dependencies
+that never ship. All four packages support PHP 8.0, so the lint job's pin to
+the floor still holds.
 
 ---
 

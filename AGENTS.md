@@ -146,6 +146,10 @@ Roughly:
 ├── prompts/
 ├── composer.json          # dev dependencies and PSR-4 autoload
 ├── phpunit.xml.dist
+├── phpcs.xml.dist         # coding standards
+├── phpstan.neon.dist      # static analysis
+├── bin/                   # dev scripts; phpstan-bootstrap.php lives here
+│                          # because no PHP may sit at the repository root
 ├── tests/
 │   ├── Unit/
 │   └── Fixtures/
@@ -192,6 +196,9 @@ prompts/
 tests/
 composer.json
 phpunit.xml.dist
+phpcs.xml.dist
+phpstan.neon.dist
+bin/
 .codex/
 .claude/
 node_modules/
@@ -1771,6 +1778,8 @@ Fixed:
 PHPUnit ^9.6
 brain/monkey ^2.6
 mockery/mockery (transitively, through brain/monkey)
+phpstan/phpstan ^2.1
+szepeviktor/phpstan-wordpress ^2.0
 ```
 
 PHPUnit 9.x because PHPUnit 10+ requires PHP 8.1+, and this project supports
@@ -1788,6 +1797,8 @@ All of it is a **dev dependency**. None of it ships in the release ZIP.
 composer.json
 phpunit.xml.dist                # the unit suite
 phpunit.integration.xml.dist    # the integration suite
+phpstan.neon.dist               # static analysis; bin/phpstan-bootstrap.php
+                                # tells it what the main plugin file defines
 tests/
 ├── bootstrap.php
 ├── TestCase.php          # base class with Brain Monkey setUp/tearDown
@@ -1906,10 +1917,34 @@ sets a wrong assumption in stone.
 
 ## Lint
 
-Where static analysis is set up, use the WordPress Coding Standards through
-`squizlabs/php_codesniffer` + `wp-coding-standards/wpcs` as a dev dependency.
+Two analysers, because they overlap barely at all:
 
-That is desirable but does not block a stage. Tests come before the linter.
+```text
+squizlabs/php_codesniffer + wp-coding-standards/wpcs   composer lint
+phpstan/phpstan + szepeviktor/phpstan-wordpress        composer analyse
+```
+
+PHPCS reads the shape of the source — escaping, nonces, prefixes, the text
+domain, the style — and does not know what a variable holds. PHPStan reads
+types across call boundaries: a value that can be null reaching a parameter
+that cannot take it, and a docblock that no longer describes the code under it.
+
+Both are configured the same way and for the same reason: what is switched on
+is what can catch a defect, and everything switched off says why, in the
+ruleset itself. `phpcs.xml.dist` is deliberately not the full `WordPress`
+standard; `phpstan.neon.dist` is level 8 with four suppressions, each carrying
+the argument for itself. A linter whose output has to be ignored teaches people
+to ignore linter output.
+
+The one worth knowing about without reading the file: PHPStan is told not to
+report a redundant `is_array()` or `is_string()` on a value that crossed a
+trust boundary. `phpstan-wordpress` types the return of `apply_filters()` from
+the `@param` tags above the call, and those describe what the plugin passes
+*in* — what comes back is whatever a third-party callback returned. Those
+guards are the only thing between another plugin's mistake and a fatal error
+in ours, and PHPStan reads every one of them as dead code.
+
+Neither blocks a stage on its own. Tests come before the linter.
 
 ---
 
