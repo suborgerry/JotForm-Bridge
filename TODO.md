@@ -189,9 +189,10 @@ hourly window is availability protection, not only spam protection.
 
 ## 5. No integration tests
 
-**Problem.** 453 tests, and every one of them is a unit test. Nothing exercises
-a REST request end to end, nothing exercises an `admin_post` action, and nothing
-renders a template from an actual file through the actual registry.
+**Problem.** 463 tests, and every one of them is a unit test. Nothing exercises
+a REST request end to end, nothing exercises an `admin_post` or `wp_ajax_`
+action, and nothing renders a template from an actual file through the actual
+registry.
 
 That is not a coverage statistic — it is where the bugs were. Of the defects
 found in the August 2026 review, the ones that mattered lived precisely in the
@@ -202,20 +203,41 @@ the auto-rendered form posted an empty body to the REST endpoint with no
 JavaScript. Each of those is invisible to a test that constructs one class and
 calls one method.
 
+**The class of defect has since repeated, which is the argument for this entry.**
+Removing the account form list later the same month left a third stale
+instruction behind — the integrations list still offered "Not in the stored form
+list" for a form with no title, naming a list that had just ceased to exist. It
+was found by opening the screen in a browser, not by the suite, and the suite
+stayed green throughout. That is now three of this exact kind, all in admin
+markup, all invisible to a unit test.
+
+**The debt grew in the same change.** `IntegrationsPage::handleConnectForm()` is
+a new handler with a capability check and a nonce check, answering over
+admin-ajax, and nothing automated touches it. It was verified by hand — a good
+nonce, a forged one, no session at all, a malformed ID, and the live upstream
+path — through `@wp-playground/cli`, which proves these seams are perfectly
+testable. But a verification done by hand runs once. Nobody who edits that method
+next will be told what they broke.
+
 **Shape.** A second suite, separate from `tests/Unit/`, that boots enough of
 WordPress to be honest:
 
 * the REST route, exercised through `WP_REST_Request` against the registered
   route rather than by calling the pipeline directly — including the permission
   callback, the JSON body and the response headers;
-* the `admin_post` handlers, exercised with and without a valid nonce and with
-  and without the capability, asserting that the guard actually fires;
+* the `admin_post` handlers *and* the `wp_ajax_jotform_bridge_connect_form`
+  route, exercised with and without a valid nonce and with and without the
+  capability, asserting that the guard actually fires;
 * rendering a real template file through `TemplateRegistry`, including a file
   that resolves outside its root;
-* activation, upgrade and uninstall against a real options table.
+* activation, upgrade and uninstall against a real options table — including the
+  legacy-option purges, which are the part of the lifecycle that only ever runs
+  once per site and therefore never runs on a developer's machine.
 
-`wp-env` or `wp-phpunit` is the usual way to get there. The precondition it had
-— continuous integration, so that a suite nobody runs does not rot — is met:
+`wp-env` or `wp-phpunit` is the usual way to get there, and `@wp-playground/cli`
+is now a demonstrated third option: it booted WordPress on PHP 8.0 with the
+plugin mounted, from a plain `npx`, with no Docker. The precondition this entry
+had — continuous integration, so that a suite nobody runs does not rot — is met:
 `.github/workflows/ci.yml` runs the existing suite on every push. A second suite
 needs a job of its own beside it.
 
