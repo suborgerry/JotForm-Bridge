@@ -7,7 +7,8 @@
 #   tests   — the suite passes, on every PHP version the plugin header promises
 #             to support and not only on whatever the author has installed;
 #   lint    — the code matches phpcs.xml.dist, so the phpcs:ignore annotations
-#             in src/ keep meaning something;
+#             in src/ keep meaning something, and HOOKS.md still describes the
+#             hooks the source actually fires;
 #   package — the release ZIP still assembles, and still contains only what it
 #             is supposed to.
 #
@@ -83,6 +84,9 @@ jobs:
 
       - name: Check the coding standards
         run: composer lint
+
+      - name: Check HOOKS.md matches the source
+        run: composer hooks:check
 
   package:
     name: Release package

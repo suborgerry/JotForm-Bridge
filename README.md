@@ -591,13 +591,19 @@ always cancel. See [Success redirect](#success-redirect).
 
 ## Hooks
 
+**[HOOKS.md](HOOKS.md) is the reference** — all seventeen of them, with
+signatures and what returning what does. It is generated from the docblocks
+beside the calls themselves and checked in CI, so it cannot drift the way the
+partial table that used to sit here had already drifted.
+
+The ones most themes reach for first:
+
 | Hook | Type | When |
 | --- | --- | --- |
 | `jotform_bridge_template_paths` | filter | Directories scanned for templates |
 | `jotform_bridge_normalized_schema` | filter | A schema just before it is stored |
 | `jotform_bridge_submission_fields` | filter | Sanitized values before mapping |
 | `jotform_bridge_spam_check` | filter | Immediately before the upstream call |
-| `jotform_bridge_duplicate_window` | filter | Seconds an identical submission is refused; `0` disables |
 | `jotform_bridge_auto_field_html` | filter | Markup of one automatically rendered field |
 | `jotform_bridge_before_submit` | action | A validated submission is about to be sent |
 | `jotform_bridge_after_submit` | action | Jotform accepted a submission |

@@ -1554,19 +1554,18 @@ Do not build:
 
 # WordPress hooks
 
-Add extension points only where they are genuinely useful. The ones that exist:
+Add extension points only where they are genuinely useful. Do not add hooks for
+the sake of the count.
 
-```text
-jotform_bridge_template_paths
-jotform_bridge_normalized_schema
-jotform_bridge_submission_fields
-jotform_bridge_before_submit
-jotform_bridge_after_submit
-jotform_bridge_auto_field_html
-jotform_bridge_spam_check
-```
+The list of them lives in `HOOKS.md`, which is generated from the docblocks
+above the `apply_filters()` and `do_action()` calls themselves by
+`bin/generate-hooks.php`, and checked in CI. It is not repeated here: this file
+carried seven of the seventeen that exist, which is the drift the generated
+reference was written to stop.
 
-Do not add hooks for the sake of the count.
+A new hook needs nothing but a docblock above its call — summary, prose if the
+contract needs explaining, and one `@param` per argument. `composer hooks`
+picks it up; `composer hooks:check` fails if somebody adds one and forgets.
 
 ---
 
