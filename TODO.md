@@ -11,10 +11,6 @@ rejected are not here, and should not be added back without a new decision.
 worth doing together, because each of them is currently a claim nobody can
 check. **Later** is the rest, in no particular order.
 
-An entry marked *Reconsider* is not work. It is a decision already taken and
-recorded, kept here so the trade-off behind it is not forgotten and so that
-revisiting it starts from evidence rather than from memory.
-
 ---
 
 # Next up
@@ -209,45 +205,7 @@ build when the three version strings — plugin header,
 
 ---
 
-## 6. Running many sites off one Jotform account
-
-**Problem.** The monthly submission allowance and the daily API call limit
-belong to the Jotform **account**, not to a site. Ten sites pointing at one
-account share one budget, while each site's QuotaGuard sees only its own
-traffic and knows nothing about its neighbours. One site under a spam wave can
-burn the allowance for all ten, and every one of them switches off.
-
-**Shape.** No code fixes this on its own — it is mostly an operational
-decision, one account per client or ceilings set against the shared budget. What
-the plugin could add is honesty about it: read the account-wide spend, compare
-it with what this site believes it sent, and say plainly when the two do not
-match because somebody else is spending from the same pot.
-
-**Depends on.** Account allowance tracking, which the plugin no longer has:
-reading `GET /user/usage` and keeping a snapshot of the spend was removed in
-favour of reacting to Jotform's own refusal. Reviving it means bringing back a
-second, always-stale source of truth, and that trade has to be made
-deliberately.
-
----
-
-## 7. No audit trail, no configuration backup
-
-**Problem.** Integrations and settings can be changed or deleted by any
-administrator, and nothing records who did it or what the previous value was.
-There is also no export or import: rebuilding a site's configuration means
-retyping it from memory.
-
-**Why it is parked.** On a single site with one administrator this is noise. It
-starts to matter at the point where several people share an admin, or where the
-same configuration has to exist on staging and production — and at that point
-the file-backed configuration in item 4 above solves most of it, because git
-becomes the audit trail and the backup. Worth revisiting together with that
-rather than building a second mechanism.
-
----
-
-## 8. The rate limiter writes to `wp_options` and counts non-atomically
+## 6. The rate limiter writes to `wp_options` and counts non-atomically
 
 **Problem.** `Submission\RateLimiter` keeps its buckets in transients, and both
 properties of that storage are wrong under load rather than merely imperfect.
@@ -288,7 +246,7 @@ hourly window is availability protection, not only spam protection.
 
 ---
 
-## 9. No integration tests
+## 7. No integration tests
 
 **Problem.** 450 tests, and every one of them is a unit test. Nothing exercises
 a REST request end to end, nothing exercises an `admin_post` action, and nothing
@@ -324,42 +282,7 @@ that only run when somebody remembers to run them.
 
 ---
 
-## 10. Reconsider: template discovery reads the theme on every render
-
-**Flagged for thought, not for action.** The decision is recorded and justified
-in "Amendment: template discovery reads the theme on demand" in `AGENTS.md`, and
-the reasoning behind it still stands. This entry exists so the trade-off is not
-forgotten, and so that if it is ever revisited it is revisited with numbers
-rather than from memory.
-
-**The state of things.** Rendering an integration that uses a custom template
-calls `TemplateRegistry::file()`, which scans the theme: `scandir()` of up to two
-directories, plus an `fopen`/`fread` of the first 8 KB of every PHP file in them.
-Memoized within the request, nothing cached between requests. A page with no
-form of ours on it scans nothing.
-
-**Why it was made that way.** A cached registry meant a developer could add a
-file to the theme and not see it, and — worse — an edited template left the
-compatibility report describing yesterday's version of the file. The `Rescan`
-button was a symptom cure that required a person to remember a cache they never
-asked for.
-
-**What would have to be true to change it.** Actual numbers from a real site:
-how many template files, how long the scan takes, and what share of the page's
-total time that is. On a theme with a handful of templates this is a few stat
-calls and a few short reads, which is noise next to a single database query.
-It becomes worth revisiting if a site has a large template directory, or if
-`opcache.validate_timestamps=0` in production makes filesystem access more
-expensive than it looks.
-
-**And what the answer would be.** An object-cache layer keyed on the directory
-mtime — not the return of the `Rescan` button. Whatever happens, the admin has
-to keep reading the state of the files directly, because that is the property
-the cache cost us last time.
-
----
-
-## 11. No accessibility audit against WCAG
+## 8. No accessibility audit against WCAG
 
 **Problem.** This is a plugin whose entire output is forms, and forms are where
 accessibility is most often got wrong and most keenly felt. The markup was
@@ -391,7 +314,7 @@ this file it is the item most likely to be affecting real people right now.
 
 ---
 
-## 12. No check against current web standards
+## 9. No check against current web standards
 
 **Problem.** The output has never been validated. The plugin generates HTML from
 a schema it does not control, and Jotform allows labels and option values that
@@ -414,44 +337,7 @@ not evidence of much.
 
 ---
 
-## 13. Reconsider: Tailwind and Alpine for the admin screens
-
-**The question.** Would the admin be better built on Tailwind and Alpine, or is
-that the wrong tool here?
-
-**What is known before anybody starts.** The evidence currently points at "wrong
-tool", and it is worth writing down so the investigation starts from it rather
-than from taste:
-
-* The plugin's stated promise is that the release ZIP works with no
-  `composer install`, no `npm install` and no `npm run build`. Tailwind needs a
-  build step; the play CDN is not an option for a shipped plugin, and it would
-  also be blocked by the CSP rules that made us move the inline JS out in the
-  first place.
-* WordPress admin already ships a design system — `common.css`, `forms.css`,
-  `.widefat`, `.form-table`, `submit_button()`. Tailwind's preflight resets
-  exactly what those depend on. Using Tailwind without preflight, inside markup
-  that has to keep looking like WordPress, gets most of the cost for little of
-  the benefit.
-* The surface is small. The whole admin stylesheet is under 200 lines, and most
-  of it exists to outweigh a core rule or to tint a table row — the kind of thing
-  a utility framework does not help with.
-* Alpine would replace about 170 lines of dependency-free vanilla JS with a
-  runtime dependency, to do two things: toggle rows and copy to the clipboard.
-
-**What would change the answer.** A much larger admin surface — several screens
-with real interactivity, an integration builder, live previews — where hand-
-written CSS and delegated event handlers genuinely stop scaling. That is not
-where this plugin is.
-
-**If it is investigated anyway**, the honest comparison is against the third
-option nobody names: keeping vanilla CSS and JS but organising them better. Most
-of what Tailwind is wanted for at this size is usually consistency, and
-consistency is a naming convention.
-
----
-
-## 14. Second review pass with a different model
+## 10. Second review pass with a different model
 
 **Problem.** The August 2026 review, the removals that followed it and the fixes
 in this file were all produced in one long session by one model. That is a
@@ -469,7 +355,7 @@ argument for the code. Worth pointing at specifically:
 * the submission pipeline's ordering and its single-answer refusal policy;
 * the proof-of-work guard, which is home-grown crypto in the security path and
   was reviewed by nobody;
-* the rate limiter trade-off recorded in item 8, including the option that was
+* the rate limiter trade-off recorded in item 6, including the option that was
   rejected there.
 
 Treat disagreement as information rather than as a verdict: the useful output is
@@ -478,54 +364,7 @@ by hand.
 
 ---
 
-## 15. Work out what Template diagnostics is for, and whether it earns its place
-
-**Problem.** The bottom of the integrations list carries a "Template
-diagnostics" block: a flat `<ul>` of `Error: …` / `Warning: …` / `Notice: …`
-lines from `TemplateScanner`. Nobody has decided who reads it or what they do
-next, and the code shows it.
-
-The evidence that it was never finished:
-
-* `CODE_DYNAMIC_FIELD` and `CODE_NO_FIELDS` are declared as constants and never
-  emitted by anything. Two of the nine codes are decoration.
-* Every diagnostic carries `code`, `file` and `slug`. The view prints `level`
-  and `message` and throws the other three away — so the block can tell you a
-  template is overridden but not offer the path, and cannot be filtered,
-  grouped, or linked to the integration it affects.
-* It renders whenever the scan produces anything, whether or not any integration
-  uses the template concerned. A parent-theme template nobody has bound is a
-  `notice` on a screen about integrations.
-* The three levels are printed with `ucfirst()` and no styling. An `error` that
-  stops a form rendering looks exactly like a `notice` that a child theme is
-  doing the normal thing.
-
-**The question to answer first.** Who is this for? There are two plausible
-readers and they want different things:
-
-* the developer who just added a template file and is asking "why is it not in
-  the select" — wants the file path, the specific reason, and to be looking at
-  it near the template list;
-* the site owner whose form stopped rendering — wants to know which integration
-  is affected, and everything else is noise. That reader is already served
-  better elsewhere: the integration row goes red and says
-  "No theme file named x.php. This form does not render."
-
-**Shape, once that is answered.** Probably: keep the errors and warnings, attach
-them to the template row they concern rather than to a separate list, drop the
-notices or fold them into the Templates table (an overridden template is a fact
-about that row, not an incident), and either emit the two unused codes or delete
-them. If the honest answer turns out to be that the integration rows and the
-Templates table already cover every case a person can act on, then the right
-outcome is to delete the block — which is a good outcome, not a failure.
-
-**Why it is parked.** It is a design question before it is a code change, and
-answering it wrongly means building a second notification surface next to one
-that already works.
-
----
-
-## 16. Sweep for hardcoding and over-engineering
+## 11. Sweep for hardcoding and over-engineering
 
 **Problem.** Nobody has read the plugin looking specifically for two opposite
 faults: a value that should have been derived or configurable but was typed in,
@@ -578,7 +417,7 @@ none of the three has not been resolved, only visited.
 
 ---
 
-## 17. Consider storing only the forms actually used, fetched by ID
+## 12. Consider storing only the forms actually used, fetched by ID
 
 **The idea.** Instead of pulling the whole account form list and keeping it,
 keep a record only for the forms integrations actually reference, resolved one
@@ -590,7 +429,7 @@ every form on the account — a shared agency account can be hundreds — and re
 that option on every admin screen that shows a form title. It also brings its own
 problems along:
 
-* the pagination defect in item 16: `limit=1000` with no paging, so a large
+* the pagination defect in item 11: `limit=1000` with no paging, so a large
   account is silently truncated and the missing forms never reach the select;
 * `jotform_bridge_forms_hidden` and the whole **Remove from list** action exist
   only because the stored list carries forms nobody wants to see. Under a
@@ -617,7 +456,7 @@ question:
    all. The smallest storage, no truncation, no hidden-forms feature — and the
    worst first-run experience, since the site owner has to go and find the ID.
 3. **A searchable, paged picker.** Best at scale, most work, and it needs the
-   paging that item 16 says is missing anyway.
+   paging that item 11 says is missing anyway.
 
 **Also to settle.** Sync with Jotform currently does double duty — it checks the
 API key with `GET /user` and records the account name. If the account list stops
