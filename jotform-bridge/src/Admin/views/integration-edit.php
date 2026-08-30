@@ -11,7 +11,7 @@
  * @var \JotformBridge\Forms\FormSchema|null           $schema
  * @var array{synced_at:int, fingerprint:string, version:string, error:string}|null $schemaMeta
  * @var bool                                           $schemaStale
- * @var array<int, array<string, string>>              $forms
+ * @var array{id:string, title:string, status:string, updated:string, connected_at:int}|null $connectedForm
  * @var array<string, string>                          $templates
  * @var array<string, mixed>|null                      $notice
  * @var string                                         $page
@@ -22,6 +22,7 @@
 declare(strict_types=1);
 
 use JotformBridge\Admin\IntegrationsPage;
+use JotformBridge\Forms\FormRepository;
 use JotformBridge\Integrations\Integration;
 use JotformBridge\Integrations\RedirectTarget;
 use JotformBridge\Templates\CompatibilityReport;
@@ -102,27 +103,95 @@ $jfbReport  = $compatibility['report'] instanceof CompatibilityReport ? $compati
 
             <tr>
                 <th scope="row">
-                    <label for="jfb-form"><?php echo esc_html__('Jotform Form', 'jotform-bridge'); ?></label>
+                    <label for="jfb-form"><?php echo esc_html__('Jotform Form ID', 'jotform-bridge'); ?></label>
                 </th>
                 <td>
-                    <?php if ($forms === []) : ?>
-                        <p>
-                            <strong><?php echo esc_html__('No forms stored yet.', 'jotform-bridge'); ?></strong>
-                            <?php echo esc_html__('Use Sync with Jotform on the Settings screen first.', 'jotform-bridge'); ?>
-                        </p>
-                    <?php else : ?>
-                        <select id="jfb-form" name="jotform_integration[form_id]">
-                            <option value=""><?php echo esc_html__('— Select a form —', 'jotform-bridge'); ?></option>
-                            <?php foreach ($forms as $jfbForm) : ?>
-                                <option
-                                    value="<?php echo esc_attr((string) ($jfbForm['id'] ?? '')); ?>"
-                                    <?php selected($integration->formId(), (string) ($jfbForm['id'] ?? '')); ?>
-                                >
-                                    <?php echo esc_html((string) ($jfbForm['title'] ?? '')); ?>
-                                </option>
-                            <?php endforeach; ?>
-                        </select>
-                    <?php endif; ?>
+                    <?php
+                    /* A field and a button rather than a select. The plugin no
+                       longer fetches the account form list — see the amendment
+                       in AGENTS.md — so the ID is typed and resolved one at a
+                       time. Connect form answers over admin-ajax and leaves the
+                       rest of this form untouched, so nothing typed is lost.
+
+                       Without JavaScript the button does nothing and the field
+                       still saves: an unconnected ID is a warning, not an
+                       error, which is what keeps this screen usable then. */
+                    ?>
+                    <p class="jfb-connect">
+                        <input
+                            type="text"
+                            class="regular-text code"
+                            id="jfb-form"
+                            name="jotform_integration[form_id]"
+                            value="<?php echo esc_attr($integration->formId()); ?>"
+                            inputmode="numeric"
+                            pattern="[0-9]*"
+                            autocomplete="off"
+                            aria-describedby="jfb-form-status jfb-form-help"
+                        >
+                        <button
+                            type="button"
+                            class="button"
+                            data-jfb-connect="#jfb-form"
+                            data-jfb-connect-target="#jfb-form-status"
+                            data-jfb-connect-url="<?php echo esc_url(admin_url('admin-ajax.php')); ?>"
+                            data-jfb-connect-action="<?php echo esc_attr(IntegrationsPage::ACTION_CONNECT); ?>"
+                            data-jfb-connect-nonce="<?php echo esc_attr(wp_create_nonce(IntegrationsPage::ACTION_CONNECT)); ?>"
+                            data-jfb-connect-busy="<?php echo esc_attr__('Connecting…', 'jotform-bridge'); ?>"
+                        >
+                            <?php echo esc_html__('Connect form', 'jotform-bridge'); ?>
+                        </button>
+                    </p>
+
+                    <?php
+                    $jfbConnectState = 'none';
+                    if ($connectedForm !== null) {
+                        $jfbConnectState = strtoupper($connectedForm['status']) === FormRepository::STATUS_DELETED
+                            ? 'warning'
+                            : 'ok';
+                    }
+                    ?>
+                    <p
+                        id="jfb-form-status"
+                        class="jfb-connect-status jfb-state-<?php echo esc_attr($jfbConnectState); ?>"
+                        role="status"
+                        aria-live="polite"
+                    >
+                        <?php if ($connectedForm === null && $integration->formId() === '') : ?>
+                            <?php echo esc_html__('Not connected yet.', 'jotform-bridge'); ?>
+                        <?php elseif ($connectedForm === null) : ?>
+                            <?php echo esc_html__('This form ID has never been connected. Press Connect form to check that it exists.', 'jotform-bridge'); ?>
+                        <?php else : ?>
+                            <?php
+                            printf(
+                                /* translators: 1: Jotform form title, 2: Jotform form status, e.g. ENABLED */
+                                esc_html__('Connected: %1$s (%2$s)', 'jotform-bridge'),
+                                esc_html($connectedForm['title'] !== '' ? $connectedForm['title'] : __('untitled form', 'jotform-bridge')),
+                                esc_html($connectedForm['status'])
+                            );
+                            ?>
+                            <?php if ($connectedForm['connected_at'] > 0) : ?>
+                                <span class="description">
+                                    <?php
+                                    printf(
+                                        /* translators: %s: human readable time difference, e.g. "5 mins" */
+                                        esc_html__('Checked %s ago.', 'jotform-bridge'),
+                                        esc_html(human_time_diff($connectedForm['connected_at'], time()))
+                                    );
+                                    ?>
+                                </span>
+                            <?php endif; ?>
+                        <?php endif; ?>
+                    </p>
+
+                    <p class="description" id="jfb-form-help">
+                        <?php
+                        echo esc_html__(
+                            'The digits at the end of the form URL, for example 262215084646053 in form.jotform.com/262215084646053. Connect form asks Jotform for its title; nothing else on this screen contacts Jotform on its own.',
+                            'jotform-bridge'
+                        );
+                        ?>
+                    </p>
                 </td>
             </tr>
 

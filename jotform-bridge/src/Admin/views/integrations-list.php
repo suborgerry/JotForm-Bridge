@@ -79,9 +79,19 @@ $jfbNewUrl = add_query_arg(['page' => $page, 'view' => 'new'], admin_url('admin.
                     <td>
                         <?php if ($jfbRow['form_title'] !== '') : ?>
                             <?php echo esc_html($jfbRow['form_title']); ?>
+                        <?php elseif ($jfbIntegration->formId() !== '') : ?>
+                            <?php /* A form ID that was typed but never resolved: show the ID,
+                                     which is the part that actually does the work, and say
+                                     what is missing rather than naming a list that no longer
+                                     exists. */ ?>
+                            <code><?php echo esc_html($jfbIntegration->formId()); ?></code>
+                            <br>
+                            <span class="description">
+                                <?php echo esc_html__('Not connected', 'jotform-bridge'); ?>
+                            </span>
                         <?php else : ?>
                             <span class="description">
-                                <?php echo esc_html__('Not in the stored form list', 'jotform-bridge'); ?>
+                                <?php echo esc_html__('No form selected', 'jotform-bridge'); ?>
                             </span>
                         <?php endif; ?>
                     </td>

@@ -15,15 +15,11 @@ final class FormRepositoryTest extends TestCase
     /** @var array<string, mixed> */
     private array $options = [];
 
-    /** @var array<string, mixed> */
-    private array $transients = [];
-
     protected function setUp(): void
     {
         parent::setUp();
 
-        $this->options    = [];
-        $this->transients = [];
+        $this->options = [];
 
         Functions\when('get_option')->alias(
             fn(string $name, $default = false) => $this->options[$name] ?? $default
@@ -42,23 +38,6 @@ final class FormRepositoryTest extends TestCase
                 return true;
             }
         );
-        Functions\when('get_transient')->alias(
-            fn(string $name) => $this->transients[$name] ?? false
-        );
-        Functions\when('set_transient')->alias(
-            function (string $name, $value): bool {
-                $this->transients[$name] = $value;
-
-                return true;
-            }
-        );
-        Functions\when('delete_transient')->alias(
-            function (string $name): bool {
-                unset($this->transients[$name]);
-
-                return true;
-            }
-        );
     }
 
     private function client(): JotformClient
@@ -66,185 +45,280 @@ final class FormRepositoryTest extends TestCase
         return new JotformClient('secret-key', 'https://api.jotform.com');
     }
 
-    public function testNothingIsCachedBeforeTheFirstRefresh(): void
+    /**
+     * The documented shape of GET /form/{formID}, taken from a live read-only
+     * call against the test account rather than invented.
+     *
+     * @return array<string, mixed>
+     */
+    private function formResponse(string $id = '240000000000001', string $status = 'ENABLED'): array
     {
-        $repository = new FormRepository($this->client());
-
-        $this->assertFalse($repository->isSynced());
-        $this->assertSame([], $repository->all());
-        $this->assertSame(0, $repository->meta()['fetched_at']);
-    }
-
-    public function testRefreshStoresTheListAndMeta(): void
-    {
-        $response = $this->httpResponse(200, [
+        return $this->httpResponse(200, [
             'responseCode' => 200,
             'content'      => [
-                ['id' => '1', 'title' => 'Contact', 'status' => 'ENABLED', 'updated_at' => '2026-02-11 08:45:02'],
-                ['id' => '2', 'title' => 'Careers', 'status' => 'ENABLED', 'updated_at' => '2026-02-12 08:45:02'],
+                'id'              => $id,
+                'username'        => 'example',
+                'title'           => 'Contact Form',
+                'height'          => '539',
+                'status'          => $status,
+                'created_at'      => '2026-02-10 13:00:13',
+                'updated_at'      => '2026-02-11 08:45:02',
+                'last_submission' => '2026-02-11 09:00:00',
+                'new'             => '1',
+                'count'           => '1',
+                'type'            => 'LEGACY',
+                'favorite'        => '0',
+                'archived'        => '0',
+                'url'             => 'https://form.jotform.com/' . $id,
             ],
         ]);
-        Functions\when('wp_remote_get')->justReturn($response);
-
-        $repository = new FormRepository($this->client());
-        $result     = $repository->refresh();
-
-        $this->assertTrue($result->isSuccess());
-        $this->assertTrue($repository->isSynced());
-        $this->assertCount(2, $repository->all());
-        $this->assertSame(2, $repository->meta()['count']);
-        $this->assertSame('', $repository->meta()['error']);
-        $this->assertGreaterThan(0, $repository->meta()['fetched_at']);
     }
 
-    public function testReadingTheCacheDoesNotCallJotformAgain(): void
+    public function testNothingIsStoredBeforeTheFirstConnect(): void
     {
-        $calls    = 0;
-        $response = $this->httpResponse(200, [
-            'responseCode' => 200,
-            'content'      => [['id' => '1', 'title' => 'Contact', 'status' => 'ENABLED']],
-        ]);
+        $repository = new FormRepository($this->client());
+
+        $this->assertSame([], $repository->all());
+        $this->assertFalse($repository->has('240000000000001'));
+        $this->assertNull($repository->get('240000000000001'));
+        $this->assertSame('', $repository->title('240000000000001'));
+    }
+
+    public function testConnectStoresTheFormItResolved(): void
+    {
+        Functions\when('wp_remote_get')->justReturn($this->formResponse());
+
+        $repository = new FormRepository($this->client());
+        $result     = $repository->connect('240000000000001');
+
+        $this->assertTrue($result->isSuccess());
+        $this->assertTrue($repository->has('240000000000001'));
+        $this->assertSame('Contact Form', $repository->title('240000000000001'));
+
+        $stored = $repository->get('240000000000001');
+
+        $this->assertSame('240000000000001', $stored['id']);
+        $this->assertSame('ENABLED', $stored['status']);
+        $this->assertSame('2026-02-11 08:45:02', $stored['updated']);
+        $this->assertGreaterThan(0, $stored['connected_at']);
+    }
+
+    /**
+     * The whole point of the change: connecting one form must not go looking
+     * for any others, and must ask about the form by ID.
+     */
+    public function testConnectAsksForOneFormByIdAndNotForTheAccountList(): void
+    {
+        $urls = [];
 
         Functions\when('wp_remote_get')->alias(
-            static function () use (&$calls, $response) {
+            function (string $url) use (&$urls) {
+                $urls[] = $url;
+
+                return $this->formResponse();
+            }
+        );
+
+        (new FormRepository($this->client()))->connect('240000000000001');
+
+        $this->assertSame(['https://api.jotform.com/form/240000000000001'], $urls);
+    }
+
+    public function testReadingTheStoreDoesNotCallJotformAgain(): void
+    {
+        $calls = 0;
+
+        Functions\when('wp_remote_get')->alias(
+            function () use (&$calls) {
                 $calls++;
 
-                return $response;
+                return $this->formResponse();
             }
         );
 
         $repository = new FormRepository($this->client());
-        $repository->refresh();
+        $repository->connect('240000000000001');
         $repository->all();
-        $repository->all();
+        $repository->title('240000000000001');
+        $repository->has('240000000000001');
 
         $this->assertSame(1, $calls);
     }
 
-    public function testFailedRefreshKeepsTheOldCacheAndRecordsTheError(): void
+    /**
+     * A stored record is a label, and losing every integration's label because
+     * a network call timed out would be a worse outcome than a stale title.
+     */
+    public function testFailedConnectKeepsWhatWasAlreadyStored(): void
     {
-        $ok = $this->httpResponse(200, [
-            'responseCode' => 200,
-            'content'      => [['id' => '1', 'title' => 'Contact', 'status' => 'ENABLED']],
-        ]);
-        Functions\when('wp_remote_get')->justReturn($ok);
+        Functions\when('wp_remote_get')->justReturn($this->formResponse());
 
         $repository = new FormRepository($this->client());
-        $repository->refresh();
+        $repository->connect('240000000000001');
 
         Functions\when('wp_remote_get')->justReturn(new WP_Error('http_request_failed', 'timeout'));
 
-        $result = $repository->refresh();
+        $result = $repository->connect('240000000000001');
 
         $this->assertFalse($result->isSuccess());
-        $this->assertCount(1, $repository->all(), 'The previous list must survive a failed refresh.');
-        $this->assertNotSame('', $repository->meta()['error']);
+        $this->assertSame('Contact Form', $repository->title('240000000000001'));
     }
 
-    public function testDeletedFormCanBeRemovedAndDoesNotComeBackOnRefresh(): void
-    {
-        $response = $this->httpResponse(200, [
-            'responseCode' => 200,
-            'content'      => [
-                ['id' => '1', 'title' => 'Contact', 'status' => 'ENABLED'],
-                ['id' => '2', 'title' => 'Old', 'status' => 'DELETED'],
-            ],
-        ]);
-        Functions\when('wp_remote_get')->justReturn($response);
-
-        $repository = new FormRepository($this->client());
-        $repository->refresh();
-
-        $this->assertTrue($repository->hide('2'));
-        $this->assertSame(['1'], array_column($repository->all(), 'id'));
-        $this->assertSame(1, $repository->meta()['count']);
-
-        $repository->refresh();
-
-        $this->assertSame(['1'], array_column($repository->all(), 'id'));
-        $this->assertSame(1, $repository->meta()['count']);
-    }
-
-    public function testOnlyDeletedFormsCanBeRemoved(): void
-    {
-        $response = $this->httpResponse(200, [
-            'responseCode' => 200,
-            'content'      => [['id' => '1', 'title' => 'Contact', 'status' => 'ENABLED']],
-        ]);
-        Functions\when('wp_remote_get')->justReturn($response);
-
-        $repository = new FormRepository($this->client());
-        $repository->refresh();
-
-        $this->assertFalse($repository->hide('1'));
-        $this->assertFalse($repository->hide('404'));
-        $this->assertCount(1, $repository->all());
-    }
-
-    public function testRestoringAFormInJotformBringsItBack(): void
+    /**
+     * Jotform answers a wrong ID, another account's form and a bad API key with
+     * the same 401, so nothing may be stored on any of them.
+     */
+    public function testAnUnauthorizedFormIsNotStored(): void
     {
         Functions\when('wp_remote_get')->justReturn(
-            $this->httpResponse(200, [
-                'responseCode' => 200,
-                'content'      => [['id' => '2', 'title' => 'Old', 'status' => 'DELETED']],
+            $this->httpResponse(401, [
+                'responseCode' => 401,
+                'message'      => "You're not authorized to use (/form-id) ",
+                'content'      => '',
+                'info'         => 'https://api.jotform.com/docs#form-id',
             ])
         );
 
         $repository = new FormRepository($this->client());
-        $repository->refresh();
-        $repository->hide('2');
+        $result     = $repository->connect('999999999999999');
 
-        Functions\when('wp_remote_get')->justReturn(
-            $this->httpResponse(200, [
-                'responseCode' => 200,
-                'content'      => [['id' => '2', 'title' => 'Old', 'status' => 'ENABLED']],
-            ])
-        );
-
-        $repository->refresh();
-
-        $this->assertSame(['2'], array_column($repository->all(), 'id'));
-        $this->assertSame([], $repository->hidden(), 'A restored form must stop being remembered as removed.');
+        $this->assertFalse($result->isSuccess());
+        $this->assertFalse($repository->has('999999999999999'));
+        $this->assertSame([], $repository->all());
     }
 
-    public function testRemovedFormIsForgottenOnceJotformStopsReturningIt(): void
+    public function testANonNumericIdIsRefusedWithoutAnyRequest(): void
     {
-        Functions\when('wp_remote_get')->justReturn(
-            $this->httpResponse(200, [
-                'responseCode' => 200,
-                'content'      => [['id' => '2', 'title' => 'Old', 'status' => 'DELETED']],
-            ])
+        Functions\when('wp_remote_get')->alias(
+            static function (): void {
+                throw new \LogicException('A malformed form ID must not reach the API.');
+            }
         );
 
         $repository = new FormRepository($this->client());
-        $repository->refresh();
-        $repository->hide('2');
 
-        Functions\when('wp_remote_get')->justReturn(
-            $this->httpResponse(200, [
-                'responseCode' => 200,
-                'content'      => [['id' => '1', 'title' => 'Contact', 'status' => 'ENABLED']],
-            ])
-        );
+        foreach (['', ' ', 'abc', '12a', '../7'] as $bad) {
+            $this->assertFalse($repository->connect($bad)->isSuccess(), $bad);
+        }
 
-        $repository->refresh();
-
-        $this->assertSame([], $repository->hidden());
+        $this->assertSame([], $repository->all());
     }
 
-    public function testFlushClearsCacheAndMeta(): void
+    public function testSeveralFormsAreKeptSideBySide(): void
     {
-        $response = $this->httpResponse(200, [
-            'responseCode' => 200,
-            'content'      => [['id' => '1', 'title' => 'Contact', 'status' => 'ENABLED']],
-        ]);
-        Functions\when('wp_remote_get')->justReturn($response);
+        $repository = new FormRepository($this->client());
+
+        Functions\when('wp_remote_get')->justReturn($this->formResponse('240000000000001'));
+        $repository->connect('240000000000001');
+
+        Functions\when('wp_remote_get')->justReturn($this->formResponse('240000000000002'));
+        $repository->connect('240000000000002');
+
+        $this->assertCount(2, $repository->all());
+        $this->assertTrue($repository->has('240000000000001'));
+        $this->assertTrue($repository->has('240000000000002'));
+    }
+
+    /**
+     * PHP coerces a numeric string array key into an integer, so a record read
+     * back out of the option has an int key. Reading has to survive that.
+     */
+    public function testAStoredRecordSurvivesTheNumericKeyCoercion(): void
+    {
+        Functions\when('wp_remote_get')->justReturn($this->formResponse());
 
         $repository = new FormRepository($this->client());
-        $repository->refresh();
+        $repository->connect('240000000000001');
+
+        // A second instance reads the option rather than the memo, exactly as a
+        // later request would.
+        $reader = new FormRepository($this->client());
+
+        $this->assertSame('Contact Form', $reader->title('240000000000001'));
+        $this->assertSame(['240000000000001'], array_map('strval', array_keys($reader->all())));
+    }
+
+    public function testATrashedFormIsStoredAndReportedAsDeleted(): void
+    {
+        Functions\when('wp_remote_get')->justReturn(
+            $this->formResponse('240000000000001', FormRepository::STATUS_DELETED)
+        );
+
+        $repository = new FormRepository($this->client());
+        $repository->connect('240000000000001');
+
+        $this->assertTrue($repository->has('240000000000001'));
+        $this->assertTrue($repository->isDeleted('240000000000001'));
+    }
+
+    public function testForgetDropsOneRecordAndLeavesTheRest(): void
+    {
+        $repository = new FormRepository($this->client());
+
+        Functions\when('wp_remote_get')->justReturn($this->formResponse('240000000000001'));
+        $repository->connect('240000000000001');
+
+        Functions\when('wp_remote_get')->justReturn($this->formResponse('240000000000002'));
+        $repository->connect('240000000000002');
+
+        $repository->forget('240000000000001');
+
+        $this->assertFalse($repository->has('240000000000001'));
+        $this->assertTrue($repository->has('240000000000002'));
+    }
+
+    public function testForgettingTheLastRecordRemovesTheOptionEntirely(): void
+    {
+        Functions\when('wp_remote_get')->justReturn($this->formResponse());
+
+        $repository = new FormRepository($this->client());
+        $repository->connect('240000000000001');
+        $repository->forget('240000000000001');
+
+        $this->assertArrayNotHasKey(FormRepository::OPTION, $this->options);
+    }
+
+    public function testFlushClearsTheStore(): void
+    {
+        Functions\when('wp_remote_get')->justReturn($this->formResponse());
+
+        $repository = new FormRepository($this->client());
+        $repository->connect('240000000000001');
         $repository->flush();
 
-        $this->assertFalse($repository->isSynced());
-        $this->assertSame(0, $repository->meta()['count']);
+        $this->assertSame([], $repository->all());
+        $this->assertArrayNotHasKey(FormRepository::OPTION, $this->options);
+    }
+
+    /**
+     * An account list left by an older version lives under a different option
+     * name on purpose: both shapes are integer-keyed arrays of arrays once PHP
+     * has coerced the keys, so no honest check could tell them apart.
+     */
+    public function testAnOldAccountListIsNotReadAsConnectedForms(): void
+    {
+        $this->options[FormRepository::LEGACY_OPTION] = [
+            ['id' => '240000000000001', 'title' => 'Contact'],
+            ['id' => '240000000000002', 'title' => 'Careers'],
+        ];
+
+        $repository = new FormRepository($this->client());
+
+        $this->assertSame([], $repository->all());
+        $this->assertFalse($repository->has('240000000000001'));
+    }
+
+    public function testMalformedStoredRecordsAreIgnoredRatherThanTrusted(): void
+    {
+        $this->options[FormRepository::OPTION] = [
+            '240000000000001' => ['title' => 'Contact', 'status' => 'ENABLED'],
+            'not-an-id'       => ['title' => 'Nonsense'],
+            '240000000000003' => 'not an array',
+        ];
+
+        $repository = new FormRepository($this->client());
+
+        $this->assertSame(['240000000000001'], array_map('strval', array_keys($repository->all())));
+        $this->assertSame('Contact', $repository->title('240000000000001'));
     }
 }

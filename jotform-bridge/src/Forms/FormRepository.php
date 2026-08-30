@@ -12,42 +12,60 @@ if (!defined('ABSPATH')) {
 }
 
 /**
- * Durable, manually synchronized copy of the Jotform account form list.
+ * What the plugin knows about the Jotform forms integrations actually use.
  *
- * Like the schema, this is stored rather than cached: Jotform is contacted only
- * by the explicit "Sync with Jotform" action on the settings screen, and nothing
- * expires on its own. An expiring list would silently break the integration
- * editor — the form select would empty itself and saving would start failing —
- * at a moment nobody chose.
+ * One record per connected form, written only by the explicit "Connect form"
+ * button in the integration editor. This used to be a copy of the whole account
+ * form list, refreshed by "Sync with Jotform" on the settings screen; that is
+ * gone, and nothing anywhere asks Jotform what forms an account has.
+ *
+ * The reasoning, recorded because the old design was deliberate too:
+ *
+ * * the list was the largest thing the plugin stored and the least of it was
+ *   used — a site with three integrations kept every form on the account, and
+ *   a shared agency account can hold hundreds;
+ * * it was fetched with `limit=1000` and no paging, so a large account was
+ *   silently truncated and the missing forms could never be selected;
+ * * "Remove from list" and its option existed only to hide rows nobody wanted
+ *   to see. A store that holds only what is referenced has nothing to hide.
+ *
+ * Like the schema this is stored rather than cached: no TTL, nothing expires on
+ * its own, and no page view or submission ever writes it. A record is a *name*
+ * for an ID — the ID itself, the authoritative part, lives on the Integration —
+ * so a stale title is cosmetic and a missing one costs nothing but a label.
  */
 final class FormRepository
 {
-    public const OPTION        = 'jotform_bridge_forms';
-    public const META_OPTION   = 'jotform_bridge_forms_meta';
-    public const HIDDEN_OPTION = 'jotform_bridge_forms_hidden';
+    /**
+     * Deliberately not the old `jotform_bridge_forms`.
+     *
+     * That option held a list; this one holds a map keyed by form ID. Both are
+     * integer-keyed arrays of arrays once PHP has coerced the numeric keys, so
+     * no honest check could tell an old value from a new one. Reusing the name
+     * would have meant guessing, and guessing wrong means an account list being
+     * read as connected forms. A new name and a plain delete of the old one is
+     * the version of this that cannot be subtly wrong.
+     */
+    public const OPTION = 'jotform_bridge_connected_forms';
+
+    /** Options versions up to 0.1.0 kept the account list in. Only deleted. */
+    public const LEGACY_OPTION        = 'jotform_bridge_forms';
+    public const LEGACY_META_OPTION   = 'jotform_bridge_forms_meta';
+    public const LEGACY_HIDDEN_OPTION = 'jotform_bridge_forms_hidden';
+    public const LEGACY_TRANSIENT     = 'jotform_bridge_forms';
 
     /** The status Jotform reports for a form sitting in the account trash. */
     public const STATUS_DELETED = 'DELETED';
 
-    /** Where versions up to 0.1.0 kept the list. Only ever deleted. */
-    public const LEGACY_TRANSIENT = 'jotform_bridge_forms';
-
     private JotformClient $client;
 
     /**
-     * In-request memo. The admin list asks for the form list once per row, and
+     * In-request memo. The integrations list asks for a title once per row, and
      * the answer cannot change within one request.
      *
-     * @var array<int, array<string, string>>|null
+     * @var array<int|string, array<string, string|int>>|null
      */
     private ?array $memo = null;
-
-    /**
-     * In-request memo for the dismissed-form ids, kept for the same reason.
-     *
-     * @var array<int, string>|null
-     */
-    private ?array $hiddenMemo = null;
 
     public function __construct(JotformClient $client)
     {
@@ -55,7 +73,15 @@ final class FormRepository
     }
 
     /**
-     * @return array<int, array<string, string>> Empty when nothing is stored.
+     * Every connected form, keyed by form ID.
+     *
+     * The key comes back as an integer, not a string: PHP coerces a numeric
+     * string array key on the way in and there is no way to stop it. Lookups by
+     * string ID still work, because the same coercion applies to them — but
+     * code iterating this should read `$form['id']`, which is a string by
+     * construction, rather than the key it arrived under.
+     *
+     * @return array<int|string, array{id:string, title:string, status:string, updated:string, connected_at:int}>
      */
     public function all(): array
     {
@@ -63,242 +89,176 @@ final class FormRepository
             return $this->memo;
         }
 
-        $stored = get_option(self::OPTION, false);
+        $stored = get_option(self::OPTION, []);
+        $forms  = [];
 
-        $this->memo = is_array($stored) ? $stored : [];
+        foreach (is_array($stored) ? $stored : [] as $key => $record) {
+            if (!is_array($record)) {
+                continue;
+            }
 
-        return $this->memo;
-    }
+            // PHP turns a numeric string key into an integer on the way in, so
+            // the id is read back from the key rather than trusted to be a
+            // string, and the record's own id is only a fallback.
+            $formId = trim((string) $key);
 
-    public function isSynced(): bool
-    {
-        return is_array(get_option(self::OPTION, false));
+            if ($formId === '' || !ctype_digit($formId)) {
+                continue;
+            }
+
+            $forms[$formId] = self::normalize($formId, $record);
+        }
+
+        $this->memo = $forms;
+
+        return $forms;
     }
 
     /**
-     * Fetches the list from Jotform and replaces what is stored, on success.
+     * @return array{id:string, title:string, status:string, updated:string, connected_at:int}|null
      */
-    public function refresh(): ApiResponse
+    public function get(string $formId): ?array
     {
-        $response = $this->client->getForms();
+        $formId = self::normalizeFormId($formId);
+
+        if ($formId === '') {
+            return null;
+        }
+
+        $all = $this->all();
+
+        return $all[$formId] ?? null;
+    }
+
+    public function has(string $formId): bool
+    {
+        return $this->get($formId) !== null;
+    }
+
+    /**
+     * The stored title, or an empty string when the form was never connected.
+     */
+    public function title(string $formId): string
+    {
+        $form = $this->get($formId);
+
+        return $form !== null ? $form['title'] : '';
+    }
+
+    public function isDeleted(string $formId): bool
+    {
+        $form = $this->get($formId);
+
+        return $form !== null && strtoupper($form['status']) === self::STATUS_DELETED;
+    }
+
+    /**
+     * Asks Jotform about one form and stores what came back.
+     *
+     * The only write path, and it runs only when an administrator presses
+     * "Connect form". On failure nothing stored is touched: a form that was
+     * connected yesterday keeps its title through a Jotform outage rather than
+     * losing its label because a network call timed out.
+     *
+     * @return ApiResponse Data is the stored record on success.
+     */
+    public function connect(string $formId): ApiResponse
+    {
+        $formId = self::normalizeFormId($formId);
+
+        if ($formId === '') {
+            return ApiResponse::failure(
+                JotformClient::ERROR_UNEXPECTED,
+                __('Enter a Jotform form ID: it is the run of digits in the form URL.', 'jotform-bridge')
+            );
+        }
+
+        $response = $this->client->getForm($formId);
 
         if (!$response->isSuccess()) {
-            $this->saveMeta(
-                [
-                    'fetched_at' => $this->meta()['fetched_at'],
-                    'count'      => $this->meta()['count'],
-                    'error'      => $response->errorMessage(),
-                ]
-            );
-
             return $response;
         }
 
-        $forms      = $this->withoutHidden($response->data());
-        $this->memo = null;
+        $record = self::normalize($formId, $response->data());
+        $record['connected_at'] = time();
 
-        update_option(self::OPTION, $forms, false);
+        $stored          = $this->all();
+        $stored[$formId] = $record;
 
-        $this->saveMeta(
-            [
-                'fetched_at' => time(),
-                'count'      => count($forms),
-                'error'      => '',
-            ]
-        );
+        $this->save($stored);
 
-        return $response;
+        return ApiResponse::success($record, $response->status(), $response->meta());
+    }
+
+    /**
+     * Drops one record. The form itself is untouched: this is a local label.
+     */
+    public function forget(string $formId): void
+    {
+        $formId = self::normalizeFormId($formId);
+
+        if ($formId === '') {
+            return;
+        }
+
+        $stored = $this->all();
+
+        if (!isset($stored[$formId])) {
+            return;
+        }
+
+        unset($stored[$formId]);
+
+        $this->save($stored);
     }
 
     public function flush(): void
     {
-        $this->memo       = null;
-        $this->hiddenMemo = null;
-
-        delete_option(self::OPTION);
-        delete_transient(self::LEGACY_TRANSIENT);
-        delete_option(self::META_OPTION);
-        delete_option(self::HIDDEN_OPTION);
-    }
-
-    /**
-     * Drops one trashed form from the stored list for good.
-     *
-     * Only a form Jotform itself reports as DELETED can go: everything else on
-     * the screen is a form the account still has, and hiding one of those would
-     * only make the integration editor lie about what can be connected.
-     *
-     * The id is remembered, because /user/forms keeps returning trashed forms
-     * and the next sync would otherwise put the row straight back.
-     *
-     * @return bool False when no trashed form with that id is stored.
-     */
-    public function hide(string $formId): bool
-    {
-        $formId = trim($formId);
-
-        if ($formId === '') {
-            return false;
-        }
-
-        $kept    = [];
-        $removed = false;
-
-        foreach ($this->all() as $form) {
-            if ((string) ($form['id'] ?? '') === $formId && self::isDeleted($form)) {
-                $removed = true;
-
-                continue;
-            }
-
-            $kept[] = $form;
-        }
-
-        if (!$removed) {
-            return false;
-        }
-
         $this->memo = null;
 
-        update_option(self::OPTION, $kept, false);
-
-        $hidden   = $this->hidden();
-        $hidden[] = $formId;
-
-        $this->saveHidden($hidden);
-
-        $meta = $this->meta();
-
-        $this->saveMeta(
-            [
-                'fetched_at' => $meta['fetched_at'],
-                'count'      => count($kept),
-                'error'      => $meta['error'],
-            ]
-        );
-
-        return true;
+        delete_option(self::OPTION);
     }
 
     /**
-     * @return array<int, string> Ids dismissed by an administrator.
+     * @param array<int|string, array<string, string|int>> $forms
      */
-    public function hidden(): array
+    private function save(array $forms): void
     {
-        if ($this->hiddenMemo !== null) {
-            return $this->hiddenMemo;
-        }
+        $this->memo = $forms;
 
-        $stored = get_option(self::HIDDEN_OPTION, []);
-        $hidden = [];
-
-        foreach (is_array($stored) ? $stored : [] as $id) {
-            $id = trim((string) $id);
-
-            if ($id !== '') {
-                $hidden[] = $id;
-            }
-        }
-
-        $this->hiddenMemo = array_values(array_unique($hidden));
-
-        return $this->hiddenMemo;
-    }
-
-    /**
-     * Applies the dismissed-form list to a freshly fetched account list.
-     *
-     * A dismissal only holds while Jotform still calls the form deleted: a form
-     * restored from the trash comes back on the screen, because it is a form the
-     * account can use again. Ids Jotform no longer returns at all are dropped
-     * too, so the option cannot grow without end.
-     *
-     * @param  array<int, array<string, string>> $forms
-     * @return array<int, array<string, string>>
-     */
-    private function withoutHidden(array $forms): array
-    {
-        $hidden = $this->hidden();
-
-        if ($hidden === []) {
-            return $forms;
-        }
-
-        $hidden = array_flip($hidden);
-        $kept   = [];
-        $stays  = [];
-
-        foreach ($forms as $form) {
-            $id = (string) ($form['id'] ?? '');
-
-            if (!isset($hidden[$id])) {
-                $kept[] = $form;
-
-                continue;
-            }
-
-            if (!self::isDeleted($form)) {
-                $kept[] = $form;
-
-                continue;
-            }
-
-            $stays[] = $id;
-        }
-
-        $this->saveHidden($stays);
-
-        return $kept;
-    }
-
-    /**
-     * @param array<string, string> $form
-     */
-    private static function isDeleted(array $form): bool
-    {
-        return strtoupper((string) ($form['status'] ?? '')) === self::STATUS_DELETED;
-    }
-
-    /**
-     * @param array<int, string> $hidden
-     */
-    private function saveHidden(array $hidden): void
-    {
-        $hidden           = array_values(array_unique($hidden));
-        $this->hiddenMemo = $hidden;
-
-        if ($hidden === []) {
-            delete_option(self::HIDDEN_OPTION);
+        if ($forms === []) {
+            delete_option(self::OPTION);
 
             return;
         }
 
-        update_option(self::HIDDEN_OPTION, $hidden, false);
+        update_option(self::OPTION, $forms, false);
     }
 
     /**
-     * @return array{fetched_at:int, count:int, error:string}
+     * @param array<string, mixed> $record
+     *
+     * @return array{id:string, title:string, status:string, updated:string, connected_at:int}
      */
-    public function meta(): array
+    private static function normalize(string $formId, array $record): array
     {
-        $meta = get_option(self::META_OPTION, []);
-
-        if (!is_array($meta)) {
-            $meta = [];
-        }
-
         return [
-            'fetched_at' => isset($meta['fetched_at']) ? (int) $meta['fetched_at'] : 0,
-            'count'      => isset($meta['count']) ? (int) $meta['count'] : 0,
-            'error'      => isset($meta['error']) ? (string) $meta['error'] : '',
+            'id'           => $formId,
+            'title'        => isset($record['title']) ? (string) $record['title'] : '',
+            'status'       => isset($record['status']) ? (string) $record['status'] : '',
+            'updated'      => isset($record['updated']) ? (string) $record['updated'] : '',
+            'connected_at' => isset($record['connected_at']) ? (int) $record['connected_at'] : 0,
         ];
     }
 
     /**
-     * @param array{fetched_at:int, count:int, error:string} $meta
+     * Jotform form IDs are numeric strings; anything else is rejected rather
+     * than sanitized into some other form's record.
      */
-    private function saveMeta(array $meta): void
+    private static function normalizeFormId(string $formId): string
     {
-        update_option(self::META_OPTION, $meta, false);
+        $formId = trim($formId);
+
+        return ctype_digit($formId) ? $formId : '';
     }
 }

@@ -11,10 +11,10 @@ use WP_Error;
 
 final class JotformClientTest extends TestCase
 {
-    public function testGetFormsReturnsNormalizedListFromEnvelope(): void
+    public function testGetFormReturnsTheFourFieldsWeKeep(): void
     {
         $fixture = json_decode(
-            (string) file_get_contents(__DIR__ . '/../../Fixtures/Jotform/user-forms.json'),
+            (string) file_get_contents(__DIR__ . '/../../Fixtures/Jotform/form.json'),
             true
         );
 
@@ -22,10 +22,9 @@ final class JotformClientTest extends TestCase
         Functions\when('wp_remote_get')->justReturn($response);
 
         $client = new JotformClient('secret-key', 'https://api.jotform.com/');
-        $result = $client->getForms();
+        $result = $client->getForm('240000000000001');
 
         $this->assertTrue($result->isSuccess());
-        $this->assertCount(3, $result->data());
         $this->assertSame(
             [
                 'id'      => '240000000000001',
@@ -33,8 +32,49 @@ final class JotformClientTest extends TestCase
                 'status'  => 'ENABLED',
                 'updated' => '2026-02-11 08:45:02',
             ],
-            $result->data()[0]
+            $result->data()
         );
+    }
+
+    /**
+     * Jotform answers an unknown form ID, a form owned by somebody else and a
+     * bad API key with an identical 401 — verified against the live API. The
+     * client must pass that through as a failure and must not invent a reason.
+     */
+    public function testAnUnauthorizedFormIsAPlainFailure(): void
+    {
+        Functions\when('wp_remote_get')->justReturn(
+            $this->httpResponse(401, [
+                'responseCode' => 401,
+                'message'      => "You're not authorized to use (/form-id) ",
+                'content'      => '',
+                'info'         => 'https://api.jotform.com/docs#form-id',
+            ])
+        );
+
+        $result = (new JotformClient('secret-key', 'https://api.jotform.com'))->getForm('999999999999999');
+
+        $this->assertFalse($result->isSuccess());
+        $this->assertSame(401, $result->status());
+
+        // Not mistaken for an allowance failure: nothing in that message says
+        // "quota" or "limit", and misreading it would trip the circuit breaker.
+        $this->assertSame(JotformClient::ERROR_HTTP_STATUS, $result->errorCode());
+    }
+
+    public function testGetFormRefusesAMalformedIdWithoutAnyRequest(): void
+    {
+        Functions\when('wp_remote_get')->alias(
+            static function (): void {
+                throw new \LogicException('A malformed form ID must not reach the API.');
+            }
+        );
+
+        $client = new JotformClient('secret-key', 'https://api.jotform.com');
+
+        foreach (['', ' ', 'abc', '12a', '../user/forms'] as $bad) {
+            $this->assertFalse($client->getForm($bad)->isSuccess(), $bad);
+        }
     }
 
     public function testApiKeyTravelsInHeaderAndNeverInTheUrl(): void
@@ -49,9 +89,9 @@ final class JotformClientTest extends TestCase
             }
         );
 
-        (new JotformClient('secret-key', 'https://eu-api.jotform.com'))->getForms();
+        (new JotformClient('secret-key', 'https://eu-api.jotform.com'))->testConnection();
 
-        $this->assertStringStartsWith('https://eu-api.jotform.com/user/forms', $captured['url']);
+        $this->assertStringStartsWith('https://eu-api.jotform.com/user', $captured['url']);
         $this->assertStringNotContainsString('secret-key', $captured['url']);
         $this->assertSame('secret-key', $captured['args']['headers']['APIKEY']);
     }

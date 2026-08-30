@@ -129,9 +129,14 @@ unzipping. The plugin ships its own autoloader.
 `define( 'JOTFORM_API_KEY', '...' );`
 
 3. Go to **Jotform Bridge → Settings**, pick the API region and save, then press
-   **Sync with Jotform**: it checks the key and loads your form list.
-4. Go to **Jotform Bridge → Integrations**, add an integration, and pick its
-   Jotform form and rendering mode.
+   **Check Connection** to confirm the key works.
+4. Go to **Jotform Bridge → Integrations**, add an integration, paste the ID of
+   your Jotform form and press **Connect form**, then choose a rendering mode.
+5. Press **Sync Schema** to load the form's fields. Nothing renders until you do.
+
+The form ID is the digits at the end of the form URL — the `262215084646053` in
+`form.jotform.com/262215084646053`. The plugin never asks Jotform what forms your
+account has: it fetches only the forms you name.
 
 The constant is the only place the plugin reads the key from: there is no key
 field in the admin area and no key in the database. Until the constant is
@@ -166,7 +171,7 @@ header — they are never executed during discovery.
 = Does uninstalling delete my integrations? =
 
 No. Deleting the plugin removes only the derived data — synced schemas, the
-account form list and the template registry. If you want a full removal,
+connected form records and the template registry. If you want a full removal,
 tick **Delete the integrations and the settings when the plugin is deleted** on
 the settings screen first. The API key is not stored by the plugin at all, so
 removing it means editing `wp-config.php`.

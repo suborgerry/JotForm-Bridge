@@ -71,8 +71,7 @@ final class JotformClient
         'upgrade your account',
     ];
 
-    private const DEFAULT_TIMEOUT   = 15;
-    private const FORMS_PAGE_LIMIT  = 1000;
+    private const DEFAULT_TIMEOUT = 15;
 
     private string $apiKey;
 
@@ -120,39 +119,69 @@ final class JotformClient
     }
 
     /**
-     * GET /user/forms — the account form list, reduced to the fields we need.
+     * GET /form/{formID} — the definition of one form, reduced to what we show.
+     *
+     * This replaced `GET /user/forms`. The account list was the largest thing
+     * the plugin stored and the least of it was ever used: a site with three
+     * integrations kept every form on the account, and the list was fetched
+     * with `limit=1000` and no paging, so a large account was silently
+     * truncated and the missing forms could never be selected at all.
+     *
+     * The fields come from a live read of the documented endpoint: `content` is
+     * a single object carrying `id`, `username`, `title`, `height`, `status`,
+     * `created_at`, `updated_at`, `last_submission`, `new`, `count`, `type`,
+     * `favorite`, `archived` and `url`. We keep the four that mean something to
+     * a site owner and drop the rest.
+     *
+     * A caller cannot learn *why* this failed. Jotform answers 401 with the
+     * same "You're not authorized to use (/form-id)" message for a form that
+     * does not exist, a form belonging to another account and an API key that
+     * is wrong — verified against the live API. That is defensible of Jotform,
+     * since telling the three apart would let anyone enumerate form IDs, but it
+     * means the plugin must never claim to know which one happened.
+     *
+     * @return ApiResponse Data is `['id', 'title', 'status', 'updated']`.
      */
-    public function getForms(): ApiResponse
+    public function getForm(string $formId): ApiResponse
     {
-        $response = $this->get(
-            '/user/forms',
-            [
-                'limit'   => self::FORMS_PAGE_LIMIT,
-                'orderby' => 'title',
-            ]
-        );
+        $formId = trim($formId);
+
+        if ($formId === '' || !ctype_digit($formId)) {
+            return ApiResponse::failure(
+                self::ERROR_UNEXPECTED,
+                __('The Jotform form ID is missing or invalid.', 'jotform-bridge')
+            );
+        }
+
+        $response = $this->get('/form/' . $formId);
 
         if (!$response->isSuccess()) {
             return $response;
         }
 
         $content = $response->data();
-        $forms   = [];
 
-        foreach ($content as $form) {
-            if (!is_array($form) || empty($form['id'])) {
-                continue;
-            }
-
-            $forms[] = [
-                'id'      => (string) $form['id'],
-                'title'   => isset($form['title']) ? (string) $form['title'] : '',
-                'status'  => isset($form['status']) ? (string) $form['status'] : '',
-                'updated' => isset($form['updated_at']) ? (string) $form['updated_at'] : '',
-            ];
+        // The envelope is an object here rather than a list, and an answer
+        // without an id is not a form however successful the status was.
+        if (!isset($content['id']) || (string) $content['id'] === '') {
+            return ApiResponse::failure(
+                self::ERROR_UNEXPECTED,
+                __('Jotform answered without a form.', 'jotform-bridge'),
+                $response->status(),
+                $response->meta()
+            );
         }
 
-        return ApiResponse::success($forms, $response->status(), $response->meta());
+        return ApiResponse::success(
+            [
+                'id'      => (string) $content['id'],
+                'title'   => isset($content['title']) ? (string) $content['title'] : '',
+                'status'  => isset($content['status']) ? (string) $content['status'] : '',
+                'updated' => isset($content['updated_at']) ? (string) $content['updated_at'] : '',
+            ],
+            $response->status(),
+            $response->meta()
+        );
     }
 
     /**

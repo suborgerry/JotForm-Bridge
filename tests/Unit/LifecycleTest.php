@@ -34,8 +34,10 @@ final class LifecycleTest extends TestCase
             'jotform_bridge_templates'        => ['templates' => [], 'generated_at' => 1],
             SchemaRepository::META_OPTION      => ['240000000000001' => ['fingerprint' => 'abc']],
             SchemaRepository::optionKey('240000000000001') => ['fields' => []],
-            FormRepository::META_OPTION        => ['count' => 3],
-            FormRepository::OPTION             => [['id' => '1']],
+            FormRepository::OPTION             => ['240000000000001' => ['id' => '240000000000001']],
+            FormRepository::LEGACY_OPTION        => [['id' => '1']],
+            FormRepository::LEGACY_META_OPTION   => ['count' => 3],
+            FormRepository::LEGACY_HIDDEN_OPTION => ['2'],
             'jotform_bridge_settings'          => ['api_key' => 'legacy-key', 'region' => 'eu'],
             'jotform_bridge_integrations'      => ['contact' => ['slug' => 'contact']],
         ];
@@ -118,6 +120,34 @@ final class LifecycleTest extends TestCase
         Plugin::onActivate();
 
         $this->assertArrayNotHasKey('jotform_bridge_templates', $this->options);
+    }
+
+    /**
+     * The account form list and everything that managed it.
+     *
+     * Nothing writes those three options any more: forms are connected one at a
+     * time by ID, so there is no list to keep, and no trashed form to hide from
+     * a list it is not in.
+     */
+    public function testActivationRemovesTheOldAccountFormList(): void
+    {
+        Plugin::onActivate();
+
+        $this->assertArrayNotHasKey(FormRepository::LEGACY_OPTION, $this->options);
+        $this->assertArrayNotHasKey(FormRepository::LEGACY_META_OPTION, $this->options);
+        $this->assertArrayNotHasKey(FormRepository::LEGACY_HIDDEN_OPTION, $this->options);
+    }
+
+    /**
+     * The connected-form records are not the account list. They name the forms
+     * integrations actually point at, and an upgrade must not blank the label
+     * on every integration on the site.
+     */
+    public function testAnUpgradeKeepsTheConnectedForms(): void
+    {
+        Plugin::onActivate();
+
+        $this->assertArrayHasKey(FormRepository::OPTION, $this->options);
     }
 
     /**

@@ -1307,8 +1307,9 @@ Two things that are easy to confuse have to stay apart:
 **Stored state** — not a cache, no TTL, never expires on its own, and written
 only by an explicit action of the administrator:
 
-* the account forms list (`jotform_bridge_forms`, the **Sync with Jotform**
-  button);
+* the connected form records (`jotform_bridge_connected_forms`, the
+  **Connect form** button — one record per form an integration names, never a
+  list of the account; see "Amendment: no account form list");
 * the normalized schema (`jotform_bridge_schema_{formId}`, the **Sync Schema**
   button).
 
@@ -1383,13 +1384,19 @@ Actions:
 
 ```text
 Save
-Sync with Jotform
+Check Connection
 ```
 
-`Sync with Jotform` is the only action on this screen that contacts Jotform. It
-checks the key with `GET /user` and reloads the account form list in one go: a
-connection test that is not followed by a sync tells the site owner nothing they
-can act on, and a sync that fails is a failed connection test with extra steps.
+`Check Connection` is the only action on this screen that contacts Jotform, and
+it does exactly one thing: `GET /user`. There is no form list to load, and no
+action anywhere that asks what forms an account has.
+
+It kept a button of its own for a reason that is not obvious. Jotform answers a
+form ID that does not exist, a form owned by another account and a wrong API key
+with the same `401 You're not authorized to use (/form-id)` — verified against
+the live API. So a failing `Connect form` cannot say which of the three it is.
+`GET /user` names no form, so its success proves the key and leaves the ID as the
+only suspect. Removing this button removes that distinction from the product.
 
 ## Integrations
 
@@ -1398,13 +1405,18 @@ The Integration UI:
 ```text
 Name
 Slug
-Jotform Form
+Jotform Form ID  + the Connect form button
 Rendering Mode
 Template
 Success Action
 Redirect Page
 Redirect Delay
 ```
+
+`Jotform Form ID` is a text field, not a select: the ID is typed and resolved one
+at a time by `Connect form`, which is the only action that asks Jotform whether a
+form exists. It answers over admin-ajax rather than by posting the screen, so
+nothing already typed into the editor is lost.
 
 `Redirect Page` and `Redirect Delay` are shown only when
 `Success Action = redirect`.
@@ -1420,6 +1432,7 @@ Redirect target status
 Actions:
 
 ```text
+Connect form
 Sync Schema
 Send Test Submission
 Delete
@@ -1955,8 +1968,9 @@ The consequences that have to hold:
 2. Rendering a form with no synced schema renders nothing — the administrator is
    shown why — rather than trying to fetch one.
 3. A submission with no synced schema answers 503 and does not contact Jotform.
-4. The account form list follows the same rule: an option with no TTL, refreshed
-   only by the **Sync with Jotform** button.
+4. The connected form records follow the same rule: an option with no TTL,
+   written only by the **Connect form** button. (This clause used to describe an
+   account-wide form list; see "Amendment: no account form list".)
 
 The price is accepted deliberately: a form edited in Jotform keeps working from
 the previous definition until the site owner presses Sync Schema.
@@ -2075,3 +2089,68 @@ The two cases are therefore separate:
 The general rule behind it: "the value is absent" and "the value could not have
 been produced by our own script" are different states, and a guard that conflates
 them can be stepped over with one character.
+
+---
+
+# Amendment: no account form list
+
+Overturns the parts of "The Jotform API", "Storage and caching" and "Admin UI"
+that assumed the plugin keeps a copy of every form on the Jotform account, and
+removes account-wide form discovery from the product.
+
+Removed:
+
+* `JotformClient::getForms()` and `FORMS_PAGE_LIMIT`, so `GET /user/forms` is
+  never called;
+* the options `jotform_bridge_forms`, `jotform_bridge_forms_meta` and
+  `jotform_bridge_forms_hidden`, deleted on upgrade and on activation;
+* the **Sync with Jotform** button, the Jotform Forms table on the settings
+  screen, and the **Remove from list** action with it;
+* the form `<select>` in the integration editor;
+* the refusal to save an integration whose form is not in the stored list.
+
+Added:
+
+* `JotformClient::getForm()` — `GET /form/{formID}`, one form by ID;
+* `jotform_bridge_connected_forms`, one record per form an integration names:
+  id, title, status, Jotform's `updated_at`, and when it was checked;
+* **Connect form**, a button beside the Jotform Form ID field in the integration
+  editor, answering over `wp_ajax_jotform_bridge_connect_form`;
+* **Check Connection** on the settings screen, which is the old button reduced
+  to the `GET /user` half.
+
+The reasoning: the account list was the largest thing the plugin stored and the
+least of it was used — three integrations kept every form on the account, and a
+shared agency account holds hundreds. It was fetched with `limit=1000` and no
+paging, so a large account was silently truncated and the missing forms could
+never be selected at all. **Remove from list** and its option existed only to
+hide rows from a list nobody had asked for. Fetching by ID makes all three
+problems not smaller but absent.
+
+The price is accepted deliberately: the site owner has to find the form ID in
+Jotform rather than pick a title from a list. That is one copy-paste per
+integration, against a store that grows with the site instead of with the
+account.
+
+What has to hold:
+
+1. **Nothing anywhere asks what forms an account has.** Not a page view, not the
+   editor, not activation. `Connect form` and `Sync Schema` name a form ID; every
+   other Jotform call is `GET /user` or a submission.
+2. **A record is a label, never authority.** The form ID lives on the Integration
+   and is what rendering and submission use. A missing record costs a title in
+   the admin and nothing else, which is why a failed `Connect form` leaves what
+   is stored alone, and why a settings save no longer flushes it.
+3. **An unconnected form ID is a warning, not a refusal.** The field is free text
+   now; refusing to store digits somebody typed, because a button beside them was
+   not pressed, would make the editor feel broken. Nothing goes quietly wrong
+   either way — an integration with no synced schema does not render at all.
+4. **Connect form is asynchronous on purpose.** It resolves one field of a form
+   still being filled in. A redirect would either discard the rest of the editor
+   or have to save it, and neither is what a button beside a text field should
+   mean. Without JavaScript the button does nothing and the field still saves,
+   which is what point 3 buys.
+5. **The 401 is ambiguous and must not be explained away.** Jotform answers a
+   nonexistent form, another account's form and a bad API key identically. The
+   admin names all three possibilities and points at Check Connection; it never
+   claims to know which one happened.

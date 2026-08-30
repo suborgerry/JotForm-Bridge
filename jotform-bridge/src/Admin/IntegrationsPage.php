@@ -36,6 +36,16 @@ final class IntegrationsPage
     public const ACTION_SYNC    = 'jotform_bridge_sync_schema';
     public const ACTION_TEST    = 'jotform_bridge_test_submission';
 
+    /**
+     * "Connect form" — the only asynchronous action in the admin.
+     *
+     * It answers over admin-ajax rather than through admin-post because it
+     * resolves one field of a form that is still being filled in: a redirect
+     * would either lose everything typed so far or have to save it, and neither
+     * is what pressing a button beside a text field should mean.
+     */
+    public const ACTION_CONNECT = 'jotform_bridge_connect_form';
+
     private const FLASH_PREFIX = 'jotform_bridge_notice_';
 
     private IntegrationRepository $integrations;
@@ -80,6 +90,7 @@ final class IntegrationsPage
         add_action('admin_post_' . self::ACTION_SAVE, [$this, 'handleSave']);
         add_action('admin_post_' . self::ACTION_DELETE, [$this, 'handleDelete']);
         add_action('admin_post_' . self::ACTION_SYNC, [$this, 'handleSyncSchema']);
+        add_action('wp_ajax_' . self::ACTION_CONNECT, [$this, 'handleConnectForm']);
 
         if ($this->tests !== null) {
             add_action('admin_post_' . self::ACTION_TEST, [$this, 'handleTestSubmission']);
@@ -209,7 +220,9 @@ final class IntegrationsPage
         $schema        = $integration->formId() !== '' ? $this->schemas->stored($integration->formId()) : null;
         $schemaMeta    = $integration->formId() !== '' ? $this->schemas->meta($integration->formId()) : null;
         $schemaStale   = $integration->formId() !== '' && $this->schemas->isStale($integration->formId());
-        $forms         = $this->forms->all();
+        // One record, not a list: the editor names the form this integration
+        // points at and knows nothing about any other form on the account.
+        $connectedForm = $integration->formId() !== '' ? $this->forms->get($integration->formId()) : null;
         $templates     = $this->templates->choices();
         $canTest       = $this->tests !== null;
 
@@ -259,10 +272,6 @@ final class IntegrationsPage
             );
         }
 
-        if ($integration->formId() !== '' && !$this->isKnownForm($integration->formId())) {
-            $errors[] = __('The selected Jotform form is not in the stored account form list. Refresh the form list on the settings screen.', 'jotform-bridge');
-        }
-
         if ($errors === []) {
             $errors = $this->integrations->save($integration, $originalSlug !== '' ? $originalSlug : null);
         }
@@ -281,6 +290,19 @@ final class IntegrationsPage
         // exactly that, so the one action that talks to Jotform stays the one
         // the administrator pressed on purpose.
         $warnings = [];
+
+        // An unconnected form ID is a warning rather than a refusal. The field
+        // is free text now, and refusing to store digits the administrator
+        // typed — because a button beside them was not pressed — would make the
+        // form feel broken. Nothing can go quietly wrong either way: an
+        // integration whose schema was never synced does not render at all, and
+        // the schema is the next warning down.
+        if ($integration->formId() !== '' && !$this->forms->has($integration->formId())) {
+            $warnings[] = __(
+                'This Jotform form has not been connected yet. Press Connect form to check that it exists and to read its title.',
+                'jotform-bridge'
+            );
+        }
 
         if (!$this->schemas->isSynced($integration->formId())) {
             $warnings[] = __(
@@ -313,7 +335,19 @@ final class IntegrationsPage
         // phpcs:ignore WordPress.Security.NonceVerification.Missing -- verified in guard().
         $slug = isset($_POST['integration']) ? sanitize_key((string) wp_unslash($_POST['integration'])) : '';
 
+        $integration = $this->integrations->get($slug);
+        $formId      = $integration !== null ? $integration->formId() : '';
+
         if ($this->integrations->delete($slug)) {
+            // The store holds the forms integrations use, so a form the last
+            // integration referencing it has just taken with it has nothing
+            // left to name. The schema is left alone: it is a manual sync the
+            // administrator paid for, and a new integration on the same form
+            // should not have to pay for it again.
+            if ($formId !== '' && !$this->isFormInUse($formId)) {
+                $this->forms->forget($formId);
+            }
+
             $this->flash('success', __('Integration deleted.', 'jotform-bridge'));
         } else {
             $this->flash('error', __('That integration does not exist.', 'jotform-bridge'));
@@ -435,6 +469,81 @@ final class IntegrationsPage
     }
 
     /**
+     * Resolves one Jotform form ID into a title, and stores the result.
+     *
+     * The one place the plugin asks Jotform about a form's existence. It
+     * deliberately cannot say *why* a lookup failed: Jotform answers 401 with
+     * the same message for a form that does not exist, a form owned by another
+     * account and an API key that is wrong, so the reply names all three and
+     * points at Check Connection, which is the only thing that separates the
+     * last of them from the first two.
+     */
+    public function handleConnectForm(): void
+    {
+        if (!current_user_can(self::CAPABILITY)) {
+            wp_send_json_error(
+                ['message' => __('You are not allowed to perform this action.', 'jotform-bridge')],
+                403
+            );
+        }
+
+        check_ajax_referer(self::ACTION_CONNECT);
+
+        // phpcs:ignore WordPress.Security.NonceVerification.Missing -- verified by check_ajax_referer() above.
+        $formId = isset($_POST['form_id']) ? sanitize_text_field(wp_unslash((string) $_POST['form_id'])) : '';
+
+        if ($formId === '' || !ctype_digit($formId)) {
+            wp_send_json_error(
+                [
+                    'message' => __(
+                        'A Jotform form ID is digits only. It is the last part of the form URL, for example the 262215084646053 in form.jotform.com/262215084646053.',
+                        'jotform-bridge'
+                    ),
+                ],
+                400
+            );
+        }
+
+        $response = $this->forms->connect($formId);
+
+        if (!$response->isSuccess()) {
+            wp_send_json_error(
+                [
+                    'message' => $response->errorMessage(),
+                    'hint'    => $response->status() === 401
+                        ? __(
+                            'Jotform refuses this the same way whether the form does not exist, belongs to another account, or the API key is wrong. Check the ID against the form URL, then use Check Connection on the Settings screen to rule out the key.',
+                            'jotform-bridge'
+                        )
+                        : '',
+                ],
+                200
+            );
+        }
+
+        $form = $response->data();
+
+        wp_send_json_success(
+            [
+                'id'      => (string) $form['id'],
+                'title'   => (string) $form['title'],
+                'status'  => (string) $form['status'],
+                'message' => sprintf(
+                    /* translators: 1: Jotform form title, 2: Jotform form status, e.g. ENABLED */
+                    __('Connected: %1$s (%2$s)', 'jotform-bridge'),
+                    (string) $form['title'] !== ''
+                        ? (string) $form['title']
+                        : __('untitled form', 'jotform-bridge'),
+                    (string) $form['status']
+                ),
+                'hint'    => strtoupper((string) $form['status']) === FormRepository::STATUS_DELETED
+                    ? __('This form is in the Jotform trash. It will not accept submissions until it is restored.', 'jotform-bridge')
+                    : __('Press Sync Schema below to load its fields, then save the integration.', 'jotform-bridge'),
+            ]
+        );
+    }
+
+    /**
      * Capability + nonce check shared by every mutating action.
      */
     private function guard(string $action): void
@@ -494,10 +603,16 @@ final class IntegrationsPage
         return (string) wp_date(trim($date . ' ' . $time), $timestamp);
     }
 
-    private function isKnownForm(string $formId): bool
+    /**
+     * Whether any stored integration still points at this Jotform form.
+     *
+     * Several integrations sharing one form is a requirement, not an accident,
+     * so deleting one of them must not take the shared record with it.
+     */
+    private function isFormInUse(string $formId): bool
     {
-        foreach ($this->forms->all() as $form) {
-            if (isset($form['id']) && (string) $form['id'] === $formId) {
+        foreach ($this->integrations->all() as $integration) {
+            if ($integration->formId() === $formId) {
                 return true;
             }
         }
@@ -507,13 +622,7 @@ final class IntegrationsPage
 
     private function formTitle(string $formId): string
     {
-        foreach ($this->forms->all() as $form) {
-            if (isset($form['id']) && (string) $form['id'] === $formId) {
-                return (string) ($form['title'] ?? '');
-            }
-        }
-
-        return '';
+        return $this->forms->title($formId);
     }
 
     /**

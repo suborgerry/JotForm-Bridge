@@ -3,8 +3,8 @@
 /**
  * Uninstall cleanup.
  *
- * Everything derived from Jotform — the synced schemas, the account form list,
- * the template registry — is always removed: it is worthless once the plugin is
+ * Everything derived from Jotform — the synced schemas, the connected form
+ * records, the template registry — is always removed: it is worthless once the plugin is
  * gone, and re-syncing it by hand is exactly one click per integration.
  *
  * Configuration is a different matter: integrations and settings
@@ -42,11 +42,15 @@ $jfbCleanUpSite = static function (): void {
         }
     }
 
+    delete_option('jotform_bridge_connected_forms');
+
+    // The account form list and its two companions. Written by versions that
+    // stored every form on the account; nothing writes them now.
     delete_option('jotform_bridge_forms');
     delete_transient('jotform_bridge_forms');
-
     delete_option('jotform_bridge_forms_meta');
     delete_option('jotform_bridge_forms_hidden');
+
     delete_option('jotform_bridge_schema_meta');
     delete_option('jotform_bridge_templates');
     delete_option('jotform_bridge_connection');

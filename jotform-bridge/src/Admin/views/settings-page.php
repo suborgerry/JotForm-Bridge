@@ -5,8 +5,6 @@
  *
  * @var \JotformBridge\Settings\Settings                  $settings
  * @var array{status:string, checked_at:int, account:string, message:string} $connection
- * @var array<int, array<string, string>>                 $forms
- * @var array{fetched_at:int, count:int, error:string}    $formsMeta
  * @var array{type:string, message:string}|null           $notice
  *
  * @package JotformBridge
@@ -17,7 +15,6 @@ declare(strict_types=1);
 use JotformBridge\Admin\ApiKeyNotice;
 use JotformBridge\Admin\SettingsPage;
 use JotformBridge\Api\ConnectionState;
-use JotformBridge\Forms\FormRepository;
 use JotformBridge\Settings\Settings;
 
 if (!defined('ABSPATH')) {
@@ -25,19 +22,8 @@ if (!defined('ABSPATH')) {
 }
 
 $jfbHasKey = $settings->hasApiKey();
-$jfbRegion    = $settings->region();
-$jfbAll       = $settings->all();
-
-$jfbFormsState = 'unavailable';
-if (!$jfbHasKey) {
-    $jfbFormsState = 'not_configured';
-} elseif ($formsMeta['error'] !== '') {
-    $jfbFormsState = 'unavailable';
-} elseif ($forms !== []) {
-    $jfbFormsState = 'loaded';
-} else {
-    $jfbFormsState = 'needs_refresh';
-}
+$jfbRegion = $settings->region();
+$jfbAll    = $settings->all();
 ?>
 <div class="wrap jfb-settings">
     <h1><?php echo esc_html__('Jotform Bridge', 'jotform-bridge'); ?></h1>
@@ -178,7 +164,7 @@ if (!$jfbHasKey) {
         <?php submit_button(__('Save Settings', 'jotform-bridge')); ?>
     </form>
 
-    <h2><?php echo esc_html__('Sync & Connection', 'jotform-bridge'); ?></h2>
+    <h2><?php echo esc_html__('Connection', 'jotform-bridge'); ?></h2>
     <p>
         <?php
         if (!$jfbHasKey) {
@@ -211,7 +197,7 @@ if (!$jfbHasKey) {
             printf(
                 '<strong>%s</strong> %s',
                 esc_html__('Not checked yet.', 'jotform-bridge'),
-                esc_html__('Press Sync with Jotform to check the key and load the form list.', 'jotform-bridge')
+                esc_html__('Press Check Connection to see whether the key works.', 'jotform-bridge')
             );
         }
         ?>
@@ -229,14 +215,22 @@ if (!$jfbHasKey) {
     <?php endif; ?>
     <div class="jfb-actions">
         <form method="post" action="<?php echo esc_url(admin_url('admin-post.php')); ?>" class="jfb-action-form">
-            <input type="hidden" name="action" value="<?php echo esc_attr(SettingsPage::ACTION_REFRESH); ?>">
-            <?php wp_nonce_field(SettingsPage::ACTION_REFRESH); ?>
-            <?php submit_button(__('Sync with Jotform', 'jotform-bridge'), 'primary', 'submit', false); ?>
+            <input type="hidden" name="action" value="<?php echo esc_attr(SettingsPage::ACTION_CHECK); ?>">
+            <?php wp_nonce_field(SettingsPage::ACTION_CHECK); ?>
+            <?php submit_button(__('Check Connection', 'jotform-bridge'), 'primary', 'submit', false); ?>
         </form>
         <p class="description">
             <?php
             echo esc_html__(
-                'Checks the API key and reloads the account form list. Nothing on this screen contacts Jotform on its own.',
+                'Asks Jotform who the API key belongs to, and nothing else. Nothing on this screen contacts Jotform on its own.',
+                'jotform-bridge'
+            );
+            ?>
+        </p>
+        <p class="description">
+            <?php
+            echo esc_html__(
+                'Worth pressing when Connect form refuses a form ID: Jotform answers a wrong ID, another account\'s form and a bad API key identically, and this is what tells the key apart from the other two.',
                 'jotform-bridge'
             );
             ?>
@@ -244,60 +238,12 @@ if (!$jfbHasKey) {
     </div>
 
     <h2><?php echo esc_html__('Jotform Forms', 'jotform-bridge'); ?></h2>
-    <?php if ($jfbFormsState === 'not_configured') : ?>
-        <p><?php echo esc_html__('Forms unavailable: no API key is configured.', 'jotform-bridge'); ?></p>
-    <?php elseif ($jfbFormsState === 'unavailable') : ?>
-        <p>
-            <strong><?php echo esc_html__('Forms unavailable.', 'jotform-bridge'); ?></strong>
-            <?php echo esc_html($formsMeta['error']); ?>
-        </p>
-    <?php elseif ($jfbFormsState === 'needs_refresh') : ?>
-        <p><?php echo esc_html__('Form list has not been loaded yet. Use Sync with Jotform.', 'jotform-bridge'); ?></p>
-    <?php else : ?>
-        <p class="description">
-            <?php
-            printf(
-                /* translators: 1: number of forms, 2: human readable time difference */
-                esc_html__('%1$d forms stored, loaded %2$s ago.', 'jotform-bridge'),
-                (int) $formsMeta['count'],
-                esc_html(human_time_diff($formsMeta['fetched_at'] > 0 ? $formsMeta['fetched_at'] : time(), time()))
-            );
-            ?>
-        </p>
-        <table class="widefat striped">
-            <thead>
-                <tr>
-                    <th scope="col"><?php echo esc_html__('Title', 'jotform-bridge'); ?></th>
-                    <th scope="col"><?php echo esc_html__('Form ID', 'jotform-bridge'); ?></th>
-                    <th scope="col"><?php echo esc_html__('Status', 'jotform-bridge'); ?></th>
-                    <th scope="col"><?php echo esc_html__('Actions', 'jotform-bridge'); ?></th>
-                </tr>
-            </thead>
-            <tbody>
-                <?php foreach ($forms as $jfbForm) : ?>
-                    <?php $jfbFormId = (string) ($jfbForm['id'] ?? ''); ?>
-                    <tr>
-                        <td><?php echo esc_html((string) ($jfbForm['title'] ?? '')); ?></td>
-                        <td><code><?php echo esc_html($jfbFormId); ?></code></td>
-                        <td><?php echo esc_html((string) ($jfbForm['status'] ?? '')); ?></td>
-                        <td>
-                            <?php if (strtoupper((string) ($jfbForm['status'] ?? '')) === FormRepository::STATUS_DELETED) : ?>
-                                <?php /* Deleted in Jotform: the row is only noise here, so it can be dropped for good. */ ?>
-                                <form method="post" action="<?php echo esc_url(admin_url('admin-post.php')); ?>">
-                                    <input type="hidden" name="action" value="<?php echo esc_attr(SettingsPage::ACTION_REMOVE); ?>">
-                                    <input type="hidden" name="form_id" value="<?php echo esc_attr($jfbFormId); ?>">
-                                    <?php wp_nonce_field(SettingsPage::ACTION_REMOVE); ?>
-                                    <button type="submit" class="button-link delete">
-                                        <?php echo esc_html__('Remove from list', 'jotform-bridge'); ?>
-                                    </button>
-                                </form>
-                            <?php else : ?>
-                                <span aria-hidden="true">&mdash;</span>
-                            <?php endif; ?>
-                        </td>
-                    </tr>
-                <?php endforeach; ?>
-            </tbody>
-        </table>
-    <?php endif; ?>
+    <p class="description">
+        <?php
+        echo esc_html__(
+            'The plugin does not keep a list of the forms on your account, and never asks Jotform for one. A form is connected by its ID on the integration that uses it, under Jotform Bridge → Integrations.',
+            'jotform-bridge'
+        );
+        ?>
+    </p>
 </div>

@@ -155,13 +155,47 @@ tr.jfb-row-unsupported .jfb-unsupported-note {
     display: none !important;
 }
 
-/* Health and target states, previously written as inline style attributes. */
+/* Health and target states, previously written as inline style attributes.
+   The hex values are WordPress core's own palette: #b32d2e is $alert-red,
+   #996800 $alert-yellow and #00a32a $alert-green, as used by core's notice
+   borders. Repeated here rather than referenced because core exposes them to
+   plugins only through Sass variables the admin never ships. */
 .jfb-state-error {
     color: #b32d2e;
 }
 
 .jfb-state-warning {
     color: #996800;
+}
+
+.jfb-state-ok {
+    color: #00a32a;
+}
+
+/* The Jotform form ID and its Connect button sit on one line, and the result
+   of the lookup goes underneath both. */
+.jfb-connect {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 8px;
+    margin-bottom: 4px;
+}
+
+.jfb-connect-status {
+    margin: 0 0 4px;
+    min-height: 1.5em;
+}
+
+/* Empty until something has been looked up: the element exists from the start
+   so that its aria-live region is registered before it is ever written to. */
+.jfb-connect-status:empty {
+    min-height: 0;
+}
+
+.jfb-connect-status .description {
+    display: block;
+    font-weight: 400;
 }
 
 .jfb-schema-table {

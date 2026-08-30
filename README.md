@@ -34,7 +34,7 @@ theme: templates address fields by readable identifiers such as `email` or
 * [Rendering a form](#rendering-a-form)
 * [Success redirect](#success-redirect)
 * [Compatibility validation](#compatibility-validation)
-* [Sync Schema, Sync with Jotform](#sync-schema-sync-with-jotform)
+* [Connect form, Sync Schema, Check Connection](#connect-form-sync-schema-check-connection)
 * [The REST endpoint](#the-rest-endpoint)
 * [JavaScript events](#javascript-events)
 * [Hooks](#hooks)
@@ -74,15 +74,19 @@ the integration and the synced Jotform form definition.
    is needed: no `composer install`, no `npm install`, no `npm run build`.
 2. Add the API key to `wp-config.php` (see below). Until it is there, the admin
    screens say so and nothing can talk to Jotform.
-3. **Jotform Bridge → Settings** — choose the API region, save.
-4. Press **Sync with Jotform**: it checks the key and loads your account's form
-   list.
-5. **Jotform Bridge → Integrations → Add Integration** — name it, pick the
-   Jotform form and the rendering mode.
+3. **Jotform Bridge → Settings** — choose the API region, save, then press
+   **Check Connection** to confirm the key works.
+4. **Jotform Bridge → Integrations → Add Integration** — name it, paste the
+   Jotform form ID, press **Connect form**, and choose a rendering mode.
+5. Press **Sync Schema** to load the form's fields. Nothing renders until you do.
+
+The form ID is the digits at the end of the form URL — the `262215084646053` in
+`form.jotform.com/262215084646053`. The plugin never asks Jotform what forms your
+account holds; it fetches only the forms you name.
 
 Get an API key from your Jotform account under **Settings → API**. A read-only
-key is enough to load forms and schemas, but creating submissions needs a key
-with write access.
+key is enough to connect forms and load schemas, but creating submissions needs a
+key with write access.
 
 ---
 
@@ -146,7 +150,7 @@ slug  →  Jotform form  →  rendering mode  →  optional template
 | --- | --- |
 | Name | What you see in the admin |
 | Slug | The public identifier used in code, e.g. `contact` |
-| Jotform Form | Which form submissions go to |
+| Jotform Form ID | Which form submissions go to, entered by ID and resolved by **Connect form** |
 | Rendering Mode | `Custom template` or `Auto` |
 | Template | Which registered template renders it (custom mode) |
 | Success Action | `Show the success message` or `Redirect to a page` |
@@ -467,24 +471,28 @@ guessed at — a wrong guess would either hide a real problem or invent one.
 
 ---
 
-## Sync Schema, Sync with Jotform
+## Connect form, Sync Schema, Check Connection
 
 Every call to Jotform is a button somebody pressed. There is no cron job, no
 background refresh and no expiry anywhere in the plugin.
 
 | Action | Where | What it does |
 | --- | --- | --- |
+| **Connect form** | Integration editor | Reads **one** form by ID (`GET /form/{id}`), stores its title and status |
 | **Sync Schema** | Integration editor | Reloads **one** form's definition, re-normalizes it, stores it and re-checks compatibility |
-| **Sync with Jotform** | Settings | Checks the key with a read-only `GET /user`, then reloads the account form list |
-| **Remove from list** | Settings, on a form Jotform reports as `DELETED` | Drops that row from the stored list; nothing is sent to Jotform |
+| **Check Connection** | Settings | Asks `GET /user` who the key belongs to. Nothing else |
 | **Send Test Submission** | Integration editor | Sends one real submission built from the stored schema and shows Jotform's answer verbatim |
 
-**Remove from list** is the one action that touches no API. Jotform keeps
-returning the forms in its trash, so a form deleted there would otherwise sit on
-the settings screen and in the integration editor's select forever. Removing it
-is remembered: the next **Sync with Jotform** leaves it out. Restore the form in
-Jotform and it reappears on the next refresh, because it is a form the account
-can use again.
+There is no action that lists the forms on your account, because the plugin never
+asks for one. It stores a record only for the forms your integrations name.
+
+**Check Connection** looks redundant next to **Connect form**, and is not.
+Jotform answers a form ID that does not exist, a form belonging to another
+account and a wrong API key with an identical `401 You're not authorized to use
+(/form-id)`. A failing **Connect form** therefore cannot tell you which of the
+three you are looking at. `GET /user` does not mention a form, so if it succeeds
+the key is fine and the ID is the problem — and that is the only place in the
+plugin where those two are separable.
 
 Templates are not on that list. They are read from the theme whenever the plugin
 needs to know what exists — drop a file into `jotform-bridge-templates/`, and it is in the select.
@@ -667,8 +675,7 @@ values.
 | Data | Where | Expires | Written by |
 | --- | --- | --- | --- |
 | Normalized schema (one per form) | option `jotform_bridge_schema_{id}` | never | **Sync Schema** |
-| Account form list | option `jotform_bridge_forms` | never | **Sync with Jotform** |
-| Trashed forms dismissed by hand | option `jotform_bridge_forms_hidden` | never | **Remove from list** |
+| Connected form records (one per form an integration names) | option `jotform_bridge_connected_forms` | never | **Connect form** |
 | Integrations | option `jotform_bridge_integrations` | never | the integration editor |
 | Settings | option `jotform_bridge_settings` | never | the settings screen |
 | Circuit-breaker state | option `jotform_bridge_quota` | daily counts, 30 days | every accepted submission |
@@ -761,7 +768,8 @@ Deactivating changes nothing: the plugin keeps no derived state that outlives a
 request, so everything — synced schemas included — is exactly as you left it
 when you activate it again.
 
-Deleting the plugin removes the synced schemas and the form list — but **not**
+Deleting the plugin removes the synced schemas and the connected form records —
+but **not**
 the integrations or the settings, so the usual "deactivate, delete, reinstall"
 round trip does not destroy work somebody did by hand. For a full removal, tick *Delete the
 integrations and the settings when the plugin is deleted* on the settings screen

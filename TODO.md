@@ -76,6 +76,12 @@ if the URL has not changed — a stale script computes no proof, and the guard
 refuses the submission. Shipping a release without bumping the version turns
 into refused submissions for a slice of real visitors.
 
+`assets/admin.js` acquired the same property in August 2026: the **Connect form**
+button is bound by that file, so an administrator whose browser holds the
+previous copy gets a button that does nothing at all. Less severe — it costs one
+admin a confusing minute rather than a visitor a lost submission — but it is the
+second file whose staleness is a functional bug rather than a cosmetic one.
+
 **Shape.** `Update URI` plus a small update server, or `plugin-update-checker`
 against GitHub Releases. Whichever it is, a release checklist that fails the
 build when the three version strings — plugin header,
@@ -333,10 +339,6 @@ a note; the point is to know which is which.
 
 **Hardcoding — concrete candidates already visible:**
 
-* `Api\JotformClient::FORMS_PAGE_LIMIT = 1000`, and `getForms()` does not
-  paginate. An account with more than a thousand forms is silently truncated,
-  and the missing ones simply never appear in the integration editor. This is
-  the one item on the list that is a defect rather than a question.
 * `Guards\ProofOfWork::BITS = 16` and `POW_BITS = 16` in `assets/frontend.js`
   are the same number written twice in two languages. The `jotform_bridge_pow_bits`
   filter changes only the PHP side, so using it silently breaks every submission
@@ -344,8 +346,10 @@ a note; the point is to know which is which.
   goes.
 * The menu position `58` in `IntegrationsPage::registerMenu()` is a bare
   literal, and it is the kind of number two plugins collide on.
-* `assets/admin.css` carries the WordPress core palette as literal hex — the
-  values are right, but nothing says where they came from.
+* ~~`assets/admin.css` carries the WordPress core palette as literal hex.~~ Done
+  in August 2026 while the Connect form styles were added: the block now names
+  the core variables the values come from and says why they are repeated rather
+  than referenced. The rest of the file has not been read for this.
 * Worth confirming as deliberate rather than accidental: `MIN_DAILY`,
   `BURST_FACTOR`, `MEDIAN_DAYS`, the four rate-limit defaults, `DUPLICATE_WINDOW`,
   `MIN_SECONDS`, `MAX_BODY_BYTES`, `HEADER_BYTES`, `SOURCE_BYTES`, and the 15 and
@@ -373,51 +377,30 @@ none of the three has not been resolved, only visited.
 
 ---
 
-## 11. Consider storing only the forms actually used, fetched by ID
+## 11. ~~Consider storing only the forms actually used, fetched by ID~~ — done
 
-**The idea.** Instead of pulling the whole account form list and keeping it,
-keep a record only for the forms integrations actually reference, resolved one
-at a time by ID.
+Settled in August 2026 and implemented. Shape **2** was chosen: no account list
+at all, a form ID typed into the integration editor and resolved one at a time
+by a **Connect form** button.
 
-**Why it is worth considering.** The account list is the largest thing the
-plugin stores and the least of it is used. A site with three integrations keeps
-every form on the account — a shared agency account can be hundreds — and reads
-that option on every admin screen that shows a form title. It also brings its own
-problems along:
+The full decision, and what has to keep holding, is recorded in
+"Amendment: no account form list" in `AGENTS.md`. In short:
 
-* the pagination defect in item 10: `limit=1000` with no paging, so a large
-  account is silently truncated and the missing forms never reach the select;
-* `jotform_bridge_forms_hidden` and the whole **Remove from list** action exist
-  only because the stored list carries forms nobody wants to see. Under a
-  by-ID model that feature has nothing left to do;
-* a form renamed in Jotform shows its old title until somebody presses Sync, and
-  the list is refreshed as a whole or not at all.
+* `GET /user/forms` is gone, and with it the `limit=1000` truncation defect this
+  file used to carry as the one outright bug in item 10;
+* `jotform_bridge_forms`, `_meta` and `_hidden` are deleted on upgrade; the store
+  is now `jotform_bridge_connected_forms`, one record per form an integration
+  names;
+* **Sync with Jotform** became **Check Connection** — the `GET /user` half only.
+  It kept a button because Jotform answers a wrong form ID, another account's
+  form and a bad API key with an identical 401, so it is the only thing that
+  tells the key apart from the ID;
+* saving an integration with an unconnected ID warns rather than refusing.
 
-Fetching one form by ID is already supported by the API the plugin uses —
-`GET /form/{formID}` returns the title and status, alongside the
-`/form/{formID}/questions` call the schema sync already makes.
+The open question this entry raised — where the key check goes if the form list
+stops being the reason to press the button — is answered by that last point.
 
-**The tension to resolve first, before any implementation.** A list is what
-makes it possible to *choose* a form without typing an ID, and not typing an ID
-was a deliberate decision in stage 3. Fetching only what you need means knowing
-what you need. Three shapes, and the choice between them is the actual design
-question:
-
-1. **Keep the list for discovery, store only what is used.** The editor fetches
-   the list to populate the select and does not persist it; a chosen form gets
-   its own stored record. Fixes the storage and the truncation for forms that
-   matter, but puts an API call back on the editor screen — which is the thing
-   the manual-sync amendment was written to avoid.
-2. **Paste an ID or a Jotform form URL, resolve it once.** No account list at
-   all. The smallest storage, no truncation, no hidden-forms feature — and the
-   worst first-run experience, since the site owner has to go and find the ID.
-3. **A searchable, paged picker.** Best at scale, most work, and it needs the
-   paging that item 10 says is missing anyway.
-
-**Also to settle.** Sync with Jotform currently does double duty — it checks the
-API key with `GET /user` and records the account name. If the account list stops
-being the reason to press it, that check needs a home.
-
-**Implementation to be agreed separately.** This entry records the idea and the
-constraints, not a decision.
-
+**What was not done, and is not obviously needed.** Shape 3, a searchable paged
+picker, stays unbuilt. It was the answer to "choosing a form without knowing its
+ID", which the ID field makes moot at the cost of one copy-paste. Revisit only if
+someone actually reports that cost, not on principle.

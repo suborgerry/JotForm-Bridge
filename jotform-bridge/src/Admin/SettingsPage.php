@@ -6,7 +6,6 @@ namespace JotformBridge\Admin;
 
 use JotformBridge\Api\ConnectionState;
 use JotformBridge\Api\JotformClient;
-use JotformBridge\Forms\FormRepository;
 use JotformBridge\Settings\Settings;
 
 if (!defined('ABSPATH')) {
@@ -17,16 +16,17 @@ if (!defined('ABSPATH')) {
  * "Jotform Bridge → Settings" admin screen and its actions.
  *
  * The screen only reads stored state; Jotform is contacted from the explicit
- * Sync with Jotform action and from nowhere else.
+ * Check Connection action and from nowhere else. It shows no list of forms:
+ * the plugin never asks what forms an account has, and a form is connected by
+ * its ID on the integration that uses it.
  */
 final class SettingsPage
 {
     public const MENU_SLUG  = 'jotform-bridge-settings';
     public const CAPABILITY = 'manage_options';
 
-    public const ACTION_SAVE    = 'jotform_bridge_save_settings';
-    public const ACTION_REFRESH = 'jotform_bridge_refresh_forms';
-    public const ACTION_REMOVE  = 'jotform_bridge_remove_form';
+    public const ACTION_SAVE  = 'jotform_bridge_save_settings';
+    public const ACTION_CHECK = 'jotform_bridge_check_connection';
 
     private const NOTICE_ARG = 'jfb_notice';
 
@@ -34,19 +34,15 @@ final class SettingsPage
 
     private JotformClient $client;
 
-    private FormRepository $forms;
-
     private ConnectionState $connection;
 
     public function __construct(
         Settings $settings,
         JotformClient $client,
-        FormRepository $forms,
         ConnectionState $connection
     ) {
         $this->settings   = $settings;
         $this->client     = $client;
-        $this->forms      = $forms;
         $this->connection = $connection;
     }
 
@@ -54,8 +50,7 @@ final class SettingsPage
     {
         add_action('admin_menu', [$this, 'registerMenu']);
         add_action('admin_post_' . self::ACTION_SAVE, [$this, 'handleSave']);
-        add_action('admin_post_' . self::ACTION_REFRESH, [$this, 'handleRefreshForms']);
-        add_action('admin_post_' . self::ACTION_REMOVE, [$this, 'handleRemoveForm']);
+        add_action('admin_post_' . self::ACTION_CHECK, [$this, 'handleCheckConnection']);
     }
 
     /**
@@ -81,8 +76,6 @@ final class SettingsPage
 
         $settings   = $this->settings;
         $connection = $this->connection->get();
-        $forms      = $this->forms->all();
-        $formsMeta  = $this->forms->meta();
         $notice     = $this->currentNotice();
 
         require __DIR__ . '/views/settings-page.php';
@@ -102,30 +95,36 @@ final class SettingsPage
 
         $this->settings->save($raw);
 
-        // Region or key changes invalidate what we know about the account.
+        // A region change can point the plugin at a different account, so what
+        // was learned from GET /user no longer stands. The connected-form
+        // records are left alone on purpose: each one is a title for an ID an
+        // integration already holds, re-read by one press of Connect form, and
+        // wiping them would blank every integration's label because somebody
+        // toggled debug logging.
         $this->connection->reset();
-        $this->forms->flush();
 
         $this->redirect('saved');
     }
 
     /**
-     * The one action on this screen that contacts Jotform.
+     * The one action on this screen that contacts Jotform: GET /user.
      *
-     * It answers both questions a site owner has here — "is the key working?"
-     * and "what forms are on the account?" — because they were never separate
-     * in practice: a connection test that is not followed by a sync tells you
-     * nothing you can act on, and a sync that fails is a failed connection test
-     * with extra steps. It used to be two buttons, and the second one silently
-     * depended on the first having been pressed at some point: the account name
-     * shown on this screen came only from the connection test.
+     * It used to reload the account form list as well, under the name "Sync
+     * with Jotform". The list is gone — forms are connected one at a time in
+     * the integration editor — but the key check emphatically is not, and this
+     * is the reason it kept a button of its own rather than being folded into
+     * Connect form.
      *
-     * `GET /user` first, because it is the cheaper of the two calls and the one
-     * whose failure explains the other.
+     * Jotform answers a bad form ID, somebody else's form and a wrong API key
+     * with the identical 401 "You're not authorized to use (/form-id)". So a
+     * failing Connect form cannot tell a site owner which of the three they are
+     * looking at. GET /user can: it does not mention a form, so if it succeeds
+     * the key is good and the ID is the problem. Without this button that
+     * distinction is unavailable anywhere in the plugin.
      */
-    public function handleRefreshForms(): void
+    public function handleCheckConnection(): void
     {
-        $this->guard(self::ACTION_REFRESH);
+        $this->guard(self::ACTION_CHECK);
 
         if (!$this->settings->hasApiKey()) {
             $this->connection->recordFailure(__('No API key configured.', 'jotform-bridge'));
@@ -139,37 +138,10 @@ final class SettingsPage
             $this->redirect('connection_failed');
         }
 
-        $response = $this->forms->refresh();
-
-        if (!$response->isSuccess()) {
-            $this->connection->recordFailure($response->errorMessage());
-            $this->redirect('forms_failed');
-        }
-
         $data = $account->data();
 
         $this->connection->recordSuccess(isset($data['username']) ? (string) $data['username'] : '');
-        $this->redirect('forms_refreshed');
-    }
-
-    /**
-     * Drops one form Jotform reports as deleted from the stored list.
-     *
-     * Nothing is sent to Jotform: the form is already in the account trash, and
-     * this only stops the row from following the site around forever.
-     */
-    public function handleRemoveForm(): void
-    {
-        $this->guard(self::ACTION_REMOVE);
-
-        // phpcs:ignore WordPress.Security.NonceVerification.Missing -- verified in guard().
-        $formId = isset($_POST['form_id']) ? sanitize_text_field(wp_unslash((string) $_POST['form_id'])) : '';
-
-        if (!$this->forms->hide($formId)) {
-            $this->redirect('form_not_removed');
-        }
-
-        $this->redirect('form_removed');
+        $this->redirect('connected');
     }
 
     /**
@@ -212,7 +184,6 @@ final class SettingsPage
         }
 
         $connection = $this->connection->get();
-        $formsMeta  = $this->forms->meta();
 
         $notices = [
             'saved' => [
@@ -225,50 +196,15 @@ final class SettingsPage
                     ? $connection['message']
                     : __('Connection to Jotform failed.', 'jotform-bridge'),
             ],
-            'forms_refreshed' => [
+            'connected' => [
                 'type'    => 'success',
                 'message' => $connection['account'] !== ''
                     ? sprintf(
-                        /* translators: 1: number of forms, 2: Jotform account username */
-                        _n(
-                            '%1$d form loaded from Jotform, connected as %2$s.',
-                            '%1$d forms loaded from Jotform, connected as %2$s.',
-                            $formsMeta['count'],
-                            'jotform-bridge'
-                        ),
-                        $formsMeta['count'],
+                        /* translators: %s: Jotform account username */
+                        __('Connected to Jotform as %s.', 'jotform-bridge'),
                         $connection['account']
                     )
-                    : sprintf(
-                        /* translators: %d: number of forms */
-                        _n(
-                            '%d form loaded from Jotform.',
-                            '%d forms loaded from Jotform.',
-                            $formsMeta['count'],
-                            'jotform-bridge'
-                        ),
-                        $formsMeta['count']
-                    ),
-            ],
-            'forms_failed' => [
-                'type'    => 'error',
-                'message' => $formsMeta['error'] !== ''
-                    ? $formsMeta['error']
-                    : __('Could not load the form list from Jotform.', 'jotform-bridge'),
-            ],
-            'form_removed' => [
-                'type'    => 'success',
-                'message' => __(
-                    'Form removed from the list. It stays in the Jotform trash, and comes back here only if it is restored there.',
-                    'jotform-bridge'
-                ),
-            ],
-            'form_not_removed' => [
-                'type'    => 'error',
-                'message' => __(
-                    'Only a form Jotform reports as deleted can be removed from this list.',
-                    'jotform-bridge'
-                ),
+                    : __('Connected to Jotform.', 'jotform-bridge'),
             ],
             'no_key' => [
                 'type'    => 'error',

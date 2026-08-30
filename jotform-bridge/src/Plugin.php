@@ -172,7 +172,6 @@ final class Plugin
             (new SettingsPage(
                 $this->settings,
                 $this->client(),
-                $this->forms(),
                 $this->connection
             ))->register();
         }
@@ -376,6 +375,15 @@ final class Plugin
         SchemaRepository::purgeLegacyTransients();
 
         delete_transient(FormRepository::LEGACY_TRANSIENT);
+
+        // The account form list and everything that existed to manage it. The
+        // plugin no longer asks Jotform what forms an account has: a form is
+        // connected by ID on the integration that uses it, so there is no list
+        // to store, nothing to truncate at a thousand rows, and no trashed form
+        // to hide from a list it is no longer in.
+        delete_option(FormRepository::LEGACY_OPTION);
+        delete_option(FormRepository::LEGACY_META_OPTION);
+        delete_option(FormRepository::LEGACY_HIDDEN_OPTION);
 
         // Versions up to 0.1.0 cached the template scan. The scan is now read
         // from the theme on demand, so the option is dead weight.

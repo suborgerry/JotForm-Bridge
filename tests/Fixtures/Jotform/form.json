@@ -1,0 +1,22 @@
+{
+    "responseCode": 200,
+    "message": "success",
+    "content": {
+        "id": "240000000000001",
+        "username": "example_account",
+        "title": "Contact Form",
+        "height": "539",
+        "status": "ENABLED",
+        "created_at": "2026-01-04 10:12:33",
+        "updated_at": "2026-02-11 08:45:02",
+        "last_submission": "2026-02-11 09:14:20",
+        "new": "1",
+        "count": "1",
+        "type": "LEGACY",
+        "favorite": "0",
+        "archived": "0",
+        "url": "https://form.jotform.com/240000000000001"
+    },
+    "duration": "27.57ms",
+    "limit-left": 999
+}

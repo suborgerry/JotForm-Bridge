@@ -8,6 +8,7 @@
 /node_modules/
 
 # Tests and coverage
+/.playwright-mcp/
 /.phpunit.result.cache
 /coverage/
 /tests/_output/
