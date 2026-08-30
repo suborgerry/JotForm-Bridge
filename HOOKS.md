@@ -31,7 +31,7 @@ accepting that the API key will be sent there.
 | --- | --- | --- |
 | `$hosts` | `array<int, string>` | Allowed hosts. |
 
-Fires in `jotform-bridge/src/Settings/Settings.php:315`.
+Fires in `jotform-bridge/src/Settings/Settings.php:343`.
 
 ## `jotform_bridge_auto_field_html`
 

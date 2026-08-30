@@ -57,6 +57,25 @@ final class Settings
     ];
 
     /**
+     * The region slugs, with no labels attached.
+     *
+     * Separate from regions() on purpose. Validating a stored value must not
+     * need a translated string: the settings are read while the plugin boots,
+     * on plugins_loaded, and asking for a label there makes WordPress load the
+     * text domain before init — which since WordPress 6.7 is a
+     * _doing_it_wrong() notice on every admin request, and a translation that
+     * is not applied anyway.
+     *
+     * @var array<int, string>
+     */
+    private const REGION_SLUGS = [
+        self::REGION_STANDARD,
+        self::REGION_EU,
+        self::REGION_HIPAA,
+        self::REGION_CUSTOM,
+    ];
+
+    /**
      * In-request memo. Six methods on this class read the option, and Logger
      * asks whether debugging is on for every line it writes.
      *
@@ -122,6 +141,17 @@ final class Settings
     }
 
     /**
+     * Whether a string names a region the plugin knows.
+     */
+    public static function isRegion(string $region): bool
+    {
+        return in_array($region, self::REGION_SLUGS, true);
+    }
+
+    /**
+     * The labels for the settings screen. Nothing but a view may call this: it
+     * translates, and so cannot be used before init.
+     *
      * @return array<string, string> Region slug => human readable label.
      */
     public static function regions(): array
@@ -177,7 +207,7 @@ final class Settings
         $stored = $this->all()['region'];
         $region = is_string($stored) ? $stored : '';
 
-        return array_key_exists($region, self::regions()) ? $region : self::REGION_STANDARD;
+        return self::isRegion($region) ? $region : self::REGION_STANDARD;
     }
 
     /**
@@ -228,9 +258,7 @@ final class Settings
         $clean = $this->all();
 
         $region          = sanitize_key(self::scalar($input, 'region'));
-        $clean['region'] = array_key_exists($region, self::regions())
-            ? $region
-            : self::REGION_STANDARD;
+        $clean['region'] = self::isRegion($region) ? $region : self::REGION_STANDARD;
 
         $clean['base_url'] = self::sanitizeBaseUrl(self::scalar($input, 'base_url'));
 
