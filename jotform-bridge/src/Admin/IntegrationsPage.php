@@ -161,9 +161,8 @@ final class IntegrationsPage
             ];
         }
 
-        $notice      = $flash;
-        $diagnostics = $this->templates->diagnostics();
-        $page        = self::MENU_SLUG;
+        $notice = $flash;
+        $page   = self::MENU_SLUG;
 
         // The templates table reads the reverse of the integration list: one
         // template can back several integrations, so each slug collects every

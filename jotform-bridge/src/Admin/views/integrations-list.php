@@ -6,7 +6,6 @@
  * @var array<string, array{integration:\JotformBridge\Integrations\Integration, form_title:string}> $rows
  * @var \JotformBridge\Templates\TemplateRegistry $templates
  * @var array<string, array<int, \JotformBridge\Integrations\Integration>> $templateUsage
- * @var array<int, array<string, string>>         $diagnostics
  * @var array<string, mixed>|null                 $notice
  * @var string                                    $page
  *
@@ -236,17 +235,5 @@ $jfbNewUrl = add_query_arg(['page' => $page, 'view' => 'new'], admin_url('admin.
             <?php endforeach; ?>
         </tbody>
     </table>
-
-    <?php if ($diagnostics !== []) : ?>
-        <h3><?php echo esc_html__('Template diagnostics', 'jotform-bridge'); ?></h3>
-        <ul class="ul-disc">
-            <?php foreach ($diagnostics as $jfbDiagnostic) : ?>
-                <li>
-                    <strong><?php echo esc_html(ucfirst((string) $jfbDiagnostic['level'])); ?>:</strong>
-                    <?php echo esc_html((string) $jfbDiagnostic['message']); ?>
-                </li>
-            <?php endforeach; ?>
-        </ul>
-    <?php endif; ?>
 
 </div>

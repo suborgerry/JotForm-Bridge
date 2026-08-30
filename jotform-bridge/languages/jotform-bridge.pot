@@ -9,7 +9,7 @@ msgstr ""
 "MIME-Version: 1.0\n"
 "Content-Type: text/plain; charset=UTF-8\n"
 "Content-Transfer-Encoding: 8bit\n"
-"POT-Creation-Date: 2026-08-29T20:08:38+00:00\n"
+"POT-Creation-Date: 2026-08-30T07:20:22+00:00\n"
 "PO-Revision-Date: YEAR-MO-DA HO:MI+ZONE\n"
 "X-Generator: WP-CLI 2.12.0\n"
 "X-Domain: jotform-bridge\n"
@@ -59,7 +59,7 @@ msgstr ""
 
 #: src/Admin/IntegrationsPage.php:103
 #: src/Admin/IntegrationsPage.php:104
-#: src/Admin/views/integrations-list.php:27
+#: src/Admin/views/integrations-list.php:26
 msgid "Integrations"
 msgstr ""
 
@@ -68,75 +68,75 @@ msgstr ""
 msgid "You are not allowed to access this page."
 msgstr ""
 
-#: src/Admin/IntegrationsPage.php:194
-#: src/Admin/IntegrationsPage.php:313
-#: src/Admin/IntegrationsPage.php:337
-#: src/Admin/IntegrationsPage.php:388
+#: src/Admin/IntegrationsPage.php:193
+#: src/Admin/IntegrationsPage.php:312
+#: src/Admin/IntegrationsPage.php:336
+#: src/Admin/IntegrationsPage.php:387
 msgid "That integration does not exist."
 msgstr ""
 
 #. translators: %s: template slug
-#: src/Admin/IntegrationsPage.php:251
+#: src/Admin/IntegrationsPage.php:250
 #, php-format
 msgid "The template \"%s\" is not in the registry."
 msgstr ""
 
-#: src/Admin/IntegrationsPage.php:257
+#: src/Admin/IntegrationsPage.php:256
 msgid "The selected Jotform form is not in the stored account form list. Refresh the form list on the settings screen."
 msgstr ""
 
-#: src/Admin/IntegrationsPage.php:265
+#: src/Admin/IntegrationsPage.php:264
 msgid "The integration could not be saved."
 msgstr ""
 
-#: src/Admin/IntegrationsPage.php:280
+#: src/Admin/IntegrationsPage.php:279
 msgid "This form has not been synced yet. Press Sync Schema to load its definition from Jotform — the form cannot render until you do."
 msgstr ""
 
-#: src/Admin/IntegrationsPage.php:296
+#: src/Admin/IntegrationsPage.php:295
 msgid "Integration saved."
 msgstr ""
 
-#: src/Admin/IntegrationsPage.php:311
+#: src/Admin/IntegrationsPage.php:310
 msgid "Integration deleted."
 msgstr ""
 
-#: src/Admin/IntegrationsPage.php:342
-#: src/Admin/IntegrationsPage.php:393
+#: src/Admin/IntegrationsPage.php:341
+#: src/Admin/IntegrationsPage.php:392
 msgid "This integration has no Jotform form selected."
 msgstr ""
 
-#: src/Admin/IntegrationsPage.php:362
+#: src/Admin/IntegrationsPage.php:361
 msgid "The Jotform form has changed since the last sync. Compatibility was re-checked."
 msgstr ""
 
-#: src/Admin/IntegrationsPage.php:363
+#: src/Admin/IntegrationsPage.php:362
 msgid "Schema synced. The Jotform form has not changed."
 msgstr ""
 
-#: src/Admin/IntegrationsPage.php:404
+#: src/Admin/IntegrationsPage.php:403
 msgid "The test submission was not accepted."
 msgstr ""
 
-#: src/Admin/IntegrationsPage.php:415
+#: src/Admin/IntegrationsPage.php:414
 msgid "The test submission reached Jotform."
 msgstr ""
 
 #. translators: %s: Jotform submission ID
-#: src/Admin/IntegrationsPage.php:420
+#: src/Admin/IntegrationsPage.php:419
 #, php-format
 msgid "Jotform submission ID: %s"
 msgstr ""
 
-#: src/Admin/IntegrationsPage.php:423
+#: src/Admin/IntegrationsPage.php:422
 msgid "Jotform accepted it but returned no submission ID."
 msgstr ""
 
-#: src/Admin/IntegrationsPage.php:424
+#: src/Admin/IntegrationsPage.php:423
 msgid "It is a real submission: it is in your Jotform inbox, it triggered whatever notifications the form has, and it counts towards this month's allowance. Delete it in Jotform if you do not want it there."
 msgstr ""
 
-#: src/Admin/IntegrationsPage.php:437
+#: src/Admin/IntegrationsPage.php:436
 #: src/Admin/QuotaNotice.php:64
 #: src/Admin/SettingsPage.php:178
 msgid "You are not allowed to perform this action."
@@ -286,17 +286,17 @@ msgid "Save Integration"
 msgstr ""
 
 #: src/Admin/views/integration-edit.php:73
-#: src/Admin/views/integrations-list.php:38
+#: src/Admin/views/integrations-list.php:37
 msgid "Name"
 msgstr ""
 
 #: src/Admin/views/integration-edit.php:89
-#: src/Admin/views/integrations-list.php:160
+#: src/Admin/views/integrations-list.php:159
 msgid "Slug"
 msgstr ""
 
 #: src/Admin/views/integration-edit.php:105
-#: src/Admin/views/integrations-list.php:39
+#: src/Admin/views/integrations-list.php:38
 msgid "Jotform Form"
 msgstr ""
 
@@ -317,7 +317,7 @@ msgid "Rendering Mode"
 msgstr ""
 
 #: src/Admin/views/integration-edit.php:154
-#: src/Admin/views/integrations-list.php:159
+#: src/Admin/views/integrations-list.php:158
 msgid "Template"
 msgstr ""
 
@@ -461,12 +461,12 @@ msgstr[0] ""
 msgstr[1] ""
 
 #: src/Admin/views/integration-edit.php:488
-#: src/Admin/views/integrations-list.php:125
+#: src/Admin/views/integrations-list.php:124
 msgid "Copy to clipboard"
 msgstr ""
 
 #: src/Admin/views/integration-edit.php:489
-#: src/Admin/views/integrations-list.php:128
+#: src/Admin/views/integrations-list.php:127
 msgid "Copied"
 msgstr ""
 
@@ -482,75 +482,71 @@ msgstr ""
 msgid "Delete"
 msgstr ""
 
-#: src/Admin/views/integrations-list.php:29
+#: src/Admin/views/integrations-list.php:28
 msgid "Add New"
 msgstr ""
 
-#: src/Admin/views/integrations-list.php:40
+#: src/Admin/views/integrations-list.php:39
 msgid "Rendering"
 msgstr ""
 
-#: src/Admin/views/integrations-list.php:41
+#: src/Admin/views/integrations-list.php:40
 msgid "Shortcode"
 msgstr ""
 
-#: src/Admin/views/integrations-list.php:42
-#: src/Admin/views/integrations-list.php:163
+#: src/Admin/views/integrations-list.php:41
+#: src/Admin/views/integrations-list.php:162
 msgid "Last modified"
 msgstr ""
 
-#: src/Admin/views/integrations-list.php:49
+#: src/Admin/views/integrations-list.php:48
 msgid "No integrations yet. Add one to connect a Jotform form to a template."
 msgstr ""
 
-#: src/Admin/views/integrations-list.php:85
+#: src/Admin/views/integrations-list.php:84
 msgid "Not in the stored form list"
 msgstr ""
 
-#: src/Admin/views/integrations-list.php:91
+#: src/Admin/views/integrations-list.php:90
 #: src/Integrations/Integration.php:98
 msgid "Auto (rendered from the schema)"
 msgstr ""
 
 #. translators: %s: expected template file name
-#: src/Admin/views/integrations-list.php:106
+#: src/Admin/views/integrations-list.php:105
 #, php-format
 msgid "No theme file named %s. This form does not render."
 msgstr ""
 
-#: src/Admin/views/integrations-list.php:113
+#: src/Admin/views/integrations-list.php:112
 msgid "No template chosen. This form does not render."
 msgstr ""
 
-#: src/Admin/views/integrations-list.php:145
-#: src/Admin/views/integrations-list.php:231
+#: src/Admin/views/integrations-list.php:144
+#: src/Admin/views/integrations-list.php:230
 msgid "Unknown"
 msgstr ""
 
-#: src/Admin/views/integrations-list.php:154
+#: src/Admin/views/integrations-list.php:153
 msgid "Templates"
 msgstr ""
 
-#: src/Admin/views/integrations-list.php:161
+#: src/Admin/views/integrations-list.php:160
 msgid "File"
 msgstr ""
 
-#: src/Admin/views/integrations-list.php:162
+#: src/Admin/views/integrations-list.php:161
 msgid "Used by"
 msgstr ""
 
 #. translators: %s: template directory name
-#: src/Admin/views/integrations-list.php:173
+#: src/Admin/views/integrations-list.php:172
 #, php-format
 msgid "No templates found. Add a PHP file with a Jotform template header to your theme %s directory."
 msgstr ""
 
-#: src/Admin/views/integrations-list.php:200
+#: src/Admin/views/integrations-list.php:199
 msgid "Not used by any integration"
-msgstr ""
-
-#: src/Admin/views/integrations-list.php:241
-msgid "Template diagnostics"
 msgstr ""
 
 #: src/Admin/views/settings-page.php:57
@@ -1101,43 +1097,43 @@ msgid "Not statically verifiable"
 msgstr ""
 
 #. translators: %s: directory path
-#: src/Templates/TemplateScanner.php:205
+#: src/Templates/TemplateScanner.php:203
 #, php-format
 msgid "The template directory \"%s\" could not be read."
 msgstr ""
 
 #. translators: %s: file name
-#: src/Templates/TemplateScanner.php:240
+#: src/Templates/TemplateScanner.php:238
 #, php-format
 msgid "\"%s\" resolves outside its template directory and was ignored."
 msgstr ""
 
 #. translators: 1: file name, 2: forbidden header name
-#: src/Templates/TemplateScanner.php:288
+#: src/Templates/TemplateScanner.php:286
 #, php-format
 msgid "\"%1$s\" declares \"%2$s\". A template must not name a Jotform form — that binding belongs to the integration."
 msgstr ""
 
 #. translators: 1: file name, 2: header name
-#: src/Templates/TemplateScanner.php:308
+#: src/Templates/TemplateScanner.php:306
 #, php-format
 msgid "\"%1$s\" is missing the \"%2$s\" header."
 msgstr ""
 
 #. translators: %s: file name
-#: src/Templates/TemplateScanner.php:330
+#: src/Templates/TemplateScanner.php:328
 #, php-format
 msgid "The name of the file \"%s\" holds no characters usable as a slug."
 msgstr ""
 
 #. translators: 1: file name, 2: header name, 3: slug taken from the file name
-#: src/Templates/TemplateScanner.php:346
+#: src/Templates/TemplateScanner.php:344
 #, php-format
 msgid "\"%1$s\" declares \"%2$s\". The header is ignored: the slug is the file name, so this template is \"%3$s\"."
 msgstr ""
 
 #. translators: 1: template slug, 2: winning file path
-#: src/Templates/TemplateScanner.php:401
+#: src/Templates/TemplateScanner.php:399
 #, php-format
 msgid "The template \"%1$s\" is overridden by \"%2$s\"."
 msgstr ""

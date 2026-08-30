@@ -235,7 +235,7 @@ final class Plugin
     public function templates(): TemplateRegistry
     {
         if ($this->templates === null) {
-            $this->templates = new TemplateRegistry();
+            $this->templates = new TemplateRegistry(null, $this->logger);
         }
 
         return $this->templates;

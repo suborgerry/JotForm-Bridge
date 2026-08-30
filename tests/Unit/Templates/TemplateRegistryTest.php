@@ -5,6 +5,8 @@ declare(strict_types=1);
 namespace JotformBridge\Tests\Unit\Templates;
 
 use Brain\Monkey\Functions;
+use JotformBridge\Settings\Settings;
+use JotformBridge\Support\Logger;
 use JotformBridge\Templates\TemplateRegistry;
 use JotformBridge\Tests\TestCase;
 
@@ -14,6 +16,9 @@ final class TemplateRegistryTest extends TestCase
 
     /** @var array<string, mixed> */
     private array $options = [];
+
+    /** @var array<int, string> Lines the Logger wrote during a test. */
+    private array $logLines = [];
 
     protected function setUp(): void
     {
@@ -207,6 +212,86 @@ final class TemplateRegistryTest extends TestCase
         // must never be handed to the renderer.
         $this->assertTrue($registry->has('contact'));
         $this->assertNull($registry->file('contact'));
+    }
+
+    /**
+     * The integrations screen used to carry a "Template diagnostics" list. It
+     * was removed because nobody could act on it; the reason a file was skipped
+     * still has to reach somebody, so it goes to the debug log instead.
+     */
+    public function testASkippedFileIsReportedToTheDebugLog(): void
+    {
+        file_put_contents(
+            $this->root . '/theme/jotform-bridge-templates/broken.php',
+            "<?php\n/*\nJotform Template Slug: broken\n*/\n"
+        );
+
+        $this->captureLog();
+
+        (new TemplateRegistry(null, new Logger(new Settings())))->all();
+
+        $written = implode("\n", $this->logLines);
+
+        $this->assertStringContainsString('Template skipped', $written);
+        $this->assertStringContainsString('missing_name', $written);
+        $this->assertStringContainsString('broken.php', $written);
+    }
+
+    /**
+     * A child theme overriding a parent template is the mechanism working, not
+     * an incident, so the notice is dropped rather than logged.
+     */
+    public function testAnOverrideNoticeIsNotLogged(): void
+    {
+        mkdir($this->root . '/parent/jotform-bridge-templates', 0777, true);
+        Functions\when('get_template_directory')->justReturn($this->root . '/parent');
+
+        file_put_contents(
+            $this->root . '/parent/jotform-bridge-templates/contact.php',
+            "<?php\n/*\nJotform Template Name: Parent Contact\n*/\n"
+        );
+        $this->write('contact.php', 'Child Contact', '');
+
+        $this->captureLog();
+
+        $registry = new TemplateRegistry(null, new Logger(new Settings()));
+
+        $this->assertSame('Child Contact', $registry->all()['contact']['name']);
+        $this->assertSame([], $this->logLines);
+    }
+
+    /**
+     * Nothing is written when the site owner has not asked for a log.
+     */
+    public function testNothingIsLoggedWhileDebugLoggingIsOff(): void
+    {
+        file_put_contents(
+            $this->root . '/theme/jotform-bridge-templates/broken.php',
+            "<?php\n/*\nJotform Template Slug: broken\n*/\n"
+        );
+
+        $this->captureLog(false);
+
+        (new TemplateRegistry(null, new Logger(new Settings())))->all();
+
+        $this->assertSame([], $this->logLines);
+    }
+
+    /**
+     * Collects what the Logger writes, so a test can read it back.
+     */
+    private function captureLog(bool $debug = true): void
+    {
+        $this->options[Settings::OPTION] = ['debug_logging' => $debug];
+        $this->logLines                  = [];
+
+        Functions\when('JotformBridge\Support\error_log')->alias(
+            function (string $line): bool {
+                $this->logLines[] = $line;
+
+                return true;
+            }
+        );
     }
 
     private function write(string $file, string $name, string $body): void

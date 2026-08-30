@@ -60,8 +60,6 @@ final class TemplateScanner
     public const CODE_OVERRIDDEN      = 'template_overridden';
     public const CODE_UNREADABLE      = 'unreadable_file';
     public const CODE_OUTSIDE_ROOT    = 'outside_template_root';
-    public const CODE_DYNAMIC_FIELD   = 'dynamic_field';
-    public const CODE_NO_FIELDS       = 'no_fields';
 
     /**
      * Enough for a file header. Reading further would only slow the scan down.

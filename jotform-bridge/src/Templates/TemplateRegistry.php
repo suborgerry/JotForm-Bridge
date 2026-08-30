@@ -4,6 +4,8 @@ declare(strict_types=1);
 
 namespace JotformBridge\Templates;
 
+use JotformBridge\Support\Logger;
+
 if (!defined('ABSPATH')) {
     exit;
 }
@@ -38,6 +40,13 @@ final class TemplateRegistry
     private ?array $discovered = null;
 
     /**
+     * Where a rejected template file goes now that no screen lists one.
+     *
+     * Null on the frontend and in tests, where nothing is listening.
+     */
+    private ?Logger $logger;
+
+    /**
      * In-request memo of the field analysis, by slug. A compatibility check
      * asks for the identifiers and the dynamic count separately, and reading
      * the file twice for that would be silly.
@@ -46,9 +55,10 @@ final class TemplateRegistry
      */
     private array $analysed = [];
 
-    public function __construct(?TemplateScanner $scanner = null)
+    public function __construct(?TemplateScanner $scanner = null, ?Logger $logger = null)
     {
         $this->scanner = $scanner ?? new TemplateScanner();
+        $this->logger  = $logger;
     }
 
     /**
@@ -123,14 +133,6 @@ final class TemplateRegistry
     }
 
     /**
-     * @return array<int, array<string, string>>
-     */
-    public function diagnostics(): array
-    {
-        return $this->load()['diagnostics'];
-    }
-
-    /**
      * @return array<int, array{path:string, source:string}>
      */
     public function roots(): array
@@ -186,7 +188,58 @@ final class TemplateRegistry
             return $this->discovered;
         }
 
-        return $this->discovered = $this->normalize($this->scanner->discover());
+        $this->discovered = $this->normalize($this->scanner->discover());
+
+        $this->report($this->discovered['diagnostics']);
+
+        return $this->discovered;
+    }
+
+    /**
+     * A file that was skipped, and why.
+     *
+     * This used to be a "Template diagnostics" list at the foot of the
+     * integrations screen, which nobody could act on: it printed a level and a
+     * message, threw the code, the file and the slug away, and showed a notice
+     * about a parent-theme template no integration had ever been bound to. The
+     * reader it was plausibly for is the developer who has just added a file
+     * and is asking why it is not in the select — and that person is better
+     * served by a log line naming the file than by a sentence on a screen about
+     * something else.
+     *
+     * Notices are dropped rather than logged: an overridden template is the
+     * child-theme mechanism working, not an incident.
+     *
+     * @param array<int, array<string, string>> $diagnostics
+     */
+    private function report(array $diagnostics): void
+    {
+        if ($this->logger === null) {
+            return;
+        }
+
+        foreach ($diagnostics as $diagnostic) {
+            $level = (string) ($diagnostic['level'] ?? '');
+
+            if ($level !== TemplateScanner::LEVEL_ERROR && $level !== TemplateScanner::LEVEL_WARNING) {
+                continue;
+            }
+
+            $context = [
+                'code' => (string) ($diagnostic['code'] ?? ''),
+                'file' => (string) ($diagnostic['file'] ?? ''),
+                'slug' => (string) ($diagnostic['slug'] ?? ''),
+            ];
+
+            $message = 'Template skipped: ' . (string) ($diagnostic['message'] ?? '');
+
+            if ($level === TemplateScanner::LEVEL_ERROR) {
+                $this->logger->error($message, $context);
+                continue;
+            }
+
+            $this->logger->debug($message, $context);
+        }
     }
 
     /**
