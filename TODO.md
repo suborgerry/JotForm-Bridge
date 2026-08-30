@@ -103,90 +103,6 @@ opened with.
 
 ---
 
-## 4. The rate limiter writes to `wp_options` and counts non-atomically
-
-**Problem.** `Submission\RateLimiter` keeps its buckets in transients, and both
-properties of that storage are wrong under load rather than merely imperfect.
-
-*Non-atomic counting.* `get_transient()` then `set_transient()` is a
-read-modify-write, so two requests arriving together read the same number and
-write the same increment. A burst can overshoot a limit of five by a few. It
-blurs the boundary; it does not open it.
-
-*Row growth.* One submission to a real integration charges two scopes across
-two windows — four transients, eight `wp_options` rows per address per hour. A
-flood that rotates addresses grows the table quickly.
-
-**Why it is parked, not urgent.** The second problem is smaller than it looks:
-expiring transients are stored with `autoload = 'no'`, so they cost nothing per
-page load, and WordPress collects the expired ones daily through
-`wp_scheduled_delete`. What is left is table size, bounded by roughly a day of
-traffic.
-
-**The threshold, so it does not have to be worked out again.** Arithmetic from
-the code, not a measurement.
-
-A key is scope + address + window length + window start, so one address writes
-a bucket per wall-clock minute it submits in and one per hour, in each of two
-scopes. Each transient is two `wp_options` rows. One ordinary visitor
-submitting once therefore costs four transients, **eight rows**.
-
-The cost is per *unique address*, not per request: a refused attempt writes
-nothing at all — `RateLimiter::consume()` returns before `set_transient()` when
-any window is already full — so a flood from one address stops growing the
-table the moment it hits the limit.
-
-| Unique addresses per day | Rows per day |
-| --- | --- |
-| ~1,000 | ~8,000 — invisible |
-| ~10,000 | ~80,000 — visible in table size, harmless |
-| ~100,000 | ~800,000 — this is where it hurts |
-
-Which means genuine traffic essentially never gets there. Reaching 100,000 rows
-honestly needs on the order of 12,000 submissions a day from distinct people.
-The scenario that does reach it is a botnet rotating addresses — 100 requests a
-second from unique addresses is roughly three million rows an hour — and that
-is precisely the distributed flood this class does not defend against anyway
-(see its docblock; `QuotaGuard` is what that is for). In that scenario the
-limiter is not protecting anything and is still filling the table.
-
-Two second-order effects worth remembering: `delete_expired_transients()` is
-itself a load spike when it has a million rows to remove, and it runs on
-WP-Cron, which only fires when somebody visits — so on a quiet site the cleanup
-lags.
-
-Non-atomic counting scales differently: the overshoot is bounded by how many
-requests from one address are in flight at once, never by volume. It needs a
-deliberate parallel burst, and the next batch reads the updated count.
-
-**How to tell the moment has arrived:**
-
-```sql
-SELECT COUNT(*) FROM wp_options
-WHERE option_name LIKE '\_transient\_jotform\_bridge\_rate\_%';
-```
-
-**Shape, when it matters.** Two independent moves, in this order:
-
-1. With a persistent object cache, count with `wp_cache_incr()` — atomic, and no
-   database rows at all. Only when `wp_using_ext_object_cache()` is true:
-   without a backing store `wp_cache_*` lives for one request, which would turn
-   the limiter off rather than speed it up. Transients stay as the fallback.
-2. Without an object cache, merge both windows of one scope into a single
-   transient with the hour's TTL and keep the minute counter inside the value.
-   Eight rows become four, and both limits survive.
-
-**Explicitly rejected: dropping the hourly window.** It halves the rows the same
-way, and it is the wrong trade. The minute window bounds a burst; the hour
-window bounds a steady trickle, and those are different attacks. Without it one
-address goes from 30 submissions an hour to 300 on one integration, and from 60
-to 900 across all of them. Worse, the daily circuit breaker trips at 200
-*accepted* submissions, so the time a single address needs to take the form
-offline for everybody falls from about seven hours to about forty minutes. The
-hourly window is availability protection, not only spam protection.
-
----
-
 ## 5. ~~No integration tests~~ — done
 
 Built in August 2026. There is a second suite, `tests/Integration/`, with 70
@@ -399,8 +315,8 @@ argument for the code. Worth pointing at specifically:
 * the submission pipeline's ordering and its single-answer refusal policy;
 * the proof-of-work guard, which is home-grown crypto in the security path and
   was reviewed by nobody;
-* the rate limiter trade-off recorded in item 4, including the option that was
-  rejected there.
+* `Submission\RateLimiter`, whose storage and counting were examined and left
+  as they are.
 
 Treat disagreement as information rather than as a verdict: the useful output is
 a place where two independent readings differ, which is a place worth looking at
