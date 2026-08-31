@@ -118,8 +118,100 @@ final class AdminScreensTest extends TestCase
             // the admin then breaks silently and half way.
             $this->assertDoesNotMatchRegularExpression('/<script(?![^>]*\ssrc=)[^>]*>/i', $html, $name);
             $this->assertDoesNotMatchRegularExpression('/<style[^>]*>/i', $html, $name);
-            $this->assertStringNotContainsString('onclick=', $html, $name);
+
+            // Any handler attribute, not just onclick. Two `onsubmit` handlers
+            // asking "are you sure?" lived here for months behind an assertion
+            // that only looked for the one name — and a refused confirmation
+            // does not stop the form, it removes the question and lets the
+            // destructive action through unasked.
+            $this->assertDoesNotMatchRegularExpression('/\son[a-z]+\s*=\s*"/i', $html, $name);
         }
+    }
+
+    /**
+     * The two destructive actions ask first, and the question now travels as
+     * data for assets/admin.js to act on.
+     */
+    public function testTheDestructiveActionsStillAskBeforeTheySubmit(): void
+    {
+        $this->createIntegration(['slug' => 'contact', 'form_id' => self::FORM_ID]);
+
+        $html = $this->renderIntegrations(['view' => 'edit', 'integration' => 'contact']);
+
+        $this->assertStringContainsString('data-jfb-confirm="Delete this integration?', $html);
+    }
+
+    /**
+     * Every screen in wp-admin says which page it is in an h1, and this one
+     * used to say it in an h2 — with a block of CSS written to make that look
+     * deliberate. Somebody navigating by heading found nothing at all.
+     */
+    public function testEveryScreenHasExactlyOneTopLevelHeading(): void
+    {
+        $this->createIntegration(['slug' => 'contact', 'form_id' => self::FORM_ID]);
+
+        $screens = [
+            'list'     => $this->renderIntegrations(),
+            'editor'   => $this->renderIntegrations(['view' => 'edit', 'integration' => 'contact']),
+            'new'      => $this->renderIntegrations(['view' => 'new']),
+            'settings' => $this->renderSettings(),
+        ];
+
+        foreach ($screens as $name => $html) {
+            $this->assertSame(1, substr_count($html, '<h1'), $name . ' should have one h1');
+        }
+    }
+
+    /**
+     * A live region has to be in the document before anything is written to
+     * it: one created at the moment it is needed is not reliably announced.
+     * Without it a copy that succeeded was a coloured word fading in beside a
+     * button, and nothing at all for anybody not looking at it.
+     */
+    public function testTheScreensWithCopyButtonsCarryALiveRegion(): void
+    {
+        $this->createIntegration(['slug' => 'contact', 'form_id' => self::FORM_ID]);
+
+        foreach (['list' => [], 'editor' => ['view' => 'edit', 'integration' => 'contact']] as $name => $query) {
+            $html = $this->renderIntegrations($query);
+
+            $this->assertStringContainsString('data-jfb-status', $html, $name);
+            $this->assertStringContainsString('role="status"', $html, $name);
+
+            // And wherever the marker appears it stays out of its button's
+            // name: at zero opacity it is still in the accessibility tree, so
+            // without this a copy button is named "… Copied" before anybody
+            // presses it.
+            $this->assertSame(
+                substr_count($html, 'class="jfb-copied"'),
+                substr_count($html, '<span class="jfb-copied" aria-hidden="true">'),
+                $name
+            );
+        }
+
+        // The list is the screen that always has copy buttons on it.
+        $this->assertStringContainsString(
+            '<span class="jfb-copied" aria-hidden="true">',
+            $this->renderIntegrations()
+        );
+    }
+
+    /**
+     * Core makes .wp-list-table narrow gracefully and does nothing for
+     * .widefat, so these tables took the whole page sideways at 320px and every
+     * field and button above them with it.
+     */
+    public function testTheTablesScrollInsideTheirOwnContainer(): void
+    {
+        $this->createIntegration(['slug' => 'contact', 'form_id' => self::FORM_ID]);
+
+        $html = $this->renderIntegrations();
+
+        $this->assertSame(
+            substr_count($html, '<table class="widefat striped">'),
+            substr_count($html, 'class="jfb-table-scroll"'),
+            'Every widefat table needs a scroll container of its own.'
+        );
     }
 
     /**

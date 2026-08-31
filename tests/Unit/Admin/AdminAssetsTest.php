@@ -19,11 +19,15 @@ final class AdminAssetsTest extends TestCase
     /** @var array<int, string> */
     private array $enqueued = [];
 
+    /** @var array<string, mixed> */
+    private array $localized = [];
+
     protected function setUp(): void
     {
         parent::setUp();
 
-        $this->enqueued = [];
+        $this->enqueued  = [];
+        $this->localized = [];
 
         Functions\when('wp_enqueue_style')->alias(
             function (string $handle): void {
@@ -34,6 +38,27 @@ final class AdminAssetsTest extends TestCase
             function (string $handle): void {
                 $this->enqueued[] = 'script:' . $handle;
             }
+        );
+        Functions\when('wp_localize_script')->alias(
+            function (string $handle, string $object, array $data): void {
+                $this->localized[$object] = $data;
+            }
+        );
+    }
+
+    /**
+     * Every sentence the script says has to come from PHP. One of them used to
+     * be an English string in the JavaScript source, where no `.po` file could
+     * ever reach it.
+     */
+    public function testTheScriptIsGivenItsTranslatedStrings(): void
+    {
+        (new AdminAssets())->enqueue('toplevel_page_jotform-bridge');
+
+        $this->assertArrayHasKey('jotformBridgeAdmin', $this->localized);
+        $this->assertSame(
+            ['copied', 'copyFailed', 'unreachable'],
+            array_keys($this->localized['jotformBridgeAdmin']['messages'])
         );
     }
 

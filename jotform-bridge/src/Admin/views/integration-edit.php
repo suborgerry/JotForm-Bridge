@@ -62,6 +62,7 @@ $jfbReport  = $compatibility['report'] instanceof CompatibilityReport ? $compati
     <hr class="wp-header-end">
 
     <?php require __DIR__ . '/partials/notice.php'; ?>
+    <?php require __DIR__ . '/partials/live-region.php'; ?>
 
     <form id="jfb-integration-form" method="post" action="<?php echo esc_url(admin_url('admin-post.php')); ?>">
         <input type="hidden" name="action" value="<?php echo esc_attr(IntegrationsPage::ACTION_SAVE); ?>">
@@ -354,7 +355,7 @@ $jfbReport  = $compatibility['report'] instanceof CompatibilityReport ? $compati
                 method="post"
                 action="<?php echo esc_url(admin_url('admin-post.php')); ?>"
                 class="jfb-action-form"
-                onsubmit="return confirm('<?php echo esc_js(__('This sends a real submission to Jotform. It will appear in your inbox, trigger the form\'s notifications and count towards your monthly allowance. Continue?', 'jotform-bridge')); ?>');"
+                data-jfb-confirm="<?php echo esc_attr__('This sends a real submission to Jotform. It will appear in your inbox, trigger the form\'s notifications and count towards your monthly allowance. Continue?', 'jotform-bridge'); ?>"
             >
                 <input type="hidden" name="action" value="<?php echo esc_attr(IntegrationsPage::ACTION_TEST); ?>">
                 <input type="hidden" name="integration" value="<?php echo esc_attr($integration->slug()); ?>">
@@ -458,6 +459,7 @@ $jfbReport  = $compatibility['report'] instanceof CompatibilityReport ? $compati
             <?php endif; ?>
         </p>
 
+        <div class="jfb-table-scroll" tabindex="0" role="region" aria-label="<?php echo esc_attr__('Schema', 'jotform-bridge'); ?>">
         <table class="widefat striped">
             <thead>
                 <tr>
@@ -515,6 +517,7 @@ $jfbReport  = $compatibility['report'] instanceof CompatibilityReport ? $compati
                 <?php endforeach; ?>
             </tbody>
         </table>
+        </div>
     <?php endif; ?>
 
     <?php if ($scaffold !== '') : ?>
@@ -557,7 +560,10 @@ $jfbReport  = $compatibility['report'] instanceof CompatibilityReport ? $compati
                 data-jfb-copy-from="#jfb-scaffold"
             >
                 <?php esc_html_e('Copy to clipboard', 'jotform-bridge'); ?>
-                <span class="jfb-copied"><?php esc_html_e('Copied', 'jotform-bridge'); ?></span>
+                <?php // aria-hidden: it is faded in with opacity, so it stays in the
+                      // accessibility tree and would otherwise be part of this
+                      // button's name before anybody pressed it. ?>
+                <span class="jfb-copied" aria-hidden="true"><?php esc_html_e('Copied', 'jotform-bridge'); ?></span>
             </button>
         </p>
 
@@ -578,7 +584,7 @@ $jfbReport  = $compatibility['report'] instanceof CompatibilityReport ? $compati
                 method="post"
                 action="<?php echo esc_url(admin_url('admin-post.php')); ?>"
                 class="jfb-action-form"
-                onsubmit="return confirm('<?php echo esc_js(__('Delete this integration? This cannot be undone.', 'jotform-bridge')); ?>');"
+                data-jfb-confirm="<?php echo esc_attr__('Delete this integration? This cannot be undone.', 'jotform-bridge'); ?>"
             >
                 <input type="hidden" name="action" value="<?php echo esc_attr(IntegrationsPage::ACTION_DELETE); ?>">
                 <input type="hidden" name="integration" value="<?php echo esc_attr($integration->slug()); ?>">

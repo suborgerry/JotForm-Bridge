@@ -1,12 +1,13 @@
 /**
  * Jotform Bridge admin screens.
  *
- * Three behaviours, all declared in the markup rather than wired up per screen,
+ * Four behaviours, all declared in the markup rather than wired up per screen,
  * so a new row, a new copy button or a new lookup needs no JavaScript of its own:
  *
  *   [data-jfb-toggle]   a select that shows or hides rows while it holds one value
  *   [data-jfb-copy]     a button that puts text on the clipboard
  *   [data-jfb-connect]  a button that resolves a Jotform form ID into its title
+ *   [data-jfb-confirm]  a form that asks before it submits
  *
  * Vanilla, no build step, no jQuery — the same rule the frontend script follows.
  * It replaces three inline <script> blocks that used to be printed straight
@@ -15,6 +16,55 @@
  */
 (function () {
     'use strict';
+
+    var SETTINGS = window.jotformBridgeAdmin || {};
+
+    /** Every sentence this script says comes from PHP, so it can be translated. */
+    function message(key) {
+        return (SETTINGS.messages && SETTINGS.messages[key]) || '';
+    }
+
+    /**
+     * The element an attribute points at, or null when it points nowhere.
+     *
+     * `querySelector('')` does not return null, it throws — and an element
+     * whose attribute is simply absent is the ordinary case here, not an error.
+     * The shortcode copy buttons spell their text out in `data-jfb-copy` and
+     * carry no `data-jfb-copy-from` at all, so every one of them threw out of
+     * the click handler before the copy was ever attempted: the button did
+     * nothing, silently, in every browser.
+     */
+    function find(element, attribute) {
+        var selector = element.getAttribute(attribute);
+
+        return selector ? document.querySelector(selector) : null;
+    }
+
+    /**
+     * Says something to a screen reader.
+     *
+     * The views render one empty `role="status"` region per screen, before
+     * anything can be written to it: a live region created at the moment it is
+     * first needed is not reliably announced. Everything this script does that
+     * has no other outcome — a copy that worked, a copy that did not — is
+     * announced here, because until now the only sign was a coloured word
+     * fading in beside a button.
+     */
+    function announce(text) {
+        var region = document.querySelector('[data-jfb-status]');
+
+        if (!region || !text) {
+            return;
+        }
+
+        // Cleared first so that repeating the same message is still a change,
+        // and is therefore still announced.
+        region.textContent = '';
+
+        window.setTimeout(function () {
+            region.textContent = text;
+        }, 100);
+    }
 
     /**
      * Shows the rows a select is responsible for only while it holds the value
@@ -33,8 +83,14 @@
     }
 
     function bindToggle(control) {
-        var rows = document.querySelectorAll(control.getAttribute('data-jfb-toggle'));
+        var selector = control.getAttribute('data-jfb-toggle');
         var wanted = control.getAttribute('data-jfb-toggle-value') || '';
+
+        if (!selector) {
+            return;
+        }
+
+        var rows = document.querySelectorAll(selector);
 
         if (!rows.length) {
             return;
@@ -63,7 +119,7 @@
             return literal;
         }
 
-        var source = document.querySelector(button.getAttribute('data-jfb-copy-from') || '');
+        var source = find(button, 'data-jfb-copy-from');
 
         return source && typeof source.value === 'string' ? source.value : '';
     }
@@ -74,22 +130,22 @@
      * The clipboard API needs a secure context, which a local admin over plain
      * HTTP is not, so the fallback is not vestigial.
      */
-    function copy(text, source) {
+    function copy(text, source, button) {
         if (navigator.clipboard && window.isSecureContext) {
             return navigator.clipboard.writeText(text).then(
                 function () {
                     return true;
                 },
                 function () {
-                    return legacyCopy(text, source);
+                    return legacyCopy(text, source, button);
                 }
             );
         }
 
-        return Promise.resolve(legacyCopy(text, source));
+        return Promise.resolve(legacyCopy(text, source, button));
     }
 
-    function legacyCopy(text, source) {
+    function legacyCopy(text, source, button) {
         // Selecting the real control is better than a throwaway one: where the
         // copy is refused outright, the text is at least ready to be copied by
         // hand.
@@ -97,7 +153,17 @@
             source.focus();
             source.select();
 
-            return exec();
+            var done = exec();
+
+            // Back to the button. Selecting the source moves focus into it, and
+            // leaving it there drops a keyboard user inside a twenty-row
+            // read-only textarea with the whole document selected, with nothing
+            // said about how they got there.
+            if (button && typeof button.focus === 'function') {
+                button.focus();
+            }
+
+            return done;
         }
 
         var field = document.createElement('textarea');
@@ -126,6 +192,13 @@
 
     /**
      * Shows the "Copied" marker the button carries, and takes it away again.
+     *
+     * The marker is `aria-hidden` in the markup, because it is faded in with
+     * opacity rather than taken out of the flow, and an element at zero opacity
+     * is still in the accessibility tree: without that attribute every copy
+     * button would be named "… Copied" from the moment the page loaded,
+     * claiming a state it was not in. The announcement is made separately, by
+     * the caller, through the live region.
      */
     function confirmCopy(button) {
         button.classList.add('is-copied');
@@ -155,13 +228,41 @@
                 return;
             }
 
-            var source = document.querySelector(button.getAttribute('data-jfb-copy-from') || '');
+            var source = find(button, 'data-jfb-copy-from');
 
-            copy(text, source).then(function (done) {
+            copy(text, source, button).then(function (done) {
                 if (done) {
                     confirmCopy(button);
                 }
+
+                announce(message(done ? 'copied' : 'copyFailed'));
             });
+        });
+    }
+
+    /**
+     * A form that asks before it submits.
+     *
+     * Both of these used to be an inline `onsubmit="return confirm(…)"`, which
+     * a content security policy refuses outright — and a refused attribute here
+     * does not disable the button, it removes the question and lets the
+     * destructive action through unasked. Declared in the markup, the question
+     * travels through esc_attr() like any other value and the behaviour lives
+     * in a file that can be cached.
+     */
+    function bindConfirms() {
+        document.addEventListener('submit', function (event) {
+            var form = event.target;
+
+            if (!form || !form.getAttribute) {
+                return;
+            }
+
+            var question = form.getAttribute('data-jfb-confirm');
+
+            if (question && !window.confirm(question)) {
+                event.preventDefault();
+            }
         });
     }
 
@@ -195,8 +296,8 @@
     }
 
     function bindConnect(button) {
-        var field = document.querySelector(button.getAttribute('data-jfb-connect'));
-        var target = document.querySelector(button.getAttribute('data-jfb-connect-target') || '');
+        var field = find(button, 'data-jfb-connect');
+        var target = find(button, 'data-jfb-connect-target');
         var url = button.getAttribute('data-jfb-connect-url') || '';
         var action = button.getAttribute('data-jfb-connect-action') || '';
         var nonce = button.getAttribute('data-jfb-connect-nonce') || '';
@@ -209,11 +310,23 @@
         var busy = button.getAttribute('data-jfb-connect-busy') || idle;
 
         button.addEventListener('click', function () {
+            // `aria-disabled` rather than the `disabled` property: a disabled
+            // control cannot hold focus, so the browser used to move focus to
+            // the document body the moment this was pressed and never brought
+            // it back — a keyboard user pressed one button and was returned to
+            // the top of the screen, well placed to miss the polite status
+            // update that had just arrived. Keeping the focus is also what
+            // makes the label below announce itself, since a screen reader
+            // reports a name change on the element it is sitting on.
+            if (button.getAttribute('aria-disabled') === 'true') {
+                return;
+            }
+
             var value = String(field.value || '').replace(/\s+/g, '');
 
             field.value = value;
 
-            button.disabled = true;
+            button.setAttribute('aria-disabled', 'true');
             button.textContent = busy;
             report(target, '', busy);
 
@@ -239,14 +352,10 @@
 
                 report(target, 'error', data.message || '', data.hint || '');
             })['catch'](function () {
-                report(
-                    target,
-                    'error',
-                    // Not a Jotform failure: the request never left the site.
-                    'Could not reach WordPress to check the form ID.'
-                );
+                // Not a Jotform failure: the request never left the site.
+                report(target, 'error', message('unreachable'));
             }).then(function () {
-                button.disabled = false;
+                button.removeAttribute('aria-disabled');
                 button.textContent = idle;
             });
         });
@@ -275,4 +384,5 @@
     bindToggles();
     bindCopyButtons();
     bindConnectButtons();
+    bindConfirms();
 })();

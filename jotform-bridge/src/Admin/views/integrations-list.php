@@ -23,14 +23,19 @@ if (!defined('ABSPATH')) {
 $jfbNewUrl = add_query_arg(['page' => $page, 'view' => 'new'], admin_url('admin.php'));
 ?>
 <div class="wrap jfb-integrations">
-    <h2 class="wp-heading-inline"><?php echo esc_html__('Integrations', 'jotform-bridge'); ?></h2>
+    <?php // An h1, like every other screen in wp-admin and every other screen
+          // of this plugin: it is how a page announces which page it is, and
+          // how somebody navigating by heading finds the top of it. ?>
+    <h1 class="wp-heading-inline"><?php echo esc_html__('Integrations', 'jotform-bridge'); ?></h1>
     <a href="<?php echo esc_url($jfbNewUrl); ?>" class="page-title-action">
         <?php echo esc_html__('Add New', 'jotform-bridge'); ?>
     </a>
     <hr class="wp-header-end">
 
     <?php require __DIR__ . '/partials/notice.php'; ?>
+    <?php require __DIR__ . '/partials/live-region.php'; ?>
 
+    <div class="jfb-table-scroll" tabindex="0" role="region" aria-label="<?php echo esc_attr__('Integrations', 'jotform-bridge'); ?>">
     <table class="widefat striped">
         <thead>
             <tr>
@@ -134,7 +139,11 @@ $jfbNewUrl = add_query_arg(['page' => $page, 'view' => 'new'], admin_url('admin.
                             title="<?php echo esc_attr__('Copy to clipboard', 'jotform-bridge'); ?>"
                         >
                             <code><?php echo esc_html($jfbShortcode); ?></code>
-                            <span class="jfb-copied"><?php echo esc_html__('Copied', 'jotform-bridge'); ?></span>
+                            <?php // Faded in rather than taken out of the flow, so it stays in the
+                                  // accessibility tree at zero opacity and would otherwise be part
+                                  // of the button's name before anybody pressed it. The copy is
+                                  // announced through the live region above instead. ?>
+                            <span class="jfb-copied" aria-hidden="true"><?php echo esc_html__('Copied', 'jotform-bridge'); ?></span>
                         </button>
                     </td>
                     <td>
@@ -159,9 +168,11 @@ $jfbNewUrl = add_query_arg(['page' => $page, 'view' => 'new'], admin_url('admin.
             <?php endforeach; ?>
         </tbody>
     </table>
+    </div>
 
     <h2><?php echo esc_html__('Templates', 'jotform-bridge'); ?></h2>
 
+    <div class="jfb-table-scroll" tabindex="0" role="region" aria-label="<?php echo esc_attr__('Templates', 'jotform-bridge'); ?>">
     <table class="widefat striped">
         <thead>
             <tr>
@@ -245,5 +256,6 @@ $jfbNewUrl = add_query_arg(['page' => $page, 'view' => 'new'], admin_url('admin.
             <?php endforeach; ?>
         </tbody>
     </table>
+    </div>
 
 </div>

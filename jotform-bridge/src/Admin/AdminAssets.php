@@ -54,6 +54,22 @@ final class AdminAssets
             JOTFORM_BRIDGE_VERSION,
             true
         );
+
+        // Everything the script says out loud. It used to carry one English
+        // sentence in its source, which no `.po` file could ever reach, and it
+        // now needs three more: a copy that succeeded and a copy that failed
+        // are announced rather than only shown.
+        wp_localize_script(
+            self::SCRIPT_HANDLE,
+            'jotformBridgeAdmin',
+            [
+                'messages' => [
+                    'copied'      => __('Copied to clipboard.', 'jotform-bridge'),
+                    'copyFailed'  => __('Could not copy. Select the text and copy it by hand.', 'jotform-bridge'),
+                    'unreachable' => __('Could not reach WordPress to check the form ID.', 'jotform-bridge'),
+                ],
+            ]
+        );
     }
 
     /**
