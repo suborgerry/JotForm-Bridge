@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace JotformBridge\Admin;
 
+use JotformBridge\Plugin;
 use JotformBridge\Settings\Settings;
 
 if (!defined('ABSPATH')) {
@@ -19,7 +20,7 @@ if (!defined('ABSPATH')) {
  */
 final class ApiKeyNotice
 {
-    public const CAPABILITY = 'manage_options';
+    public const CAPABILITY = Plugin::CAPABILITY;
 
     /**
      * The line an administrator has to paste into wp-config.php.

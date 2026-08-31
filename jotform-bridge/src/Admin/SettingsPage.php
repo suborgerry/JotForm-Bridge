@@ -6,6 +6,7 @@ namespace JotformBridge\Admin;
 
 use JotformBridge\Api\ConnectionState;
 use JotformBridge\Api\JotformClient;
+use JotformBridge\Plugin;
 use JotformBridge\Settings\Settings;
 
 if (!defined('ABSPATH')) {
@@ -23,7 +24,7 @@ if (!defined('ABSPATH')) {
 final class SettingsPage
 {
     public const MENU_SLUG  = 'jotform-bridge-settings';
-    public const CAPABILITY = 'manage_options';
+    public const CAPABILITY = Plugin::CAPABILITY;
 
     public const ACTION_SAVE  = 'jotform_bridge_save_settings';
     public const ACTION_CHECK = 'jotform_bridge_check_connection';

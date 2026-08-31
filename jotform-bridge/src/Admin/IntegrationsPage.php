@@ -10,6 +10,7 @@ use JotformBridge\Integrations\CompatibilityChecker;
 use JotformBridge\Integrations\Integration;
 use JotformBridge\Integrations\IntegrationRepository;
 use JotformBridge\Integrations\RedirectTarget;
+use JotformBridge\Plugin;
 use JotformBridge\Submission\TestSubmission;
 use JotformBridge\Templates\TemplateRegistry;
 use JotformBridge\Templates\TemplateScaffold;
@@ -29,7 +30,7 @@ if (!defined('ABSPATH')) {
 final class IntegrationsPage
 {
     public const MENU_SLUG  = 'jotform-bridge';
-    public const CAPABILITY = 'manage_options';
+    public const CAPABILITY = Plugin::CAPABILITY;
 
     public const ACTION_SAVE    = 'jotform_bridge_save_integration';
     public const ACTION_DELETE  = 'jotform_bridge_delete_integration';
@@ -72,8 +73,8 @@ final class IntegrationsPage
         SchemaRepository $schemas,
         TemplateRegistry $templates,
         CompatibilityChecker $compatibility,
-        ?RedirectTarget $redirects = null,
-        ?TestSubmission $tests = null
+        ?TestSubmission $tests = null,
+        ?RedirectTarget $redirects = null
     ) {
         $this->integrations  = $integrations;
         $this->forms         = $forms;
@@ -496,7 +497,7 @@ final class IntegrationsPage
             wp_send_json_error(
                 [
                     'message' => __(
-                        'A Jotform form ID is digits only. It is the last part of the form URL, for example the 262215084646053 in form.jotform.com/262215084646053.',
+                        'A Jotform form ID is digits only. It is the last part of the form URL, for example the 240000000000001 in form.jotform.com/240000000000001.',
                         'jotform-bridge'
                     ),
                 ],

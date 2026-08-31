@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace JotformBridge\Admin;
 
+use JotformBridge\Plugin;
 use JotformBridge\Submission\QuotaGuard;
 
 if (!defined('ABSPATH')) {
@@ -24,8 +25,20 @@ if (!defined('ABSPATH')) {
  */
 final class QuotaNotice
 {
-    public const CAPABILITY   = 'manage_options';
+    public const CAPABILITY   = Plugin::CAPABILITY;
     public const ACTION_RESET = 'jotform_bridge_reset_quota';
+
+    /**
+     * How few API calls Jotform has to report before the site owner is told.
+     *
+     * A day's allowance is in the thousands, so a hundred is roughly the last
+     * few minutes of a busy form — late enough not to nag on an ordinary day,
+     * early enough that syncing a schema or a handful of submissions still fit
+     * before the account stops answering. The number is deliberately not
+     * filterable: this is the last warning before the forms stop working, and a
+     * site that has turned it down has no second one.
+     */
+    private const WARN_BELOW = 100;
 
     private QuotaGuard $quota;
 
@@ -141,7 +154,7 @@ final class QuotaNotice
     {
         $status = $this->quota->status();
 
-        if ($status['limit_left'] >= 0 && $status['limit_left'] < 100) {
+        if ($status['limit_left'] >= 0 && $status['limit_left'] < self::WARN_BELOW) {
             printf(
                 '<div class="notice notice-warning is-dismissible"><p><strong>%1$s</strong> %2$s</p></div>',
                 esc_html__('Jotform Bridge:', 'jotform-bridge'),

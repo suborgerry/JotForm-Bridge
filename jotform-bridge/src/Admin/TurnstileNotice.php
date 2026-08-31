@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace JotformBridge\Admin;
 
+use JotformBridge\Plugin;
 use JotformBridge\Submission\Guards\Turnstile;
 
 if (!defined('ABSPATH')) {
@@ -29,7 +30,7 @@ if (!defined('ABSPATH')) {
  */
 final class TurnstileNotice
 {
-    public const CAPABILITY = 'manage_options';
+    public const CAPABILITY = Plugin::CAPABILITY;
 
     /**
      * The lines an administrator has to paste into wp-config.php.

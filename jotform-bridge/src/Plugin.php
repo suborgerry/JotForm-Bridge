@@ -49,6 +49,16 @@ final class Plugin
      */
     public const VERSION_OPTION = 'jotform_bridge_version';
 
+    /**
+     * Who may configure this plugin, and who may see why a form did not render.
+     *
+     * Stated once. It used to be written out six times — five admin classes
+     * with a constant each and one bare literal in the renderer — which is five
+     * places to miss when the answer changes and one that would have been
+     * missed by anybody searching for the constant rather than the string.
+     */
+    public const CAPABILITY = 'manage_options';
+
     private static ?Plugin $instance = null;
 
     private Settings $settings;
@@ -165,8 +175,7 @@ final class Plugin
                 $this->schemas(),
                 $this->templates(),
                 $this->compatibility(),
-                null,
-                new TestSubmission($this->schemas(), $this->client(), null, null, $this->quota())
+                new TestSubmission($this->schemas(), $this->client(), $this->quota())
             ))->register();
 
             (new SettingsPage(
@@ -286,13 +295,8 @@ final class Plugin
             $this->integrations(),
             $this->schemas(),
             $this->client(),
-            null,
-            null,
-            null,
-            $this->logger,
-            null,
-            null,
-            $this->quota()
+            $this->quota(),
+            $this->logger
         );
     }
 
