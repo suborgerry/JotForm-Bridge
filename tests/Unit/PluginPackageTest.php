@@ -110,6 +110,46 @@ final class PluginPackageTest extends TestCase
         }
     }
 
+    /**
+     * Neither shipped script says a sentence of its own.
+     *
+     * Every string these files show a visitor or an administrator arrives
+     * through wp_localize_script, because a sentence written into JavaScript
+     * source is a sentence no `.po` file can reach. The rule was already
+     * written down for admin.js, and admin.js kept it; frontend.js carried an
+     * English fallback in the one branch that runs when the localized object is
+     * missing — so the single case where it was reachable was the single case
+     * where it could not be translated.
+     *
+     * The check reads the source of both, because "the file we remembered to
+     * look at" is how the last markup rule was got round.
+     */
+    public function testNeitherShippedScriptCarriesASentenceOfItsOwn(): void
+    {
+        foreach (['frontend.js', 'admin.js'] as $name) {
+            $source = (string) file_get_contents(self::PLUGIN_DIR . '/assets/' . $name);
+
+            // Comments are prose on purpose; only executable source is at issue.
+            $source = (string) preg_replace('#/\*.*?\*/#s', '', $source);
+            $source = (string) preg_replace('#^\s*//.*$#m', '', $source);
+
+            // A quoted literal opening with a capital, carrying a space and
+            // closing on sentence punctuation. Selectors, attribute names and
+            // separators do not look like that.
+            preg_match_all('/([\'"])([A-Z][^\'"\n]*?\s+[^\'"\n]*?[.!?])\1/', $source, $matches);
+
+            $this->assertSame(
+                [],
+                $matches[2],
+                sprintf(
+                    'assets/%s says something no .po file can reach: %s',
+                    $name,
+                    implode(' | ', $matches[2])
+                )
+            );
+        }
+    }
+
     public function testRepositoryRootContainsNoPluginPhp(): void
     {
         $root = glob(__DIR__ . '/../../*.php') ?: [];

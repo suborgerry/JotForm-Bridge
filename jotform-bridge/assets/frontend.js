@@ -260,10 +260,25 @@
         });
     }
 
+    /**
+     * One of the sentences PHP handed over, never one written here.
+     *
+     * An English string in this file is a string no `.po` can reach, and the
+     * one that used to sit at the end of this function was the worst place for
+     * it: the only way to reach a fallback is for the localized object to be
+     * missing, so the single case where it showed was the single case where it
+     * was guaranteed to be untranslated.
+     *
+     * There is nothing to fall back to instead, and that is the honest answer.
+     * A settings object this script cannot find means wp_localize_script did
+     * not run, which also means no endpoint — the form is not going to send
+     * whatever this returns. Both callers already treat an empty message as
+     * nothing to show and nothing to move focus to.
+     */
     function message(key) {
         var messages = SETTINGS.messages || {};
 
-        return messages[key] || 'The form could not be submitted.';
+        return messages[key] || messages.error || '';
     }
 
     function endpointFor(form, integration) {
