@@ -188,7 +188,7 @@ $jfbReport  = $compatibility['report'] instanceof CompatibilityReport ? $compati
                     <p class="description" id="jfb-form-help">
                         <?php
                         echo esc_html__(
-                            'The digits at the end of the form URL, for example 262215084646053 in form.jotform.com/262215084646053. Connect form asks Jotform for its title; nothing else on this screen contacts Jotform on its own.',
+                            'The digits at the end of the form URL, for example 240000000000001 in form.jotform.com/240000000000001. Connect form asks Jotform for its title; nothing else on this screen contacts Jotform on its own.',
                             'jotform-bridge'
                         );
                         ?>

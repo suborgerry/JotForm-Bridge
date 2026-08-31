@@ -80,8 +80,8 @@ the integration and the synced Jotform form definition.
    Jotform form ID, press **Connect form**, and choose a rendering mode.
 5. Press **Sync Schema** to load the form's fields. Nothing renders until you do.
 
-The form ID is the digits at the end of the form URL — the `262215084646053` in
-`form.jotform.com/262215084646053`. The plugin never asks Jotform what forms your
+The form ID is the digits at the end of the form URL — the `240000000000001` in
+`form.jotform.com/240000000000001`. The plugin never asks Jotform what forms your
 account holds; it fetches only the forms you name.
 
 Get an API key from your Jotform account under **Settings → API**. A read-only

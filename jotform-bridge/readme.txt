@@ -134,8 +134,8 @@ unzipping. The plugin ships its own autoloader.
    your Jotform form and press **Connect form**, then choose a rendering mode.
 5. Press **Sync Schema** to load the form's fields. Nothing renders until you do.
 
-The form ID is the digits at the end of the form URL — the `262215084646053` in
-`form.jotform.com/262215084646053`. The plugin never asks Jotform what forms your
+The form ID is the digits at the end of the form URL — the `240000000000001` in
+`form.jotform.com/240000000000001`. The plugin never asks Jotform what forms your
 account has: it fetches only the forms you name.
 
 The constant is the only place the plugin reads the key from: there is no key
