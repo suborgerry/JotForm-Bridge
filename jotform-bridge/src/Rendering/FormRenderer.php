@@ -8,6 +8,7 @@ use JotformBridge\Forms\FormSchema;
 use JotformBridge\Forms\SchemaRepository;
 use JotformBridge\Integrations\Integration;
 use JotformBridge\Integrations\IntegrationRepository;
+use JotformBridge\Plugin;
 use JotformBridge\Rest\SubmissionController;
 use JotformBridge\Support\Logger;
 
@@ -114,7 +115,7 @@ final class FormRenderer
             );
         }
 
-        $this->assets->enqueue();
+        $this->assets->enqueue($slug);
 
         return $html;
     }
@@ -143,7 +144,7 @@ final class FormRenderer
             );
         }
 
-        $this->assets->enqueue();
+        $this->assets->enqueue($integration->slug());
 
         return $html;
     }
@@ -186,7 +187,7 @@ final class FormRenderer
             'reason'      => $reason,
         ]);
 
-        if (!current_user_can('manage_options')) {
+        if (!current_user_can(Plugin::CAPABILITY)) {
             return '';
         }
 

@@ -52,11 +52,15 @@
     var SOLVING = '__jotformBridgeSolving';
 
     /**
-     * Leading zero bits a proof of work must have.
+     * Leading zero bits a proof of work must have, when PHP has not said.
      *
      * Sixteen is about 65,000 hashes on average: a fraction of a second on a
      * phone, and a wall for anything trying to send thousands of submissions.
-     * The server decides what it accepts; this only has to agree with it.
+     *
+     * The server decides what it accepts, and it says so per integration in
+     * SETTINGS.powBits — the same filtered number the guard checks against.
+     * This constant is only what to use when that is missing, which is the
+     * default the guard falls back to as well.
      */
     var POW_BITS = 16;
 
@@ -188,8 +192,23 @@
     }
 
     /**
+     * What this integration's proof of work has to cost.
+     *
+     * PHP evaluates jotform_bridge_pow_bits per slug and hands the answers over
+     * in SETTINGS.powBits, so the two sides cannot disagree. A slug missing
+     * from the map is a form whose page did not localize — the default is what
+     * the guard uses too, so a submission still stands a chance.
+     */
+    function powBitsFor(integration) {
+        var map = SETTINGS.powBits || {};
+        var bits = map[integration];
+
+        return typeof bits === 'number' && bits > 0 ? bits : POW_BITS;
+    }
+
+    /**
      * Finds a number that makes sha256("slug|timestamp|nonce") start with
-     * POW_BITS zero bits.
+     * the number of zero bits the server asks this integration for.
      *
      * Sliced across timers rather than run in one go: the work is short, but on
      * a slow phone a single loop would still be a visible freeze, and freezing
@@ -199,13 +218,14 @@
     function solve(integration, done) {
         var timestamp = Math.floor(Date.now() / 1000);
         var prefix = integration + '|' + timestamp + '|';
+        var bits = powBitsFor(integration);
         var nonce = 0;
 
         function slice() {
             var limit = nonce + POW_BATCH;
 
             for (; nonce < limit; nonce++) {
-                if (hasLeadingZeroBits(sha256(utf8(prefix + nonce)), POW_BITS)) {
+                if (hasLeadingZeroBits(sha256(utf8(prefix + nonce)), bits)) {
                     done({ timestamp: timestamp, value: timestamp + ':' + nonce });
 
                     return;

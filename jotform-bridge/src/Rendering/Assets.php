@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace JotformBridge\Rendering;
 
 use JotformBridge\Rest\SubmissionController;
+use JotformBridge\Submission\Guards\ProofOfWork;
 use JotformBridge\Submission\Guards\Turnstile;
 
 if (!defined('ABSPATH')) {
@@ -31,6 +32,18 @@ final class Assets
     public const TURNSTILE_HANDLE = 'jotform-bridge-turnstile';
 
     private bool $registered = false;
+
+    /**
+     * Proof-of-work difficulty per integration slug, for the forms on this page.
+     *
+     * The guard evaluates `jotform_bridge_pow_bits` per slug, so the browser
+     * cannot be told a single number: two integrations on one page may be worth
+     * different amounts of work. Filled in as forms render, which is why the
+     * localized data is rewritten on every enqueue rather than once.
+     *
+     * @var array<string, int>
+     */
+    private array $powBits = [];
 
     public function register(): void
     {
@@ -62,11 +75,62 @@ final class Assets
             );
         }
 
+        $this->localize();
+
+        $this->registered = true;
+    }
+
+    /**
+     * Called from the renderer, i.e. only when a form is really on the page.
+     *
+     * @param string $slug The integration being rendered, so the script can be
+     *                     told what its proof of work has to cost.
+     */
+    public function enqueue(string $slug = ''): void
+    {
+        $this->register();
+
+        if ($slug !== '' && !isset($this->powBits[$slug])) {
+            $this->powBits[$slug] = ProofOfWork::bits($slug);
+
+            $this->localize();
+        }
+
+        wp_enqueue_script(self::HANDLE);
+
+        if (Turnstile::isConfigured()) {
+            wp_enqueue_script(self::TURNSTILE_HANDLE);
+        }
+    }
+
+    /**
+     * Hands the script everything it may not invent for itself.
+     *
+     * Called again for each new form on the page, because the difficulty map
+     * only becomes complete as they render. Each call replaces the data rather
+     * than adding to it: wp_localize_script() prepends to whatever is already
+     * there, so localizing twice would print two assignments to the same
+     * variable and leave the earlier one as dead weight in the markup.
+     *
+     * The difficulty has to arrive this way and not as a constant in the
+     * script. It used to be written into `assets/frontend.js` by hand, which
+     * meant `jotform_bridge_pow_bits` moved the server and left the browser
+     * where it was: filtering it upwards refused every submission on the site,
+     * and filtering it downwards changed nothing at all while still charging
+     * the visitor the old, higher cost.
+     */
+    private function localize(): void
+    {
+        // localize() prepends to existing data; an empty string is nothing to
+        // prepend to, so this replaces rather than accumulates.
+        wp_scripts()->add_data(self::HANDLE, 'data', '');
+
         wp_localize_script(
             self::HANDLE,
             'jotformBridgeSettings',
             [
                 'endpoint' => SubmissionController::endpoint(),
+                'powBits'  => (object) $this->powBits,
                 'messages' => [
                     'error'       => __('The form could not be submitted. Please try again.', 'jotform-bridge'),
                     'network'     => __('The form could not be sent. Check your connection and try again.', 'jotform-bridge'),
@@ -74,21 +138,5 @@ final class Assets
                 ],
             ]
         );
-
-        $this->registered = true;
-    }
-
-    /**
-     * Called from the renderer, i.e. only when a form is really on the page.
-     */
-    public function enqueue(): void
-    {
-        $this->register();
-
-        wp_enqueue_script(self::HANDLE);
-
-        if (Turnstile::isConfigured()) {
-            wp_enqueue_script(self::TURNSTILE_HANDLE);
-        }
     }
 }

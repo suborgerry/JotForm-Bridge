@@ -101,7 +101,7 @@ final class ProofOfWork
             return false;
         }
 
-        if (!self::meets($slug, $timestamp, $nonce, $this->bits($slug))) {
+        if (!self::meets($slug, $timestamp, $nonce, self::bits($slug))) {
             return false;
         }
 
@@ -138,14 +138,28 @@ final class ProofOfWork
         return $rest === 0 || (ord($hash[$whole]) >> (8 - $rest)) === 0;
     }
 
-    private function bits(string $slug): int
+    /**
+     * How much work this integration's submissions must cost.
+     *
+     * Public and static because the browser has to be told the same number, and
+     * `Rendering\Assets` asks this method rather than reading the constant: two
+     * places evaluating the same filter is how the numbers drift apart, and
+     * they used not to be asked at all.
+     *
+     * The floor and the ceiling are the range in which the guard is still a
+     * guard. Below about eight bits the work is free even for a script that
+     * solves it once per submission; above 24 a mid-range phone takes long
+     * enough that people abandon the form, and refusing real visitors is the
+     * failure mode this whole layer exists to avoid.
+     */
+    public static function bits(string $slug): int
     {
         /**
          * Filters how much work a submission must cost.
          *
-         * Every extra bit doubles it. The frontend script has to be taught the
-         * same number, so this is only useful together with a filter on the
-         * script itself.
+         * Every extra bit doubles it. The browser is told the result through
+         * `jotformBridgeSettings.powBits`, so a filter here changes both sides
+         * and needs nothing done to the script.
          *
          * @param int    $bits Leading zero bits required.
          * @param string $slug Integration slug.

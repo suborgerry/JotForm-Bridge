@@ -347,13 +347,18 @@ abstract class TestCase extends PHPUnitTestCase
      * The guard refuses a submission that arrives without one, so a test that
      * wants to reach the upstream boundary has to pay the same 65,000 hashes a
      * visitor's browser pays.
+     *
+     * The difficulty comes from ProofOfWork::bits() rather than from the
+     * constant, because that is where the script gets it too: a test that
+     * always solved at 16 could not tell whether a filtered site still works.
      */
     protected function proofOfWork(string $slug): string
     {
         $timestamp = time();
+        $bits      = ProofOfWork::bits($slug);
 
         for ($nonce = 0; $nonce < 5000000; $nonce++) {
-            if (ProofOfWork::meets($slug, $timestamp, $nonce)) {
+            if (ProofOfWork::meets($slug, $timestamp, $nonce, $bits)) {
                 return $timestamp . ':' . $nonce;
             }
         }

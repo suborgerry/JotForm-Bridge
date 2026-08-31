@@ -95,7 +95,7 @@ accepted. Return 0 to turn the guard off.
 | --- | --- | --- |
 | `$seconds` | `int` | Duplicate window. |
 
-Fires in `jotform-bridge/src/Submission/SubmissionPipeline.php:362`.
+Fires in `jotform-bridge/src/Submission/SubmissionPipeline.php:374`.
 
 ## `jotform_bridge_global_rate_limits`
 
@@ -139,16 +139,16 @@ Fires in `jotform-bridge/src/Forms/SchemaRepository.php:152`.
 
 Filters how much work a submission must cost.
 
-Every extra bit doubles it. The frontend script has to be taught the
-same number, so this is only useful together with a filter on the
-script itself.
+Every extra bit doubles it. The browser is told the result through
+`jotformBridgeSettings.powBits`, so a filter here changes both sides
+and needs nothing done to the script.
 
 | Parameter | Type | Description |
 | --- | --- | --- |
 | `$bits` | `int` | Leading zero bits required. |
 | `$slug` | `string` | Integration slug. |
 
-Fires in `jotform-bridge/src/Submission/Guards/ProofOfWork.php:153`.
+Fires in `jotform-bridge/src/Submission/Guards/ProofOfWork.php:167`.
 
 ## `jotform_bridge_pow_required`
 
@@ -164,7 +164,7 @@ cached copy of an older version of the plugin's script.
 | `$required` | `bool` | Whether the proof is mandatory. |
 | `$slug` | `string` | Integration slug. |
 
-Fires in `jotform-bridge/src/Submission/Guards/ProofOfWork.php:169`.
+Fires in `jotform-bridge/src/Submission/Guards/ProofOfWork.php:183`.
 
 ## `jotform_bridge_rate_limits`
 
@@ -204,7 +204,7 @@ Filters the sanitized values just before they are mapped.
 | `$values` | `array<string, string\|array<int, string>>` | Sanitized values. |
 | `$slug` | `string` | Integration slug. |
 
-Fires in `jotform-bridge/src/Submission/SubmissionPipeline.php:191`.
+Fires in `jotform-bridge/src/Submission/SubmissionPipeline.php:203`.
 
 ## `jotform_bridge_template_paths`
 
@@ -261,7 +261,7 @@ Fires after a submission was accepted by Jotform.
 | `$values` | `array<string, string\|array<int, string>>` | Sanitized values. |
 | `$submissionId` | `string` | Jotform submission ID. |
 
-Fires in `jotform-bridge/src/Submission/SubmissionPipeline.php:276`.
+Fires in `jotform-bridge/src/Submission/SubmissionPipeline.php:288`.
 
 ## `jotform_bridge_before_submit`
 
@@ -272,5 +272,5 @@ Fires before a validated submission is sent to Jotform.
 | `$slug` | `string` | Integration slug. |
 | `$values` | `array<string, string\|array<int, string>>` | Sanitized values. |
 
-Fires in `jotform-bridge/src/Submission/SubmissionPipeline.php:228`.
+Fires in `jotform-bridge/src/Submission/SubmissionPipeline.php:240`.
 

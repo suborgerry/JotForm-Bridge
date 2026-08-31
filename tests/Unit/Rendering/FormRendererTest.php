@@ -86,6 +86,17 @@ final class FormRendererTest extends TestCase
         Functions\when('wp_script_is')->justReturn(false);
         Functions\when('wp_register_script')->justReturn(true);
         Functions\when('wp_localize_script')->justReturn(true);
+
+        // Assets clears the handle's data before localizing, so that a page
+        // with two forms carries one settings object rather than one per form.
+        Functions\when('wp_scripts')->justReturn(
+            new class {
+                public function add_data(string $handle, string $key, $value): bool
+                {
+                    return true;
+                }
+            }
+        );
         Functions\when('wp_enqueue_script')->alias(
             function (): bool {
                 $this->enqueued = true;
