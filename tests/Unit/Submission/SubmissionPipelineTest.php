@@ -750,10 +750,7 @@ final class SubmissionPipelineTest extends TestCase
             new IntegrationRepository(),
             new SchemaRepository($client),
             $client,
-            null,
-            null,
-            null,
-            new Logger(new Settings())
+            logger: new Logger(new Settings())
         ))->submit('contact', $this->valid());
 
         $this->assertSame(200, $outcome->status());

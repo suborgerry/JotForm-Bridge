@@ -60,12 +60,17 @@ final class TestSubmission
 
     private ?QuotaGuard $quota;
 
+    /**
+     * The quota guard comes before the two collaborators for the same reason it
+     * does on SubmissionPipeline: it is the one the composition root passes, and
+     * it used to sit last behind two nulls.
+     */
     public function __construct(
         SchemaRepository $schemas,
         JotformClient $client,
+        ?QuotaGuard $quota = null,
         ?SubmissionValidator $validator = null,
-        ?SubmissionMapper $mapper = null,
-        ?QuotaGuard $quota = null
+        ?SubmissionMapper $mapper = null
     ) {
         $this->schemas   = $schemas;
         $this->client    = $client;

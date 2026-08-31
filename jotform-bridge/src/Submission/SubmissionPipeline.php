@@ -67,17 +67,29 @@ final class SubmissionPipeline
 
     private QuotaGuard $quota;
 
+    /**
+     * The three things that cannot be built here come first, then the two the
+     * composition root always has an opinion about, then the collaborators that
+     * are the same object however they are made.
+     *
+     * The order is not cosmetic. It used to end with the quota guard and carry
+     * the logger in the middle, so the one caller that supplies both had to
+     * write `null, null, null, $logger, null, null, $quota` and count positions
+     * to get there. A row of nulls is a dependency graph nobody can read, and
+     * inserting a parameter in the middle of one moves every argument after it
+     * with nothing but the type checker to notice.
+     */
     public function __construct(
         IntegrationRepository $integrations,
         SchemaRepository $schemas,
         JotformClient $client,
+        ?QuotaGuard $quota = null,
+        ?Logger $logger = null,
         ?SubmissionValidator $validator = null,
         ?SubmissionMapper $mapper = null,
         ?SpamGuard $spam = null,
-        ?Logger $logger = null,
         ?RedirectTarget $redirects = null,
-        ?RateLimiter $limiter = null,
-        ?QuotaGuard $quota = null
+        ?RateLimiter $limiter = null
     ) {
         $this->redirects = $redirects ?? new RedirectTarget();
         $this->limiter   = $limiter ?? new RateLimiter();

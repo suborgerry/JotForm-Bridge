@@ -182,7 +182,7 @@ final class TestSubmissionTest extends TestCase
     {
         $client = new JotformClient('test-api-key', 'https://api.jotform.com');
 
-        return new TestSubmission(new SchemaRepository($client), $client, null, null, $quota);
+        return new TestSubmission(new SchemaRepository($client), $client, $quota);
     }
 
     private function integration(): Integration
