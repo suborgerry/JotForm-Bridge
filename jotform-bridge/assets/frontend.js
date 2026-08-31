@@ -494,10 +494,15 @@
 
             var selector = quote(path);
             var slot = form.querySelector('[data-jotform-field-error="' + selector + '"]');
-            var input = form.querySelector('[data-jotform-field="' + selector + '"]');
 
-            if (input) {
-                input.setAttribute('aria-invalid', 'true');
+            // Every input, not the first: a radio or checkbox group shares one
+            // semantic path across all of its inputs, and marking only the one
+            // that happens to come first leaves the rest of the group looking
+            // valid to a screen reader.
+            var inputs = form.querySelectorAll('[data-jotform-field="' + selector + '"]');
+
+            for (var k = 0; k < inputs.length; k++) {
+                inputs[k].setAttribute('aria-invalid', 'true');
             }
 
             if (slot) {
@@ -604,17 +609,38 @@
         return form.querySelectorAll('button[type="submit"], input[type="submit"], button:not([type])');
     }
 
+    /**
+     * Marks the form as sending, and its submit buttons as unavailable.
+     *
+     * `aria-disabled` rather than the `disabled` property, which would look
+     * like the obvious choice: a disabled control cannot hold focus, so the
+     * browser moves focus to the document body the instant the visitor presses
+     * Submit. A keyboard user loses their place for as long as the request
+     * runs, and a screen reader is left on nothing. The repeated submit this
+     * exists to stop is already refused in `handle()`, which returns as soon as
+     * it sees the busy attribute, so the property was never what was doing the
+     * work.
+     *
+     * A theme styles the state through `form[data-jotform-busy]` — the same
+     * attribute it has always had — or through `[aria-disabled="true"]`.
+     */
     function setBusy(form, busy) {
         var buttons = submitButtons(form);
 
         for (var i = 0; i < buttons.length; i++) {
-            buttons[i].disabled = busy;
+            if (busy) {
+                buttons[i].setAttribute('aria-disabled', 'true');
+            } else {
+                buttons[i].removeAttribute('aria-disabled');
+            }
         }
 
         if (busy) {
             form.setAttribute(BUSY_ATTRIBUTE, 'true');
+            form.setAttribute('aria-busy', 'true');
         } else {
             form.removeAttribute(BUSY_ATTRIBUTE);
+            form.removeAttribute('aria-busy');
         }
     }
 

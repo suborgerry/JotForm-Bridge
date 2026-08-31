@@ -246,7 +246,8 @@ PHP;
 
             $choices .= sprintf(
                 "        <label for=\"%s\">\n"
-                . "            <input type=\"%s\" id=\"%s\" name=\"%s\" value=\"%s\" data-jotform-field=\"%s\"%s>\n"
+                . "            <input type=\"%s\" id=\"%s\" name=\"%s\" value=\"%s\" data-jotform-field=\"%s\"\n"
+                . "                aria-describedby=\"%s-error\"%s>\n"
                 . "            %s\n"
                 . "        </label>\n",
                 $optionId,
@@ -255,6 +256,11 @@ PHP;
                 $id,
                 $this->text((string) $option['value']),
                 $key,
+                // Every input of the group describes itself by the one slot the
+                // group shares, below. Without it the server's message lands in
+                // an element nothing points at, and a screen reader announces
+                // the group as invalid without ever saying why.
+                $id,
                 // A required radio group is satisfied by any one input; a
                 // required checkbox group is not, so the server decides.
                 $required && $inputType === 'radio' ? ' required' : '',

@@ -50,6 +50,12 @@
  * radio group. Everything carrying neither attribute is ignored, which is how a
  * layout helper stays out of the payload.
  *
+ * The error slot needs an `id`, and every input it belongs to needs an
+ * `aria-describedby` naming it. That is what makes the server's message part of
+ * the field a screen reader announces; without it the message is written into
+ * the page and read by nobody. For a group, all of its inputs point at the one
+ * slot the group shares.
+ *
  * The two attributes are separate on purpose: `data-jotform-field` values are
  * checked against the Jotform schema and an unknown one fails the submission,
  * so a honeypot marked that way would break every send. `$honeypot` and
@@ -181,12 +187,14 @@ $required = static function (string $key) use ($fields): bool {
                         name="cf-preferred-contact"
                         value="<?php echo esc_attr($option['value']); ?>"
                         data-jotform-field="preferred_contact"
+                        aria-describedby="cf-contact-error"
                     >
                     <?php echo esc_html($option['label']); ?>
                 </label>
             <?php endforeach; ?>
 
-            <span class="contact-form__error" data-jotform-field-error="preferred_contact"></span>
+            <?php // Every input of the group points at this one slot: a message nothing points at is one a screen reader never reads. ?>
+            <span class="contact-form__error" id="cf-contact-error" data-jotform-field-error="preferred_contact"></span>
         </fieldset>
     <?php endif; ?>
 
@@ -202,12 +210,13 @@ $required = static function (string $key) use ($fields): bool {
                         id="cf-topic-<?php echo (int) $index; ?>"
                         value="<?php echo esc_attr($option['value']); ?>"
                         data-jotform-field="topics_of"
+                        aria-describedby="cf-topics-error"
                     >
                     <?php echo esc_html($option['label']); ?>
                 </label>
             <?php endforeach; ?>
 
-            <span class="contact-form__error" data-jotform-field-error="topics_of"></span>
+            <span class="contact-form__error" id="cf-topics-error" data-jotform-field-error="topics_of"></span>
         </fieldset>
     <?php endif; ?>
 

@@ -120,6 +120,30 @@ final class TemplateScaffoldTest extends TestCase
         }
     }
 
+    /**
+     * The starter is what a template author copies, so a missing association
+     * here is a defect propagated into every theme built from it. A group's
+     * inputs share one error slot and each of them has to name it.
+     */
+    public function testEveryInputOfAChoiceGroupNamesTheGroupsErrorSlot(): void
+    {
+        $source = $this->build();
+
+        foreach (['preferred_contact' => 2, 'topics_of' => 4] as $key => $inputs) {
+            $slot = 'contact-' . str_replace(['.', '_'], '-', $key);
+
+            $this->assertStringContainsString(
+                'id="' . $slot . '-error" data-jotform-field-error="' . $key . '"',
+                $source
+            );
+            $this->assertSame(
+                $inputs,
+                substr_count($source, 'aria-describedby="' . $slot . '-error"'),
+                'Every input of the ' . $key . ' group describes itself by the group error slot.'
+            );
+        }
+    }
+
     public function testChoiceOptionsComeFromTheSchema(): void
     {
         $source = $this->build();

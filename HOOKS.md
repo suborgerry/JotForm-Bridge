@@ -71,7 +71,7 @@ text in every other.
 | `$field` | `array<string, mixed>` | Normalized field; its text is raw. |
 | `$integration` | `string` | Integration slug. |
 
-Fires in `jotform-bridge/src/Rendering/AutoRenderer.php:143`.
+Fires in `jotform-bridge/src/Rendering/AutoRenderer.php:154`.
 
 ## `jotform_bridge_daily_ceiling`
 

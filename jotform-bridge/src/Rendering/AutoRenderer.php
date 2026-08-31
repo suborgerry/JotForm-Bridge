@@ -43,6 +43,17 @@ final class AutoRenderer
     private int $instances = 0;
 
     /**
+     * Hides text visually while leaving it in the accessibility tree.
+     *
+     * The same declarations WordPress core uses for `.screen-reader-text`,
+     * written inline because the plugin ships no stylesheet of its own — see
+     * `requiredMark()`.
+     */
+    private const SR_ONLY_STYLE = 'position:absolute;width:1px;height:1px;'
+        . 'margin:-1px;padding:0;border:0;overflow:hidden;clip-path:inset(50%);'
+        . 'clip:rect(1px,1px,1px,1px);white-space:nowrap;';
+
+    /**
      * Autocomplete tokens for the sub-inputs of composite fields.
      *
      * @var array<string, string>
@@ -238,7 +249,7 @@ final class AutoRenderer
         return sprintf(
             '<div class="jfb-field jfb-field--%1$s">%2$s%3$s%4$s</div>',
             esc_attr($type),
-            $this->label($id, (string) $field['label'], $required),
+            $this->label($id, $this->labelFor($field), $required),
             $control,
             $this->errorSlot($id, $key)
         );
@@ -267,14 +278,21 @@ final class AutoRenderer
 
             $choices .= sprintf(
                 '<label class="jfb-choice" for="%1$s">'
-                . '<input type="%2$s" id="%1$s" name="%3$s" value="%4$s" data-jotform-field="%5$s"%6$s>'
-                . '<span class="jfb-choice-label">%7$s</span>'
+                . '<input type="%2$s" id="%1$s" name="%3$s" value="%4$s" data-jotform-field="%5$s"'
+                . ' aria-describedby="%6$s"%7$s>'
+                . '<span class="jfb-choice-label">%8$s</span>'
                 . '</label>',
                 esc_attr($optionId),
                 esc_attr($type === FieldNormalizer::TYPE_RADIO ? 'radio' : 'checkbox'),
                 esc_attr($id),
                 esc_attr((string) $option['value']),
                 esc_attr($key),
+                // Every input of the group describes itself by the one error
+                // slot below it. Without this the server's message is written
+                // into an element nothing points at: a screen reader announces
+                // the group as invalid and never says why, which was the whole
+                // point of sending a message per field.
+                esc_attr($id . '-error'),
                 // A required radio group is satisfied by any one of its inputs,
                 // so the attribute belongs on each of them. A required checkbox
                 // group is not: `required` there would demand every single box,
@@ -284,11 +302,14 @@ final class AutoRenderer
             );
         }
 
+        // No `aria-required` on the fieldset: it maps to the `group` role,
+        // which does not support the attribute, so it is invalid ARIA and is
+        // ignored. The requirement is already carried by the legend, which
+        // states it in text, and by the `required` attribute on each radio.
         return sprintf(
-            '<fieldset class="jfb-field jfb-field--%1$s"%2$s>%3$s%4$s%5$s</fieldset>',
+            '<fieldset class="jfb-field jfb-field--%1$s">%2$s%3$s%4$s</fieldset>',
             esc_attr($type),
-            $required ? ' aria-required="true"' : '',
-            $this->legend((string) $field['label'], $required),
+            $this->legend($this->labelFor($field), $required),
             $choices,
             $this->errorSlot($id, $key)
         );
@@ -310,7 +331,7 @@ final class AutoRenderer
             $required = (bool) $child['required'];
             $label    = (string) $child['label'] !== ''
                 ? (string) $child['label']
-                : $this->childFallbackLabel((string) $child['child']);
+                : $this->fallbackLabel((string) $child['child']);
 
             $inner .= sprintf(
                 '<div class="jfb-field jfb-field--%1$s">%2$s'
@@ -333,7 +354,7 @@ final class AutoRenderer
         return sprintf(
             '<fieldset class="jfb-field jfb-field--%1$s">%2$s%3$s</fieldset>',
             esc_attr((string) $field['type']),
-            $this->legend((string) $field['label'], (bool) $field['required']),
+            $this->legend($this->labelFor($field), (bool) $field['required']),
             $inner
         );
     }
@@ -387,9 +408,17 @@ final class AutoRenderer
             return '';
         }
 
+        // The class is kept so a theme that already styles `.screen-reader-text`
+        // keeps control, and the same rules are repeated inline because nothing
+        // guarantees the class exists: the plugin ships no frontend stylesheet,
+        // and the definition a site usually gets comes from core's block
+        // library CSS, which themes and performance plugins routinely remove.
+        // Without it this text is not hidden but printed, and every required
+        // label reads "First Name *(required)".
         return sprintf(
             ' <span class="jfb-required"><span aria-hidden="true">*</span>'
-            . '<span class="screen-reader-text">%s</span></span>',
+            . '<span class="screen-reader-text" style="%1$s">%2$s</span></span>',
+            esc_attr(self::SR_ONLY_STYLE),
             esc_html__('(required)', 'jotform-bridge')
         );
     }
@@ -447,12 +476,32 @@ final class AutoRenderer
     }
 
     /**
-     * Jotform does not always send a sub-label; the sub-field name is a better
-     * placeholder than an empty label.
+     * The text a field is labelled with.
+     *
+     * Jotform allows a question with no label at all, and an empty `<label>` is
+     * an association to nothing: the control ends up with no accessible name,
+     * or — where the field is required — with the required marker as its whole
+     * name, which passes every checker and tells a visitor nothing. The
+     * semantic key is the honest fallback: it is stable, it is what the
+     * template author already types, and it is visible in the admin schema
+     * table beside the field it belongs to.
+     *
+     * @param array<string, mixed> $field
      */
-    private function childFallbackLabel(string $child): string
+    private function labelFor(array $field): string
     {
-        return ucwords(str_replace(['_', 'addr '], [' ', 'address '], $child));
+        $label = (string) $field['label'];
+
+        return $label !== '' ? $label : $this->fallbackLabel((string) $field['key']);
+    }
+
+    /**
+     * Jotform does not always send a label or a sub-label; the machine-readable
+     * name is a better placeholder than nothing.
+     */
+    private function fallbackLabel(string $key): string
+    {
+        return ucwords(str_replace(['.', '_', 'addr '], [' ', ' ', 'address '], $key));
     }
 
     private function id(string $prefix, string $key): string

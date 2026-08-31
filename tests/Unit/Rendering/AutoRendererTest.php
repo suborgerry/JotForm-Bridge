@@ -128,7 +128,40 @@ final class AutoRendererTest extends TestCase
 
         $this->assertStringContainsString('type="checkbox"', $html);
         $this->assertStringNotContainsString(' required>', $html);
-        $this->assertStringContainsString('aria-required="true"', $html, 'The group itself is still required.');
+        $this->assertStringContainsString(
+            '(required)',
+            $html,
+            'The legend is what states the requirement for a checkbox group.'
+        );
+    }
+
+    /**
+     * A fieldset maps to the ARIA `group` role, which does not support
+     * `aria-required`. The attribute was therefore invalid ARIA and ignored,
+     * and it was the one thing axe and Lighthouse both flagged on an
+     * auto-rendered form.
+     */
+    public function testAGroupNeverCarriesAriaRequired(): void
+    {
+        $required = $this->render(
+            $this->schemaWith(
+                [
+                    'qid'      => '11',
+                    'type'     => 'control_checkbox',
+                    'name'     => 'topics',
+                    'text'     => 'Topics',
+                    'required' => 'Yes',
+                    'options'  => 'Pricing|Support',
+                ]
+            )
+        );
+
+        $this->assertStringNotContainsString('aria-required', $required);
+        $this->assertStringContainsString('<fieldset class="jfb-field jfb-field--checkbox">', $required);
+
+        // The scalar controls keep theirs: `aria-required` is valid on a
+        // textbox, and only the group role is the problem.
+        $this->assertStringContainsString('required aria-required="true"', $this->render());
     }
 
     public function testARequiredRadioGroupMarksEveryOption(): void
@@ -137,9 +170,75 @@ final class AutoRendererTest extends TestCase
 
         $this->assertSame(
             2,
-            substr_count($html, 'data-jotform-field="preferred_contact" required'),
+            substr_count($html, 'data-jotform-field="preferred_contact" aria-describedby="jfb-contact-1-preferred-contact-error" required'),
             'Each radio of a required group carries the attribute, so the browser enforces one choice.'
         );
+    }
+
+    /**
+     * The server answers one error per semantic path, and a group shares one
+     * path across every input in it. Unless each of those inputs points at the
+     * slot the message lands in, a screen reader announces the group as invalid
+     * and never says why: the text is in the page, associated with nothing.
+     */
+    public function testEveryInputOfAChoiceGroupIsDescribedByTheGroupsErrorSlot(): void
+    {
+        $html = $this->render();
+
+        foreach (['preferred_contact' => 2, 'topics_of' => 4] as $key => $inputs) {
+            $slot = 'jfb-contact-1-' . str_replace('_', '-', $key) . '-error';
+
+            $this->assertStringContainsString(
+                '<span class="jfb-error" id="' . $slot . '" data-jotform-field-error="' . $key . '"></span>',
+                $html
+            );
+            $this->assertSame(
+                $inputs,
+                substr_count($html, 'data-jotform-field="' . $key . '" aria-describedby="' . $slot . '"'),
+                'Every input of the group describes itself by the group error slot.'
+            );
+        }
+    }
+
+    /**
+     * Jotform allows a question with no label. An empty `<label>` leaves the
+     * control with no accessible name at all — and where the field is required,
+     * with the required marker as its entire name, which passes every automated
+     * check and tells a visitor nothing.
+     */
+    public function testAFieldWithNoJotformLabelFallsBackToItsSemanticKey(): void
+    {
+        $html = $this->render(
+            $this->schemaWith(
+                [
+                    'qid'      => '7',
+                    'type'     => 'control_textbox',
+                    'name'     => 'referenceCode',
+                    'text'     => '',
+                    'required' => 'Yes',
+                ]
+            )
+        );
+
+        $this->assertStringContainsString(
+            '<label class="jfb-label" for="jfb-contact-1-reference-code">Reference Code',
+            $html
+        );
+    }
+
+    /**
+     * The plugin ships no frontend stylesheet, so `.screen-reader-text` is
+     * whatever the site happens to define. The definition most sites have comes
+     * from core's block library CSS, which themes and performance plugins
+     * routinely remove — and then every required label reads
+     * "First Name *(required)" out loud, in ink.
+     */
+    public function testTheRequiredMarkerHidesItselfWithoutHelpFromTheTheme(): void
+    {
+        $html = $this->render();
+
+        $this->assertStringContainsString('class="screen-reader-text" style="position:absolute;', $html);
+        $this->assertStringContainsString('clip-path:inset(50%)', $html);
     }
 
     public function testACompositeFieldBecomesAFieldsetOfItsChildren(): void
