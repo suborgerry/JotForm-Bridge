@@ -945,6 +945,16 @@ The script has to:
 * show validation errors;
 * restore the submit state after an error.
 
+While a submission is in flight the submit buttons are marked `aria-disabled`
+and the form `aria-busy`. Not the `disabled` property: a disabled control cannot
+hold focus, so the browser moves focus to the document body the instant the
+visitor presses Submit, and a keyboard user loses their place for as long as the
+request runs. The repeated submit `disabled` appeared to prevent is refused by
+the submit handler, which returns as soon as it sees the busy attribute.
+
+A field error marks every input carrying that semantic path `aria-invalid`, not
+the first one it finds: a choice group shares one path across all of its inputs.
+
 It dispatches:
 
 ```text
@@ -1269,6 +1279,28 @@ with:
 * error hooks;
 * predictable CSS classes.
 
+Three of those have a wrong answer that looks right, and each was shipped once:
+
+* A `fieldset` maps to the ARIA `group` role, which does not support
+  `aria-required`. A required choice group states its requirement in the legend
+  and, for radios, in the `required` attribute on each input — never in an
+  attribute the browser discards.
+* Every input of a choice group carries `aria-describedby` naming the one error
+  slot the group shares. Otherwise the server's message is written into an
+  element nothing points at, and the group announces itself as invalid without
+  ever saying why.
+* Jotform allows a question with no label. An empty `<label>` names nothing, and
+  on a required field the required marker becomes the whole accessible name —
+  which passes every automated check and tells a visitor nothing. The semantic
+  key is the fallback.
+
+The plugin ships no frontend stylesheet, so anything the markup relies on being
+hidden hides itself. `.screen-reader-text` is kept as a hook for the theme, and
+the same declarations are repeated in a `style` attribute: the definition most
+sites have comes from core's block library CSS, which themes and performance
+plugins routinely remove, and then every required label reads
+"First Name *(required)" in ink.
+
 The base classes:
 
 ```text
@@ -1299,11 +1331,28 @@ Behaviour is declared in the markup rather than wired up per screen:
 ```text
 [data-jfb-toggle="<selector>"] + [data-jfb-toggle-value="<value>"]
 [data-jfb-copy="<text>"] | [data-jfb-copy-from="<selector>"]
+[data-jfb-connect="<selector>"] + the endpoint, action and nonce beside it
+[data-jfb-confirm="<question>"] on a form that must ask before it submits
 ```
 
 That way a PHP constant reaches the HTML through `esc_attr()` in an attribute
 rather than through `esc_js()` in a script body, and a new row or a new copy
 button needs no JavaScript at all.
+
+An inline event handler attribute is an inline script and is refused by the same
+policy. `data-jfb-confirm` exists because two `onsubmit="return confirm(…)"`
+handlers survived here behind a test that only looked for `onclick` — and a
+refused confirmation does not stop the form, it removes the question and lets
+the destructive action through unasked.
+
+Every sentence `admin.js` says comes from `wp_localize_script`. A string written
+into the JavaScript source is a string no `.po` file can reach.
+
+Each screen renders one empty `[data-jfb-status]` region with `role="status"`,
+with the page rather than when it is first needed: a live region created and
+written to in the same breath is not reliably announced. Anything the admin
+does whose only other outcome is visual — a copy that worked, a copy that did
+not — is announced there.
 
 ---
 

@@ -250,11 +250,28 @@ label being renamed or translated.
 | `data-jotform-errors` | any element | Where form-level errors go |
 | `data-jotform-success` | any element | Where the success message goes |
 | `data-jotform-busy` | `<form>` | Set to `true` while a submission is in flight |
+| `aria-busy` | `<form>` | The same state, spelled the way assistive technology reads it |
+| `aria-disabled` | submit button | Set to `true` while a submission is in flight |
 
 A radio group and a checkbox group each share one `data-jotform-field` across all
 their inputs; a checkbox group therefore submits a list. An element without the
 attribute takes no part in the payload at all, which is how a honeypot or a
 layout helper stays out of it.
+
+Give every error slot an `id`, and every control it belongs to an
+`aria-describedby` naming it — for a group, all of its inputs name the one slot
+the group shares. That association is what makes the server's message part of
+the field a screen reader announces when the script moves focus to it. Without
+it the message is written into the page and read by nobody: the control is
+announced as invalid, and never says why.
+
+While a submission is in flight the submit button is marked `aria-disabled`
+rather than `disabled`. A disabled control cannot hold focus, so the browser
+would move focus to the document body the moment the visitor pressed Submit and
+leave them there until the answer arrived. The repeated submit this prevents is
+refused by the script itself, which returns as soon as it sees the busy
+attribute. Style the state through `form[data-jotform-busy]` or
+`[aria-disabled="true"]`.
 
 An identifier the schema does not know is **rejected**, not dropped: a
 template/schema mismatch surfaces instead of quietly losing an answer.
@@ -339,14 +356,16 @@ Copy it to `your-theme/jotform-bridge-templates/contact.php`. The short version:
 
     <p>
         <label for="cf-email">Email</label>
-        <input type="email" id="cf-email" data-jotform-field="email" required>
-        <span data-jotform-field-error="email"></span>
+        <input type="email" id="cf-email" data-jotform-field="email"
+               aria-describedby="cf-email-error" required>
+        <span id="cf-email-error" data-jotform-field-error="email"></span>
     </p>
 
     <p>
         <label for="cf-message">Message</label>
-        <textarea id="cf-message" data-jotform-field="message"></textarea>
-        <span data-jotform-field-error="message"></span>
+        <textarea id="cf-message" data-jotform-field="message"
+                  aria-describedby="cf-message-error"></textarea>
+        <span id="cf-message-error" data-jotform-field-error="message"></span>
     </p>
 
     <button type="submit">Send</button>
@@ -437,8 +456,8 @@ not usable, and it never appears on a validation failure or an upstream error.
 
 The frontend script sets the success state, writes the message, dispatches
 `jotformbridge:success`, and only then navigates — with
-`window.location.assign()`, after the configured delay, keeping the form
-disabled the whole time so a second submission is impossible. A theme that wants
+`window.location.assign()`, after the configured delay, keeping the form busy
+the whole time so a second submission is impossible. A theme that wants
 its own flow cancels the navigation:
 
 ```js

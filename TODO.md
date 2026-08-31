@@ -81,39 +81,7 @@ server, or `plugin-update-checker` against GitHub Releases.
 
 ---
 
-## 4. No accessibility audit against WCAG
-
-**Problem.** This is a plugin whose entire output is forms, and forms are where
-accessibility is most often got wrong and most keenly felt. The markup was
-written with the right intentions — `<label for>`, `<fieldset>`/`<legend>` for
-choice groups, `aria-describedby` on every control, `aria-invalid` set by the
-script, `role="alert"` with `aria-live="assertive"` for form errors and
-`role="status"` with `aria-live="polite"` for the success message, focus moved
-to the first invalid control on failure — but nothing has been measured against
-the standard. Good intentions and a conformance check are different things.
-
-**Shape.** WCAG 2.2 AA as the target, on both renderers and on the admin:
-
-* automated first — axe-core or Lighthouse through the browser MCP, on an
-  auto-rendered form, a custom-template form and the two admin screens;
-* then the parts a tool cannot see: keyboard-only completion of a form,
-  the announcement order when validation fails, whether the live region actually
-  reads the error or is beaten by the focus move, the visible focus ring on the
-  copy buttons and the delete button, and the required-field marker being
-  understandable without colour;
-* the auto renderer's error slots are `<span>` elements written to by
-  JavaScript — check they are announced when filled, since an `aria-live`
-  region added after page load is not reliably announced in every screen reader.
-
-Fix what the audit finds; record what is deliberately not fixed and why.
-
-**Why it is parked.** It is a real piece of work, not a checkbox, and it wants
-the browser MCP available. It should not be parked for long: of everything in
-this file it is the item most likely to be affecting real people right now.
-
----
-
-## 5. No check against current web standards
+## 4. No check against current web standards
 
 **Problem.** The output has never been validated. The plugin generates HTML from
 a schema it does not control, and Jotform allows labels and option values that
@@ -127,16 +95,23 @@ not evidence of much.
   label, a label with quotes and angle brackets, duplicate option values, an
   option value that is an empty string, a very long label;
 * check the same for the admin screens;
-* confirm the generated IDs are unique with two of the same integration on one
-  page, which the instance counter is supposed to handle;
 * check `assets/frontend.js` against what the supported browser range actually
   provides. It is written as ES5 and now guards `window.fetch`, but nothing
   states what that range is — decide it and write it down, because the answer
   changes whether the ES5 style is still worth its cost.
 
+**Already settled, by the accessibility audit rather than by a validator.** Two
+of the same integration on one page produce no duplicate ids and distinct radio
+group names, so the instance counter does what it claims. Duplicate and empty
+option values never reach the renderer: `Forms\FieldNormalizer::options()` drops
+them. An empty label and a label carrying quotes and angle brackets were
+rendered and inspected — the first is now filled in from the semantic key, the
+second escapes correctly. What is left here is the validator itself, which is a
+different question from the accessibility tree, and the browser range.
+
 ---
 
-## 6. Second review pass with a different model
+## 5. Second review pass with a different model
 
 **Problem.** The plugin, the removals recorded as `Amendment:` sections and the
 fixes in this file were produced by one model. That is a single point of view,
@@ -163,7 +138,7 @@ by hand.
 
 ---
 
-## 7. Sweep for hardcoding and over-engineering
+## 6. Sweep for hardcoding and over-engineering
 
 **Problem.** Nobody has read the plugin looking specifically for two opposite
 faults: a value that should have been derived or configurable but was typed in,

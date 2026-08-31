@@ -4,7 +4,7 @@ Tags: jotform, forms, contact form, headless, custom form
 Requires at least: 6.4
 Tested up to: 6.8
 Requires PHP: 8.0
-Stable tag: 0.2.0
+Stable tag: 0.2.1
 License: GPL-2.0-or-later
 License URI: https://www.gnu.org/licenses/gpl-2.0.html
 
@@ -191,6 +191,32 @@ double click cannot create two Jotform submissions.
 3. The settings screen: API key, region and diagnostics.
 
 == Changelog ==
+
+= 0.2.1 =
+* Accessibility fixes across both renderers and the admin, from an audit against
+  WCAG 2.2 AA.
+* A radio or checkbox group's error message is now announced: every input in the
+  group points at the slot the message lands in. It used to be written into the
+  page and read by nobody.
+* A Jotform field with an empty label no longer renders a control with no
+  accessible name; it falls back to the field's semantic key.
+* Removed `aria-required` from choice group fieldsets, where it was invalid ARIA
+  and ignored.
+* The submit button keeps the keyboard focus while a submission is in flight,
+  and so does **Connect form**.
+* Fixes the **copy shortcode** button, which threw and did nothing at all, in
+  every browser.
+* Copying now says so out loud, and the copy buttons no longer announce
+  "Copied" before they are pressed.
+* The admin tables scroll inside their own container instead of taking the whole
+  page sideways on a narrow screen.
+* The Integrations screen has an `<h1>` again; the connection status green and
+  the shortcode button meet the contrast minimum.
+* The two destructive actions ask before they submit through a data attribute
+  rather than an inline handler, which a Content Security Policy refuses — and a
+  refused confirmation removed the question, not the action.
+* The required marker on an auto-rendered form hides itself without depending on
+  a stylesheet the plugin does not ship.
 
 = 0.2.0 =
 * Forms are connected one at a time by ID instead of the whole account form list
