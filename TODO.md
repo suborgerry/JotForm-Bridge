@@ -6,17 +6,12 @@ rediscovering the reasoning.
 
 Not a backlog of everything imaginable — things that were considered and
 rejected are not here, and should not be added back without a new decision.
+Finished work is not here either: it lives in the code, in the `Amendment:`
+sections of `AGENTS.md` and in the git history.
 
-The toolchain section that used to head this file is gone: the PHPCS ruleset,
-`composer.lock`, continuous integration and the generated hook reference were
-done together in August 2026, and the request-size check that remained was
-examined and dropped — see `SubmissionController::MAX_BODY_BYTES`, where the
-reasoning now lives beside the code it is about. What follows is in no
-particular order.
+In no particular order.
 
 ---
-
-# Later
 
 ## 1. An outbox for submissions that never reached Jotform
 
@@ -26,10 +21,9 @@ nothing is stored, and the visitor is unlikely to type it all again. For a
 plugin whose entire job is delivering form submissions, losing one is the worst
 failure it has.
 
-**Why it matters more now than it used to.** The guards added in August 2026
-mean the plugin refuses submissions on purpose more often than before —
-rate limit, quota guard, upstream allowance failures. Every one of those is a
-person who tried to reach the site and did not.
+The guards mean the plugin refuses submissions on purpose — rate limit, quota
+guard, upstream allowance failures. Every one of those is a person who tried to
+reach the site and did not.
 
 **Shape.** Persist the mapped submission locally (custom post type, or a small
 table), retry on cron or Action Scheduler with backoff, delete on success. The
@@ -38,8 +32,8 @@ breaker is open, queue and answer success.
 
 **Caveat.** The moment submissions are stored locally, the plugin holds
 personal data, which today it deliberately does not — see the promise in
-readme.txt. That has to be a conscious decision with retention limits and an
-uninstall story, not a side effect.
+`readme.txt` and invariant 21 in `AGENTS.md`. That has to be a conscious
+decision with retention limits and an uninstall story, not a side effect.
 
 ---
 
@@ -69,180 +63,25 @@ and ships no updater. Every install is a manual ZIP upload. On one site that is
 an annoyance; across a portfolio of client sites it means the fleet drifts and
 security fixes do not land.
 
-**Why it is sharper than it looks.** The proof of work made version discipline a
-correctness requirement, not hygiene. `frontend.js` is enqueued with the plugin
-version in its URL, and a browser holding the previous file will keep using it
-if the URL has not changed — a stale script computes no proof, and the guard
+**Why it is sharper than it looks.** Version discipline is a correctness
+requirement, not hygiene. `frontend.js` is enqueued with the plugin version in
+its URL, and a browser holding the previous file will keep using it if the URL
+has not changed — a stale script computes no proof of work, and the guard
 refuses the submission. Shipping a release without bumping the version turns
-into refused submissions for a slice of real visitors.
+into refused submissions for a slice of real visitors. `assets/admin.js` has
+the same property: it binds the **Connect form** button, so a stale copy gives
+an administrator a button that does nothing.
 
-`assets/admin.js` acquired the same property in August 2026: the **Connect form**
-button is bound by that file, so an administrator whose browser holds the
-previous copy gets a button that does nothing at all. Less severe — it costs one
-admin a confusing minute rather than a visitor a lost submission — but it is the
-second file whose staleness is a functional bug rather than a cosmetic one.
+**State.** The version-consistency half exists: `bin/version.php --check` fails
+when the three version strings disagree and `--set X.Y.Z` writes all three,
+wired into `composer check` and the CI lint job.
 
-**What is done.** The version-consistency half, in August 2026.
-`bin/version.php` reads the three strings, `--check` fails when they disagree,
-and `--set X.Y.Z` writes all three at once. It runs as `composer version:check`,
-inside `composer check`, and as a step in the CI lint job. `tests/bootstrap.php`
-no longer carries a fourth copy: it reads the version out of the plugin header.
-
-A single source of truth was considered and is not available. WordPress parses
-`Version:` out of the raw file with a regular expression and wordpress.org does
-the same to `Stable tag:`, so neither can be an expression. The constant could be
-derived from the header at runtime, but it builds the asset URLs on every
-request, and a file read plus a regex per page load is a bad price for removing
-one literal. One command that writes all three, plus a check that proves they
-agree, is as close as this gets.
-
-**What is left.** The delivery channel: `Update URI` plus a small update server,
-or `plugin-update-checker` against GitHub Releases. Until that exists, every
-install is still a manual ZIP upload, which is the actual problem this entry
-opened with.
+**What is left.** The delivery channel: `Update URI` plus a small update
+server, or `plugin-update-checker` against GitHub Releases.
 
 ---
 
-## 5. ~~No integration tests~~ — done
-
-Built in August 2026. There is a second suite, `tests/Integration/`, with 70
-tests beside the 463 unit tests, and a CI job of its own.
-
-**What it runs on.** WordPress core on the official SQLite drop-in, driven by
-plain PHPUnit: no database server, no Docker, no `wp-env`. `bin/install-wp.sh`
-downloads both into `.wordpress/` (git-ignored) and symlinks the plugin into
-`wp-content/plugins/`, so the suite tests the working tree rather than a copy.
-`tests/Integration/install.php` installs the site once and keeps a pristine
-database; every run is restored from it, so nothing an earlier run left behind
-can make a test pass. `composer test:integration` is the whole command, and
-`.github/workflows/ci.yml` runs it on PHP 8.0 and 8.4.
-
-Two decisions in there are worth not rediscovering:
-
-* the plugin is *active in the options table*, so `wp-settings.php` includes it
-  the way a site does. A bootstrap that required the plugin file would not have
-  noticed it failing to load at all;
-* each test gets a fresh request (`Runtime::newRequest()`): storage emptied,
-  the callbacks bound to the previous services removed, the composition root
-  discarded and booted again. `IntegrationRepository`, `Settings`,
-  `FormRepository` and `TemplateRegistry` all memoize within a request, which
-  is right on a site and wrong across fifty tests in one process.
-
-**What it covers**, which is what this entry asked for:
-
-* the REST route through `WP_REST_Request` against the registered route — the
-  permission callback, the JSON body, 200/403/413/422/429/502/503, the
-  `Retry-After` and `Cache-Control` headers, the redirect in the success body,
-  and the mapped payload that reaches the upstream boundary;
-* the `admin_post_` handlers and `wp_ajax_jotform_bridge_connect_form`, each
-  with and without a valid nonce and with and without the capability, asserting
-  that a refused action changed nothing;
-* a template rendered from a real theme directory — the shipped
-  `examples/contact.php`, so the documented example is checked too — child theme
-  priority, a symlink leaving its root, and a path that resolves outside;
-* activation, upgrade, deactivation and uninstall against a real options table,
-  including every legacy purge and the stored API key an old version left
-  behind;
-* the admin screens rendered, asserting they do not describe features that were
-  removed. That is the defect class this entry was mostly about, and it is now
-  a failing test rather than a thing somebody notices in a browser.
-
-**What it found immediately.** `Settings::region()` validated a stored value
-against `regions()`, which translates, so every admin request called `__()` on
-`plugins_loaded` — a `_doing_it_wrong` notice about loading the text domain too
-early, on WordPress 6.7 and later. The region slugs are now a list of their own
-and the labels stay in the view. Nothing in three hundred unit tests could see
-it, because nothing there loads WordPress.
-
-**What is still not covered, and is not pretending to be:**
-
-* `assets/frontend.js`. The suite computes the proof of work in PHP, so it
-  proves the server's half of the contract and not that the browser computes the
-  same thing — the two copies of `BITS = 16` in item 10 are still unguarded by
-  anything but a person opening the page. Double submit, the events and the
-  redirect are still Playwright by hand;
-* multisite. `Plugin::eachSite()` and the network-activation path have no test:
-  the installed site is single;
-* the admin screens are rendered by constructing the page object, not through
-  `admin.php` — there is no `current_screen`, and the submenu order is not
-  asserted;
-* the HTTP status beside a `wp_send_json` answer. WordPress only sets it when
-  `headers_sent()` is false, and by the first PHPUnit dot it is true. The body
-  is asserted; the status is not;
-* WordPress 6.4, the floor in the plugin header. CI runs whatever is current;
-  `JFB_WP_VERSION=6.4` pins it for a one-off check;
-* a live Jotform call, deliberately. Outbound HTTP is blocked and an unmocked
-  request fails the test, so the boundary is always a fixture.
-
----
-
-## 6. ~~PHPStan, or a decision that PHPCS is enough~~ — done
-
-Run once before deciding, as this entry asked, in August 2026. The answer was
-yes, narrowly: `phpstan.neon.dist` at level 8, `composer analyse`, and a step in
-the CI lint job beside `composer lint`.
-
-**What the first run found** on 12,349 lines — four real defects, none of which
-PHPCS or any of the 533 tests could see:
-
-* `Plugin::quota()` still passed `Settings` to a `QuotaGuard` whose constructor
-  had been deleted along with the account quota tracking. PHP discards an
-  argument to a class that has no constructor without a word, so nothing failed
-  and nothing could have. Every other call site, the tests included, already
-  said `new QuotaGuard()` — which is exactly why no test could notice;
-* `SubmissionPipeline::fingerprint()` documented a `$context` parameter it does
-  not have;
-* `FormRepository` wrote the connected-form record shape into four docblocks
-  and `TemplateRegistry` wrote the registry shape into three. In both classes
-  the memo property had drifted looser than the method that fills and returns
-  it. Each now has one `@phpstan-type` alias, so the copies cannot disagree
-  again.
-
-Two smaller things came with them: `TemplateScanner::read()` now documents that
-`fread()` raises a `ValueError` below one byte and the `@` does not suppress it,
-and `IntegrationsPage::redirect()` is annotated `@return never` — the invariant
-every guard clause on that screen already leaned on, written down. That one
-annotation removed seven findings.
-
-**What it got wrong, which is the more useful result.** Eleven of the
-twenty-seven findings were redundant `is_array()` and `is_string()` guards, and
-every one of them sat on a trust boundary: `apply_filters()`, `get_sites()`, a
-Jotform API payload. `phpstan-wordpress` types the return of `apply_filters()`
-from the `@param` tags above the call — tags this project requires, because
-`bin/generate-hooks.php` reads them — and those describe what the plugin passes
-*in*. What comes back is whatever a third-party callback returned. So the
-analyser reads the only defence against another plugin's mistake as dead code,
-fed the wrong answer by our own convention.
-
-`function.alreadyNarrowedType` and `instanceof.alwaysTrue` are therefore off,
-with that argument written into `phpstan.neon.dist` beside them. The price is
-one genuinely redundant check, on `token_get_all()`, which is left alone.
-
-Two suppressions more, both narrow: `variable.undefined` inside
-`src/Admin/views/`, because a view is included in the scope of the method that
-renders it and no static analyser can see that; and PHPStan's own wrong
-signature for `str_contains()` and `str_ends_with()`, which declares the
-haystack `non-empty-string` when an empty one is legal and answers `false` —
-measured at every `phpVersion` from 8.0 to 8.4, not assumed.
-
-**Level 8 rather than the 5 or 6 this entry proposed.** The array shapes are
-checked at 8 and not at 6, and half the real findings were array shapes — at
-level 6 this would have bought two findings instead of four. Level 9 was
-measured and rejected: 310 findings, overwhelmingly about the `mixed`
-WordPress hands back by definition.
-
-**No baseline file.** This entry warned that a baseline nobody empties is a
-list of accepted defects; none was needed, because four fixes and four
-documented suppressions reach zero. Keep it that way: a new suppression has to
-carry its argument, the way the four there do.
-
-The cost, measured: 3 seconds cold, under one warm, 64 MB of dev dependencies
-that never ship. All four packages support PHP 8.0, so the lint job's pin to
-the floor still holds.
-
----
-
-## 7. No accessibility audit against WCAG
+## 4. No accessibility audit against WCAG
 
 **Problem.** This is a plugin whose entire output is forms, and forms are where
 accessibility is most often got wrong and most keenly felt. The markup was
@@ -274,7 +113,7 @@ this file it is the item most likely to be affecting real people right now.
 
 ---
 
-## 8. No check against current web standards
+## 5. No check against current web standards
 
 **Problem.** The output has never been validated. The plugin generates HTML from
 a schema it does not control, and Jotform allows labels and option values that
@@ -297,21 +136,21 @@ not evidence of much.
 
 ---
 
-## 9. Second review pass with a different model
+## 6. Second review pass with a different model
 
-**Problem.** The August 2026 review, the removals that followed it and the fixes
-in this file were all produced in one long session by one model. That is a
-single point of view, and the failure it is prone to is not missing an obvious
-bug — it is being consistent with its own earlier reasoning. Every one of these
-decisions looked right to the model that made them, which is exactly what a
-wrong decision also looks like.
+**Problem.** The plugin, the removals recorded as `Amendment:` sections and the
+fixes in this file were produced by one model. That is a single point of view,
+and the failure it is prone to is not missing an obvious bug — it is being
+consistent with its own earlier reasoning. Every one of these decisions looked
+right to the model that made them, which is exactly what a wrong decision also
+looks like.
 
 **Shape.** A fresh review of the plugin by the Fable model, started cold —
-without this conversation's context, so it is reading the code rather than the
+without that conversation's context, so it is reading the code rather than the
 argument for the code. Worth pointing at specifically:
 
-* the four `Amendment:` sections in `AGENTS.md`, which are the decisions with
-  the most reasoning and the least outside scrutiny;
+* the `Amendment:` sections in `AGENTS.md`, which are the decisions with the
+  most reasoning and the least outside scrutiny;
 * the submission pipeline's ordering and its single-answer refusal policy;
 * the proof-of-work guard, which is home-grown crypto in the security path and
   was reviewed by nobody;
@@ -324,7 +163,7 @@ by hand.
 
 ---
 
-## 10. Sweep for hardcoding and over-engineering
+## 7. Sweep for hardcoding and over-engineering
 
 **Problem.** Nobody has read the plugin looking specifically for two opposite
 faults: a value that should have been derived or configurable but was typed in,
@@ -344,10 +183,7 @@ a note; the point is to know which is which.
   goes.
 * The menu position `58` in `IntegrationsPage::registerMenu()` is a bare
   literal, and it is the kind of number two plugins collide on.
-* ~~`assets/admin.css` carries the WordPress core palette as literal hex.~~ Done
-  in August 2026 while the Connect form styles were added: the block now names
-  the core variables the values come from and says why they are repeated rather
-  than referenced. The rest of the file has not been read for this.
+* `assets/admin.css` beyond the core-palette block, which has been read already.
 * Worth confirming as deliberate rather than accidental: `MIN_DAILY`,
   `BURST_FACTOR`, `MEDIAN_DAYS`, the four rate-limit defaults, `DUPLICATE_WINDOW`,
   `MIN_SECONDS`, `MAX_BODY_BYTES`, `HEADER_BYTES`, `SOURCE_BYTES`, and the 15 and
@@ -372,33 +208,3 @@ a note; the point is to know which is which.
 **What the pass should produce.** For each finding, one of three outcomes: fix
 it, or write down why it stays, or delete the machinery. A finding that ends in
 none of the three has not been resolved, only visited.
-
----
-
-## 11. ~~Consider storing only the forms actually used, fetched by ID~~ — done
-
-Settled in August 2026 and implemented. Shape **2** was chosen: no account list
-at all, a form ID typed into the integration editor and resolved one at a time
-by a **Connect form** button.
-
-The full decision, and what has to keep holding, is recorded in
-"Amendment: no account form list" in `AGENTS.md`. In short:
-
-* `GET /user/forms` is gone, and with it the `limit=1000` truncation defect this
-  file used to carry as the one outright bug in item 10;
-* `jotform_bridge_forms`, `_meta` and `_hidden` are deleted on upgrade; the store
-  is now `jotform_bridge_connected_forms`, one record per form an integration
-  names;
-* **Sync with Jotform** became **Check Connection** — the `GET /user` half only.
-  It kept a button because Jotform answers a wrong form ID, another account's
-  form and a bad API key with an identical 401, so it is the only thing that
-  tells the key apart from the ID;
-* saving an integration with an unconnected ID warns rather than refusing.
-
-The open question this entry raised — where the key check goes if the form list
-stops being the reason to press the button — is answered by that last point.
-
-**What was not done, and is not obviously needed.** Shape 3, a searchable paged
-picker, stays unbuilt. It was the answer to "choosing a form without knowing its
-ID", which the ID field makes moot at the cost of one copy-paste. Revisit only if
-someone actually reports that cost, not on principle.

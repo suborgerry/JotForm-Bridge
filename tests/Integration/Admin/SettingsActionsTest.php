@@ -13,11 +13,11 @@ use JotformBridge\Tests\Integration\TestCase;
 /**
  * The two admin-post actions on the Settings screen.
  *
- * Saving the settings is where one of the defects TODO item 5 was written
- * about actually happened — a stored value reset because the screen posted one
- * field fewer than the handler assumed. That class of mistake is invisible to a
- * test that calls Settings::save() with a hand-built array, and obvious to one
- * that posts what the screen posts.
+ * Saving the settings is where one of the defects the integration suite was
+ * built for actually happened — a stored value reset because the screen posted
+ * one field fewer than the handler assumed. That class of mistake is invisible
+ * to a test that calls Settings::save() with a hand-built array, and obvious to
+ * one that posts what the screen posts.
  */
 final class SettingsActionsTest extends TestCase
 {

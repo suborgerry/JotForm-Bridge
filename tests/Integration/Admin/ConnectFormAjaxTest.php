@@ -12,8 +12,8 @@ use JotformBridge\Tests\Integration\TestCase;
  * "Connect form", the plugin's one asynchronous admin action.
  *
  * It was added with a capability check, a nonce check and an upstream call,
- * and verified once by hand. Nothing automated touched it until this file: the
- * debt TODO item 5 names by name.
+ * and verified once by hand. Nothing automated touched it until this file: it
+ * is the gap the integration suite was built to close.
  *
  * Fired through `do_action( 'wp_ajax_...' )`, which is how admin-ajax.php
  * reaches it.
