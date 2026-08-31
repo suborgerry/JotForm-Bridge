@@ -5,8 +5,10 @@ declare(strict_types=1);
 namespace JotformBridge\Tests\Integration\Admin;
 
 use JotformBridge\Admin\IntegrationsPage;
+use JotformBridge\Admin\QuotaNotice;
 use JotformBridge\Admin\SettingsPage;
 use JotformBridge\Settings\Settings;
+use JotformBridge\Submission\QuotaGuard;
 use JotformBridge\Tests\Integration\TestCase;
 
 /**
@@ -33,7 +35,7 @@ final class AdminScreensTest extends TestCase
     private const REMOVED = [
         'Sync with Jotform',
         'Rescan',
-        'stored form list',
+        'form list',
         'Remove from list',
         'Monthly Submission Allowance',
         'Last 7 days',
@@ -212,6 +214,86 @@ final class AdminScreensTest extends TestCase
             substr_count($html, 'class="jfb-table-scroll"'),
             'Every widefat table needs a scroll container of its own.'
         );
+    }
+
+    /**
+     * The quota notice is a screen too, and nothing rendered one until now.
+     *
+     * It is the only admin surface that describes what spends an API call, so
+     * it is the one most likely to go on naming a call the plugin stopped
+     * making — which is exactly what it was doing: it credited "refreshing the
+     * form list" for a share of the allowance, months after the last version
+     * that had a form list to refresh.
+     */
+    public function testTheQuotaWarningDescribesOnlyCallsThePluginStillMakes(): void
+    {
+        $quota = new QuotaGuard();
+        $quota->noteLimitLeft(42);
+
+        $html = $this->renderNotice($quota);
+
+        $this->assertStringContainsString('42', $html, 'The warning states what is left.');
+        $this->assertNoRemovedFeature($html);
+    }
+
+    /**
+     * Every branch of the trip notice, for the same reason: each one is prose
+     * about a feature, and prose about a feature outlives the feature.
+     */
+    public function testEveryTripNoticeDescribesOnlyFeaturesThatStillExist(): void
+    {
+        foreach ([QuotaGuard::REASON_UPSTREAM_QUOTA, QuotaGuard::REASON_UPSTREAM_API_LIMIT] as $reason) {
+            $quota = new QuotaGuard();
+            $quota->reset();
+            $quota->tripFromUpstream($reason);
+
+            $html = $this->renderNotice($quota);
+
+            $this->assertStringContainsString(
+                'stopped sending submissions',
+                $html,
+                sprintf('The %s trip has to say the forms are off.', $reason)
+            );
+            $this->assertNoRemovedFeature($html);
+        }
+    }
+
+    /**
+     * The ceiling the site derives from its own history, reached the only way
+     * it can be reached: by sending.
+     */
+    public function testTheDailyCeilingNoticeDescribesOnlyFeaturesThatStillExist(): void
+    {
+        $quota = new QuotaGuard();
+        $quota->reset();
+
+        for ($i = 0; $i < QuotaGuard::MIN_DAILY; $i++) {
+            $quota->record();
+        }
+
+        $this->assertTrue($quota->isTripped(), 'MIN_DAILY submissions have to reach the floor ceiling.');
+
+        $html = $this->renderNotice($quota);
+
+        $this->assertStringContainsString((string) QuotaGuard::MIN_DAILY, $html);
+        $this->assertNoRemovedFeature($html);
+    }
+
+    /**
+     * A notice prints on this plugin's screens, so the test has to be on one.
+     */
+    private function renderNotice(QuotaGuard $quota): string
+    {
+        $this->actAsAdministrator();
+
+        // Neither is loaded by wp-settings.php; admin.php pulls them in
+        // before any notice runs.
+        require_once ABSPATH . 'wp-admin/includes/class-wp-screen.php';
+        require_once ABSPATH . 'wp-admin/includes/screen.php';
+
+        set_current_screen('toplevel_page_' . IntegrationsPage::MENU_SLUG);
+
+        return $this->capture(fn() => (new QuotaNotice($quota))->render());
     }
 
     /**

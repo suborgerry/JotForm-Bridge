@@ -149,7 +149,7 @@ final class QuotaNotice
                     sprintf(
                         /* translators: %d: remaining API calls */
                         __(
-                            'the Jotform account has %d API calls left for today. Syncing a schema, refreshing the form list and every submission each spend one. The allowance resets at midnight Eastern time.',
+                            'the Jotform account has %d API calls left for today. Connecting a form, syncing a schema, checking the connection and every submission each spend one. The allowance resets at midnight Eastern time.',
                             'jotform-bridge'
                         ),
                         (int) $status['limit_left']
