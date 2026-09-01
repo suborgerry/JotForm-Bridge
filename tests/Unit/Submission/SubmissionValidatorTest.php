@@ -226,6 +226,31 @@ final class SubmissionValidatorTest extends TestCase
         $this->assertArrayHasKey('company', $this->validator->validate($this->schema, $input)->errors());
     }
 
+    /**
+     * The limit is stated to the visitor in characters, so it has to be counted
+     * in characters. Measured in bytes, a Cyrillic answer was refused at half
+     * the length the message named — and the test above, written in ASCII,
+     * could never have seen it.
+     */
+    public function testALimitStatedInCharactersIsCountedInCharacters(): void
+    {
+        $input            = $this->valid();
+        $input['company'] = str_repeat('я', SubmissionValidator::MAX_TEXT_LENGTH);
+
+        $result = $this->validator->validate($this->schema, $input);
+
+        $this->assertSame([], $result->errors());
+        $this->assertSame($input['company'], $result->values()['company']);
+    }
+
+    public function testTheCharacterLimitStillBitesOneCharacterLater(): void
+    {
+        $input            = $this->valid();
+        $input['company'] = str_repeat('я', SubmissionValidator::MAX_TEXT_LENGTH + 1);
+
+        $this->assertArrayHasKey('company', $this->validator->validate($this->schema, $input)->errors());
+    }
+
     public function testAnOversizedRequestIsRejectedAsAWhole(): void
     {
         $input            = $this->valid();

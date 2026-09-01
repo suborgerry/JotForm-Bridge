@@ -40,10 +40,40 @@ final class SubmissionValidator
      */
     public const MAX_PATH_LENGTH = 128;
 
+    /**
+     * Longest value each kind of field may carry, in characters.
+     *
+     * Characters, not bytes, and the distinction is not academic: these numbers
+     * are quoted back to the visitor in a message that says "characters", and
+     * every one of them was being measured with strlen(). On a site writing
+     * anything but ASCII that made the real limit a fraction of the stated one
+     * — half of it in Cyrillic or Greek, a third in most of CJK — and the
+     * message went on naming the number the field would not accept. A form that
+     * refuses a valid answer and misstates why is the failure this whole
+     * validator exists to avoid, and it would have been invisible to anyone
+     * testing in English.
+     *
+     * mb_strlen() is safe to call unconditionally: WordPress polyfills it in
+     * wp-includes/compat.php on the installs that have no mbstring extension.
+     *
+     * The byte-denominated bounds elsewhere in this class are deliberately not
+     * these. MAX_PAYLOAD_BYTES is a budget for what crosses the wire, and
+     * MAX_PATH_LENGTH bounds a semantic key, which cannot contain a multibyte
+     * character in the first place.
+     */
     public const MAX_TEXT_LENGTH     = 1000;
     public const MAX_TEXTAREA_LENGTH = 10000;
-    public const MAX_EMAIL_LENGTH    = 254;
     public const MAX_PHONE_LENGTH    = 64;
+
+    /**
+     * Longest email address, in octets rather than characters.
+     *
+     * The odd one out on purpose: 254 is the RFC 5321 bound on a forward path,
+     * which is counted in octets, and is_email() refuses a non-ASCII address
+     * before this is reached anyway. Measuring it in characters would be
+     * inventing a limit rather than applying the standard's.
+     */
+    public const MAX_EMAIL_LENGTH = 254;
 
     /**
      * @param array<string, mixed> $input Raw `fields` map from the request.
@@ -322,7 +352,7 @@ final class SubmissionValidator
             return null;
         }
 
-        if (strlen($clean) > $limit) {
+        if (mb_strlen($clean) > $limit) {
             $errors[$path] = sprintf(
                 /* translators: %d: maximum number of characters */
                 __('This value is longer than %d characters.', 'jotform-bridge'),
@@ -346,7 +376,7 @@ final class SubmissionValidator
             return null;
         }
 
-        if (strlen($clean) > self::MAX_TEXTAREA_LENGTH) {
+        if (mb_strlen($clean) > self::MAX_TEXTAREA_LENGTH) {
             $errors[$path] = sprintf(
                 /* translators: %d: maximum number of characters */
                 __('This value is longer than %d characters.', 'jotform-bridge'),
@@ -422,7 +452,7 @@ final class SubmissionValidator
         $clean = sanitize_text_field($raw);
         $digits = preg_replace('/\D+/', '', $clean) ?? '';
 
-        if (strlen($clean) > self::MAX_PHONE_LENGTH || strlen($digits) < 5) {
+        if (mb_strlen($clean) > self::MAX_PHONE_LENGTH || strlen($digits) < 5) {
             $errors[$path] = __('Enter a valid phone number.', 'jotform-bridge');
 
             return null;
