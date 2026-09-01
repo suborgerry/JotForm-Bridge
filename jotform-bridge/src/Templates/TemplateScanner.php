@@ -364,10 +364,16 @@ final class TemplateScanner
     /**
      * The moment the file last changed on disk.
      *
+     * Read by one thing: the "last modified" column on the integrations list,
+     * which is how a developer checks that the file the admin is describing is
+     * the file they just edited.
+     *
      * Editors and sync tools that rewrite a file with its original timestamp
      * (cp -p, rsync -t, "preserve modification time") leave filemtime() behind,
      * while the inode change time still moves, so the later of the two is the
-     * closer answer to "when was this template last touched".
+     * closer answer to "when was this template last touched". Kept after being
+     * questioned as cleverness with no reader: it has one, and both calls hit
+     * PHP's stat cache for the same file, so the pair costs one syscall.
      */
     private function lastChange(string $file): int
     {

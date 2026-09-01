@@ -26,6 +26,13 @@ if (!defined('ABSPATH')) {
  * explicit per-integration Sync Schema action and from nowhere else, and the
  * filesystem is read whenever the templates are listed. Saving an
  * integration, opening a screen or rendering a form never triggers a fetch.
+ *
+ * The five action handlers were considered for a class of their own, since this
+ * is the longest file in the plugin. They stay: every one of them runs the same
+ * four steps — guard(), do the work, flash(), redirect() — and moving them out
+ * would produce two classes joined by those four private helpers, which is more
+ * structure describing the same thing rather than less. Length here is five
+ * short handlers, not one long anything.
  */
 final class IntegrationsPage
 {
