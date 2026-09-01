@@ -234,7 +234,7 @@ final class IntegrationsPage
 
         $isNew         = $integration === null || $view === 'new';
         $originalSlug  = $view === 'edit' ? $slug : '';
-        $integration   = $integration ?? new Integration('', '', '', Integration::MODE_CUSTOM, '');
+        $integration   = $integration ?? new Integration('', '', '', Integration::MODE_DEFAULT, '');
         $compatibility = $this->compatibility->check($integration);
         $redirect      = $this->redirects->check($integration);
         $schema        = $integration->formId() !== '' ? $this->schemas->stored($integration->formId()) : null;

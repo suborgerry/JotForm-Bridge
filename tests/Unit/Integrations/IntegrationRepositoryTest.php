@@ -194,7 +194,7 @@ final class IntegrationRepositoryTest extends TestCase
         $this->assertSame('', $integration->formId());
     }
 
-    public function testAnUnknownRenderingModeFallsBackToCustom(): void
+    public function testAnUnknownRenderingModeFallsBackToTheDefault(): void
     {
         $integration = Integration::fromInput(
             [
@@ -204,7 +204,28 @@ final class IntegrationRepositoryTest extends TestCase
             ]
         );
 
-        $this->assertSame(Integration::MODE_CUSTOM, $integration->mode());
+        $this->assertSame(Integration::MODE_DEFAULT, $integration->mode());
+    }
+
+    /**
+     * A new integration renders from the schema unless somebody chooses a
+     * template.
+     *
+     * The fallback used to be `custom`, which meant the default integration
+     * could not render at all until a template file existed that nobody had
+     * written yet.
+     */
+    public function testAnIntegrationWithNoChosenModeRendersFromTheSchema(): void
+    {
+        $this->assertSame(
+            Integration::MODE_AUTO,
+            Integration::fromInput(['name' => 'Contact'])->mode()
+        );
+
+        $this->assertSame(
+            Integration::MODE_AUTO,
+            Integration::fromArray(['slug' => 'contact', 'name' => 'Contact'])->mode()
+        );
     }
 
     /**
@@ -227,7 +248,7 @@ final class IntegrationRepositoryTest extends TestCase
         $this->assertSame('', $integration->slug());
         $this->assertSame('', $integration->formId());
         $this->assertSame('', $integration->templateSlug());
-        $this->assertSame(Integration::MODE_CUSTOM, $integration->mode());
+        $this->assertSame(Integration::MODE_DEFAULT, $integration->mode());
 
         $this->assertNotSame(
             [],

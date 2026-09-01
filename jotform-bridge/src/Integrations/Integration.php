@@ -20,6 +20,18 @@ final class Integration
     public const MODE_CUSTOM = 'custom';
     public const MODE_AUTO   = 'auto';
 
+    /**
+     * The mode an integration has when nothing has chosen one.
+     *
+     * Auto, because it is the mode that can render on its own: a new
+     * integration set to `custom` needs a template file that does not exist
+     * yet, so the first thing the editor would say about it is that it is
+     * broken. Rendering from the synced schema needs nothing further, and
+     * moving to a template afterwards is one select away — the starter
+     * template on the same screen is generated from that same schema.
+     */
+    public const MODE_DEFAULT = self::MODE_AUTO;
+
     public const SUCCESS_MESSAGE  = 'message';
     public const SUCCESS_REDIRECT = 'redirect';
 
@@ -71,7 +83,7 @@ final class Integration
         $this->slug           = $slug;
         $this->name           = $name;
         $this->formId         = $formId;
-        $this->mode           = self::isMode($mode) ? $mode : self::MODE_CUSTOM;
+        $this->mode           = self::isMode($mode) ? $mode : self::MODE_DEFAULT;
         $this->templateSlug   = $templateSlug;
         $this->createdAt      = $createdAt;
         $this->updatedAt      = $updatedAt;
@@ -94,8 +106,10 @@ final class Integration
     public static function modes(): array
     {
         return [
-            self::MODE_CUSTOM => __('Custom template', 'jotform-bridge'),
+            // The default first: the order of a select reads as a
+            // recommendation, whatever the `selected` attribute says.
             self::MODE_AUTO   => __('Auto (rendered from the schema)', 'jotform-bridge'),
+            self::MODE_CUSTOM => __('Custom template', 'jotform-bridge'),
         ];
     }
 
@@ -182,7 +196,7 @@ final class Integration
             self::scalar($data, 'slug'),
             self::scalar($data, 'name'),
             self::scalar($data, 'form_id'),
-            $mode !== '' ? $mode : self::MODE_CUSTOM,
+            $mode !== '' ? $mode : self::MODE_DEFAULT,
             self::scalar($data, 'template'),
             isset($data['created_at']) && is_scalar($data['created_at']) ? (int) $data['created_at'] : 0,
             isset($data['updated_at']) && is_scalar($data['updated_at']) ? (int) $data['updated_at'] : 0,

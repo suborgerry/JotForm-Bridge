@@ -94,6 +94,29 @@ final class AdminScreensTest extends TestCase
         );
     }
 
+    /**
+     * The Add Integration screen offers auto rendering, not a template.
+     *
+     * A new integration defaulting to `custom` renders nothing until a
+     * template file exists, so the screen's own default was the one setting
+     * guaranteed to produce a broken form.
+     */
+    public function testTheAddScreenDefaultsToRenderingFromTheSchema(): void
+    {
+        $html = $this->renderIntegrations(['view' => 'new']);
+
+        $this->assertMatchesRegularExpression(
+            '/<option\s+value="auto"\s+selected/',
+            $html,
+            'The Add Integration screen must preselect auto rendering.'
+        );
+
+        $this->assertDoesNotMatchRegularExpression(
+            '/<option\s+value="custom"\s+selected/',
+            $html
+        );
+    }
+
     public function testTheEditorShowsTheSyncedSchemaAsATable(): void
     {
         $this->createIntegration(['slug' => 'contact', 'form_id' => self::FORM_ID]);
