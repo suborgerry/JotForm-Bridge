@@ -81,37 +81,7 @@ server, or `plugin-update-checker` against GitHub Releases.
 
 ---
 
-## 4. No check against current web standards
-
-**Problem.** The output has never been validated. The plugin generates HTML from
-a schema it does not control, and Jotform allows labels and option values that
-are not obviously safe to interpolate into markup — so "it renders in Chrome" is
-not evidence of much.
-
-**Shape.**
-
-* run the generated markup of both renderers through the W3C validator,
-  including a form with a schema that exercises the awkward cases: an empty
-  label, a label with quotes and angle brackets, duplicate option values, an
-  option value that is an empty string, a very long label;
-* check the same for the admin screens;
-* check `assets/frontend.js` against what the supported browser range actually
-  provides. It is written as ES5 and now guards `window.fetch`, but nothing
-  states what that range is — decide it and write it down, because the answer
-  changes whether the ES5 style is still worth its cost.
-
-**Already settled, by the accessibility audit rather than by a validator.** Two
-of the same integration on one page produce no duplicate ids and distinct radio
-group names, so the instance counter does what it claims. Duplicate and empty
-option values never reach the renderer: `Forms\FieldNormalizer::options()` drops
-them. An empty label and a label carrying quotes and angle brackets were
-rendered and inspected — the first is now filled in from the semantic key, the
-second escapes correctly. What is left here is the validator itself, which is a
-different question from the accessibility tree, and the browser range.
-
----
-
-## 5. Second review pass with a different model
+## 4. Second review pass with a different model
 
 **Problem.** The plugin, the removals recorded as `Amendment:` sections and the
 fixes in this file were produced by one model. That is a single point of view,
@@ -138,7 +108,7 @@ by hand.
 
 ---
 
-## 6. Sweep for hardcoding and over-engineering
+## 5. Sweep for hardcoding and over-engineering
 
 **Problem.** Nobody has read the plugin looking specifically for two opposite
 faults: a value that should have been derived or configurable but was typed in,
