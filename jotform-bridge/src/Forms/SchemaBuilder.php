@@ -19,9 +19,9 @@ final class SchemaBuilder
 {
     private FieldNormalizer $normalizer;
 
-    public function __construct(?FieldNormalizer $normalizer = null)
+    public function __construct()
     {
-        $this->normalizer = $normalizer ?? new FieldNormalizer();
+        $this->normalizer = new FieldNormalizer();
     }
 
     /**

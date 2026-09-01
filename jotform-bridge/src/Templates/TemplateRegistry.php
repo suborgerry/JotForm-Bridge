@@ -61,9 +61,9 @@ final class TemplateRegistry
      */
     private array $analysed = [];
 
-    public function __construct(?TemplateScanner $scanner = null, ?Logger $logger = null)
+    public function __construct(?Logger $logger = null)
     {
-        $this->scanner = $scanner ?? new TemplateScanner();
+        $this->scanner = new TemplateScanner();
         $this->logger  = $logger;
     }
 

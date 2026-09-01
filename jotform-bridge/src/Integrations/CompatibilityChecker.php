@@ -34,14 +34,11 @@ final class CompatibilityChecker
 
     private TemplateValidator $validator;
 
-    public function __construct(
-        SchemaRepository $schemas,
-        TemplateRegistry $templates,
-        ?TemplateValidator $validator = null
-    ) {
+    public function __construct(SchemaRepository $schemas, TemplateRegistry $templates)
+    {
         $this->schemas   = $schemas;
         $this->templates = $templates;
-        $this->validator = $validator ?? new TemplateValidator();
+        $this->validator = new TemplateValidator();
     }
 
     /**

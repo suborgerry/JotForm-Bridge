@@ -73,15 +73,14 @@ final class IntegrationsPage
         SchemaRepository $schemas,
         TemplateRegistry $templates,
         CompatibilityChecker $compatibility,
-        ?TestSubmission $tests = null,
-        ?RedirectTarget $redirects = null
+        ?TestSubmission $tests = null
     ) {
         $this->integrations  = $integrations;
         $this->forms         = $forms;
         $this->schemas       = $schemas;
         $this->templates     = $templates;
         $this->compatibility = $compatibility;
-        $this->redirects     = $redirects ?? new RedirectTarget();
+        $this->redirects     = new RedirectTarget();
         $this->tests         = $tests;
     }
 

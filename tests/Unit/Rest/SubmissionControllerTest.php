@@ -9,8 +9,8 @@ use JotformBridge\Submission\SubmissionPipeline;
 use JotformBridge\Tests\TestCase;
 
 /**
- * The controller's own behaviour: when it builds the pipeline, and that it
- * still accepts a ready-made one.
+ * The controller's own behaviour: when it builds the pipeline, and that
+ * nothing on the registration path builds one at all.
  */
 final class SubmissionControllerTest extends TestCase
 {

@@ -44,15 +44,14 @@ final class FormRenderer
         SchemaRepository $schemas,
         CustomTemplateRenderer $custom,
         Assets $assets,
-        ?Logger $logger = null,
-        ?AutoRenderer $auto = null
+        ?Logger $logger = null
     ) {
         $this->integrations = $integrations;
         $this->schemas      = $schemas;
         $this->custom       = $custom;
         $this->assets       = $assets;
         $this->logger       = $logger;
-        $this->auto         = $auto ?? new AutoRenderer();
+        $this->auto         = new AutoRenderer();
     }
 
     public function render(string $slug): string

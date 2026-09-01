@@ -228,7 +228,7 @@ final class TemplateRegistryTest extends TestCase
 
         $this->captureLog();
 
-        (new TemplateRegistry(null, new Logger(new Settings())))->all();
+        (new TemplateRegistry(new Logger(new Settings())))->all();
 
         $written = implode("\n", $this->logLines);
 
@@ -254,7 +254,7 @@ final class TemplateRegistryTest extends TestCase
 
         $this->captureLog();
 
-        $registry = new TemplateRegistry(null, new Logger(new Settings()));
+        $registry = new TemplateRegistry(new Logger(new Settings()));
 
         $this->assertSame('Child Contact', $registry->all()['contact']['name']);
         $this->assertSame([], $this->logLines);
@@ -272,7 +272,7 @@ final class TemplateRegistryTest extends TestCase
 
         $this->captureLog(false);
 
-        (new TemplateRegistry(null, new Logger(new Settings())))->all();
+        (new TemplateRegistry(new Logger(new Settings())))->all();
 
         $this->assertSame([], $this->logLines);
     }

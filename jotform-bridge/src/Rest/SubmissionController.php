@@ -63,6 +63,14 @@ final class SubmissionController
      * — and keeps a mistake inside the pipeline from taking down requests that
      * would never have touched it.
      *
+     * A ready-made pipeline used to be accepted here as well, and normalized
+     * into a factory that returned it. Nothing ever passed one — not the
+     * composition root, not a test — so the class carried two ways of being
+     * built, one of them unreachable, and the only path that mattered was the
+     * lazy one this exists for. Handing one in eagerly would also defeat the
+     * point: the object would be built on every request that registers the
+     * route, which is every request on the site.
+     *
      * @var callable(): SubmissionPipeline
      */
     private $factory;
@@ -70,18 +78,11 @@ final class SubmissionController
     private ?SubmissionPipeline $pipeline = null;
 
     /**
-     * @param callable(): SubmissionPipeline|SubmissionPipeline $pipeline
+     * @param callable(): SubmissionPipeline $factory
      */
-    public function __construct($pipeline)
+    public function __construct(callable $factory)
     {
-        if ($pipeline instanceof SubmissionPipeline) {
-            $this->pipeline = $pipeline;
-            $this->factory  = static fn(): SubmissionPipeline => $pipeline;
-
-            return;
-        }
-
-        $this->factory = $pipeline;
+        $this->factory = $factory;
     }
 
     public function register(): void

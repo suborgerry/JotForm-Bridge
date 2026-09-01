@@ -17,7 +17,6 @@ use JotformBridge\Forms\SchemaRepository;
 use JotformBridge\Integrations\CompatibilityChecker;
 use JotformBridge\Integrations\IntegrationRepository;
 use JotformBridge\Rendering\Assets;
-use JotformBridge\Rendering\AutoRenderer;
 use JotformBridge\Rendering\CustomTemplateRenderer;
 use JotformBridge\Rendering\FormRenderer;
 use JotformBridge\Rest\SubmissionController;
@@ -243,7 +242,7 @@ final class Plugin
     public function templates(): TemplateRegistry
     {
         if ($this->templates === null) {
-            $this->templates = new TemplateRegistry(null, $this->logger);
+            $this->templates = new TemplateRegistry($this->logger);
         }
 
         return $this->templates;
@@ -269,8 +268,7 @@ final class Plugin
                 $this->schemas(),
                 new CustomTemplateRenderer($this->templates()),
                 $this->assets(),
-                $this->logger,
-                new AutoRenderer()
+                $this->logger
             );
         }
 

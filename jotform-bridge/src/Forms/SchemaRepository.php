@@ -51,10 +51,10 @@ final class SchemaRepository
 
     private SchemaBuilder $builder;
 
-    public function __construct(JotformClient $client, ?SchemaBuilder $builder = null)
+    public function __construct(JotformClient $client)
     {
         $this->client  = $client;
-        $this->builder = $builder ?? new SchemaBuilder();
+        $this->builder = new SchemaBuilder();
     }
 
     /**

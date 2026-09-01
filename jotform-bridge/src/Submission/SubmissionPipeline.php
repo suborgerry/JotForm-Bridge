@@ -68,39 +68,39 @@ final class SubmissionPipeline
     private QuotaGuard $quota;
 
     /**
-     * The three things that cannot be built here come first, then the two the
-     * composition root always has an opinion about, then the collaborators that
-     * are the same object however they are made.
+     * What has to be handed in, and nothing else.
      *
-     * The order is not cosmetic. It used to end with the quota guard and carry
-     * the logger in the middle, so the one caller that supplies both had to
-     * write `null, null, null, $logger, null, null, $quota` and count positions
-     * to get there. A row of nulls is a dependency graph nobody can read, and
-     * inserting a parameter in the middle of one moves every argument after it
-     * with nothing but the type checker to notice.
+     * This used to take ten parameters, seven of them optional. Five of those
+     * seven — the validator, the mapper, the spam guard, the redirect resolver
+     * and the rate limiter — were never supplied by the composition root, by a
+     * test, or by anything else: every caller took the default. They were not
+     * seams, only the appearance of one, and they made the dependency graph
+     * unreadable in exchange for nothing. All five are stateless services with
+     * no constructor of their own, so substituting them buys nothing that the
+     * filters they already expose do not.
+     *
+     * The two that remain optional are supplied, and for a reason each. The
+     * quota guard has to be the same instance the admin notice reads, so the
+     * composition root owns it. The logger is absent on purpose in the unit
+     * tests, which is how they assert that nothing here requires one.
      */
     public function __construct(
         IntegrationRepository $integrations,
         SchemaRepository $schemas,
         JotformClient $client,
         ?QuotaGuard $quota = null,
-        ?Logger $logger = null,
-        ?SubmissionValidator $validator = null,
-        ?SubmissionMapper $mapper = null,
-        ?SpamGuard $spam = null,
-        ?RedirectTarget $redirects = null,
-        ?RateLimiter $limiter = null
+        ?Logger $logger = null
     ) {
-        $this->redirects = $redirects ?? new RedirectTarget();
-        $this->limiter   = $limiter ?? new RateLimiter();
-        $this->quota     = $quota ?? new QuotaGuard();
         $this->integrations = $integrations;
         $this->schemas      = $schemas;
         $this->client       = $client;
-        $this->validator    = $validator ?? new SubmissionValidator();
-        $this->mapper       = $mapper ?? new SubmissionMapper();
-        $this->spam         = $spam ?? new SpamGuard();
+        $this->quota        = $quota ?? new QuotaGuard();
         $this->logger       = $logger;
+        $this->validator    = new SubmissionValidator();
+        $this->mapper       = new SubmissionMapper();
+        $this->spam         = new SpamGuard();
+        $this->redirects    = new RedirectTarget();
+        $this->limiter      = new RateLimiter();
     }
 
     /**
