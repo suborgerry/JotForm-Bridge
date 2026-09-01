@@ -112,7 +112,7 @@ $jfbAll    = $settings->all();
                         id="jfb-base-url"
                         name="jotform_bridge[base_url]"
                         value="<?php echo esc_attr((string) $jfbAll['base_url']); ?>"
-                        placeholder="https://api.jotform.com"
+                        placeholder="<?php echo esc_attr(Settings::regionUrl(Settings::REGION_STANDARD)); ?>"
                     >
                     <p class="description">
                         <?php

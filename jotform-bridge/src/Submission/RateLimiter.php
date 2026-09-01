@@ -36,10 +36,24 @@ final class RateLimiter
 {
     public const TRANSIENT_PREFIX = 'jotform_bridge_rate_';
 
-    /** Submissions allowed from one address per minute. */
+    /**
+     * Submissions allowed from one address per minute.
+     *
+     * Five, because a person who genuinely needs to send the same form twice
+     * in a minute exists — a typo spotted immediately, a second enquiry about
+     * a different thing — and a person who needs to send it six times does
+     * not. The minute window is what stops a burst; the hour below is what
+     * stops a slow drip that never trips it.
+     */
     public const DEFAULT_PER_MINUTE = 5;
 
-    /** Submissions allowed from one address per hour. */
+    /**
+     * Submissions allowed from one address per hour.
+     *
+     * Deliberately far below six times the per-minute allowance. A source
+     * sending steadily just under the minute limit for an hour is not a
+     * visitor, whatever any single minute of it looks like.
+     */
     public const DEFAULT_PER_HOUR = 30;
 
     /**
@@ -51,7 +65,14 @@ final class RateLimiter
      */
     public const DEFAULT_GLOBAL_PER_MINUTE = 15;
 
-    /** Requests allowed from one address per hour across every integration. */
+    /**
+     * Requests allowed from one address per hour across every integration.
+     *
+     * Not the sum of the per-integration hourly budgets, and not meant to be:
+     * a site with six forms does not have visitors who use six forms. This is
+     * the ceiling on what one address can cost the server in an hour, whatever
+     * it names.
+     */
     public const DEFAULT_GLOBAL_PER_HOUR = 60;
 
     /**

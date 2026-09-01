@@ -22,13 +22,35 @@ if (!defined('ABSPATH')) {
  */
 final class SubmissionValidator
 {
-    /** Upper bound on how many semantic paths one request may carry. */
+    /**
+     * Upper bound on how many semantic paths one request may carry.
+     *
+     * A hundred is several times the largest form anyone builds by hand and
+     * still small enough that the loop below cannot be turned into work. It is
+     * checked before the schema is consulted, so a request naming a thousand
+     * fields costs one count() rather than a thousand lookups.
+     */
     public const MAX_FIELDS = 100;
 
-    /** Upper bound on the total size of the submitted values, in bytes. */
+    /**
+     * Upper bound on the total size of the submitted values, in bytes.
+     *
+     * Bytes, because this is a budget for what crossed the wire rather than a
+     * limit quoted to anybody. Sixty-four kilobytes is six times the longest
+     * single textarea this class will accept, which leaves room for a form of
+     * several long answers and none for a payload built to be expensive to
+     * walk. SubmissionController's MAX_BODY_BYTES is the coarse outer rail at
+     * four times this; this is the one that bounds the values themselves.
+     */
     public const MAX_PAYLOAD_BYTES = 65536;
 
-    /** Upper bound on how many values one multi-value field may carry. */
+    /**
+     * Upper bound on how many values one multi-value field may carry.
+     *
+     * Matched to MAX_FIELDS rather than reasoned about separately: a checkbox
+     * question with more than a hundred options does not exist, and a request
+     * claiming one is doing something other than answering a form.
+     */
     public const MAX_VALUES = 100;
 
     /**

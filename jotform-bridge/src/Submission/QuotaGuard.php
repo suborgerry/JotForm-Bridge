@@ -69,12 +69,36 @@ final class QuotaGuard
 
     /**
      * How far above the recent median a day may go before it is stopped.
+     *
+     * Six, because the distribution this multiplies is not symmetric. A form's
+     * ordinary week is flat and its real days are spikes — a newsletter went
+     * out, a post did well, a trade show opened — and those land at several
+     * times the median without anything being wrong. A factor of two or three
+     * would trip on the site's best days, which are the days the forms matter
+     * most; the flood this exists to stop arrives at hundreds of times the
+     * median and is caught by six just as surely as by three.
      */
     public const BURST_FACTOR = 6;
 
-    /** Days of history kept, and the window the median is taken over. */
+    /**
+     * The window the median is taken over.
+     *
+     * Seven days, so the ceiling is a week rather than a habit: a form that is
+     * quiet at weekends and busy on Mondays gets one median, not two.
+     */
+    private const MEDIAN_DAYS = 7;
+
+    /**
+     * Days of history kept.
+     *
+     * More than MEDIAN_DAYS reads, on purpose. The daily counts are the only
+     * record of what this site's traffic normally looks like, they are handed
+     * to `jotform_bridge_daily_ceiling` in full so a filter can decide
+     * differently from the way the median decides, and thirty integers in an
+     * option costs nothing. It is not dead storage; it is the evidence for a
+     * decision the site owner may want to overrule.
+     */
     private const HISTORY_DAYS = 30;
-    private const MEDIAN_DAYS  = 7;
 
     /**
      * The reason this submission may not be sent, or an empty string.

@@ -31,7 +31,7 @@ accepting that the API key will be sent there.
 | --- | --- | --- |
 | `$hosts` | `array<int, string>` | Allowed hosts. |
 
-Fires in `jotform-bridge/src/Settings/Settings.php:343`.
+Fires in `jotform-bridge/src/Settings/Settings.php:356`.
 
 ## `jotform_bridge_auto_field_html`
 
@@ -83,7 +83,7 @@ Filters the daily ceiling the quota guard trips at.
 | `$median` | `int` | Median of the last seven days. |
 | `$state` | `array<string, mixed>` | Raw guard state. |
 
-Fires in `jotform-bridge/src/Submission/QuotaGuard.php:239`.
+Fires in `jotform-bridge/src/Submission/QuotaGuard.php:263`.
 
 ## `jotform_bridge_duplicate_window`
 
@@ -109,7 +109,7 @@ Set either value to 0 to disable that window.
 | --- | --- | --- |
 | `$limits` | `array{per_minute:int, per_hour:int}` | Current limits. |
 
-Fires in `jotform-bridge/src/Submission/RateLimiter.php:161`.
+Fires in `jotform-bridge/src/Submission/RateLimiter.php:182`.
 
 ## `jotform_bridge_minimum_time`
 
@@ -148,7 +148,7 @@ and needs nothing done to the script.
 | `$bits` | `int` | Leading zero bits required. |
 | `$slug` | `string` | Integration slug. |
 
-Fires in `jotform-bridge/src/Submission/Guards/ProofOfWork.php:167`.
+Fires in `jotform-bridge/src/Submission/Guards/ProofOfWork.php:173`.
 
 ## `jotform_bridge_pow_required`
 
@@ -164,7 +164,7 @@ cached copy of an older version of the plugin's script.
 | `$required` | `bool` | Whether the proof is mandatory. |
 | `$slug` | `string` | Integration slug. |
 
-Fires in `jotform-bridge/src/Submission/Guards/ProofOfWork.php:183`.
+Fires in `jotform-bridge/src/Submission/Guards/ProofOfWork.php:189`.
 
 ## `jotform_bridge_rate_limits`
 
@@ -177,7 +177,7 @@ Set either value to 0 to disable that window.
 | `$limits` | `array{per_minute:int, per_hour:int}` | Current limits. |
 | `$slug` | `string` | Integration slug. |
 
-Fires in `jotform-bridge/src/Submission/RateLimiter.php:182`.
+Fires in `jotform-bridge/src/Submission/RateLimiter.php:203`.
 
 ## `jotform_bridge_spam_check`
 

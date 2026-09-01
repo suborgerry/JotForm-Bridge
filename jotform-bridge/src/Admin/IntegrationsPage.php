@@ -49,6 +49,17 @@ final class IntegrationsPage
 
     private const FLASH_PREFIX = 'jotform_bridge_notice_';
 
+    /**
+     * Where the top-level menu sits, below Settings and above Tools.
+     *
+     * Fractional, and deliberately. WordPress keys the menu array by this
+     * value, so two plugins choosing the same whole number do not end up
+     * adjacent — one silently replaces the other, and which one depends on
+     * plugin load order. Whole numbers are exactly what everybody picks, which
+     * is what makes them the collision.
+     */
+    private const MENU_POSITION = 58.7;
+
     private IntegrationRepository $integrations;
 
     private FormRepository $forms;
@@ -106,7 +117,7 @@ final class IntegrationsPage
             self::MENU_SLUG,
             [$this, 'render'],
             $this->menuIcon(),
-            58
+            self::MENU_POSITION
         );
 
         add_submenu_page(

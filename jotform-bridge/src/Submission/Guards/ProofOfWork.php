@@ -58,6 +58,12 @@ final class ProofOfWork
     /**
      * How old a solution may be. Generous, because it is computed when the
      * visitor starts filling the form in rather than when they submit it.
+     *
+     * The frontend recomputes at POW_STALE, 240 seconds, and that has to stay
+     * comfortably below this: a browser reusing a solution the guard has aged
+     * out gets a refusal it cannot explain to the visitor. Lowering this value
+     * without lowering that one is how a form starts failing for anybody who
+     * takes more than a few minutes to fill it in.
      */
     public const WINDOW = 600;
 

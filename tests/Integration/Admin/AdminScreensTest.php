@@ -280,6 +280,61 @@ final class AdminScreensTest extends TestCase
     }
 
     /**
+     * The menu is registered by WordPress, not by us, so nothing in the unit
+     * suite can see whether it arrived — or where.
+     *
+     * The position matters as much as the presence: WordPress keys $menu by it,
+     * so a plugin that picks the same slot as another does not sit beside it,
+     * it overwrites it. The fractional slot is what keeps ours out of the way
+     * of everybody who typed a whole number.
+     */
+    public function testTheTopLevelMenuIsRegisteredInASlotOfItsOwn(): void
+    {
+        global $menu, $submenu;
+
+        $this->actAsAdministrator();
+
+        require_once ABSPATH . 'wp-admin/includes/plugin.php';
+
+        $menu    = [];
+        $submenu = [];
+
+        $plugin = $this->plugin();
+
+        (new IntegrationsPage(
+            $plugin->integrations(),
+            $plugin->forms(),
+            $plugin->schemas(),
+            $plugin->templates(),
+            $plugin->compatibility()
+        ))->registerMenu();
+
+        $slots = [];
+
+        foreach ($menu as $position => $item) {
+            $slots[(string) $position] = $item[2] ?? '';
+        }
+
+        $this->assertContains(
+            IntegrationsPage::MENU_SLUG,
+            array_values($slots),
+            'The top-level menu did not register.'
+        );
+
+        $ours = array_search(IntegrationsPage::MENU_SLUG, $slots, true);
+
+        $this->assertIsString($ours);
+        $this->assertStringContainsString('.', $ours, 'A whole-numbered slot is one another plugin can overwrite.');
+
+        $this->assertArrayHasKey(IntegrationsPage::MENU_SLUG, $submenu);
+        $this->assertSame(
+            IntegrationsPage::MENU_SLUG,
+            $submenu[IntegrationsPage::MENU_SLUG][0][2] ?? '',
+            'Integrations is the first submenu, which is what makes it the landing screen.'
+        );
+    }
+
+    /**
      * A notice prints on this plugin's screens, so the test has to be on one.
      */
     private function renderNotice(QuotaGuard $quota): string

@@ -5,6 +5,19 @@
  * Everything here is scoped to one of the plugin's own wrappers — .jfb-settings,
  * .jfb-integrations, .jfb-integration — except where a core table rule has to be
  * outweighed, and even then the plugin's own class carries the specificity.
+ *
+ * Every colour below is one WordPress core already uses in wp-admin, and was
+ * checked against core's own stylesheets rather than picked to look right:
+ * #d63638 #b32d2e #fcf0f1 (error), #dba617 #996800 #fcf9e8 (warning), #007017
+ * (success), #dcdcde #c3c4c7 #a7aaad #f6f7f7 (borders, disabled, grounds) and
+ * #3858e9 (focus). Matching them is not decoration — an admin screen that
+ * invents its own red is a screen that reads as a different product, and core
+ * exposes none of these to plugins as a variable, so they have to be repeated
+ * here to be used at all.
+ *
+ * The single exception is #8a2424, which is in no core stylesheet: it is a
+ * hand-darkened hover for the delete button, because core ships a destructive
+ * link style and no destructive button style.
  */
 
 /* An integration whose template is gone renders nothing on the front end, so
@@ -153,10 +166,8 @@ tr.jfb-row-unsupported .jfb-unsupported-note {
 }
 
 /* Health and target states, previously written as inline style attributes.
-   The hex values are WordPress core's own palette: #b32d2e is $alert-red,
-   #996800 $alert-yellow and #00a32a $alert-green, as used by core's notice
-   borders. Repeated here rather than referenced because core exposes them to
-   plugins only through Sass variables the admin never ships. */
+   See the palette note at the top of this file for where the colours come
+   from. */
 .jfb-state-error {
     color: #b32d2e;
 }
@@ -166,8 +177,11 @@ tr.jfb-row-unsupported .jfb-unsupported-note {
 }
 
 /* Not core's #00a32a, which is 2.93:1 on the admin's grey and 3.35:1 on white:
-   core uses that green for notice borders and icons, never for body text. This
-   is the darker green already used by the copied marker, at 6.3:1. */
+   core uses that green for notice borders and icons, never for body text.
+   #007017 is what core itself puts on green text, .copy-to-clipboard-container
+   .success among them — which is to say the copied marker below is not a
+   near-miss of core's success colour but the same one, used for the same job,
+   at 6.3:1. */
 .jfb-state-ok {
     color: #007017;
 }

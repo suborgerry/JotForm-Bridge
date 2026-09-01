@@ -64,7 +64,23 @@
      */
     var POW_BITS = 16;
 
-    /** How long a computed solution stays usable, in seconds. */
+    /**
+     * How long a computed solution stays usable here, in seconds.
+     *
+     * This is the second number in this file that has a counterpart in PHP,
+     * and the relationship is required rather than tidy: it has to stay
+     * comfortably under ProofOfWork::WINDOW, which is what the guard will
+     * still accept. Reuse a solution the server has aged out and the
+     * submission is refused with no way for the visitor to tell why — the
+     * form simply stops working after a few minutes on the page.
+     *
+     * The margin is wide (240 against 600) because the two clocks are not the
+     * same clock, and because the solve that follows a stale one takes time of
+     * its own on a slow device. Unlike the difficulty, this is not sent from
+     * PHP: the window has no filter, so there is one value on each side and
+     * nothing that can move them apart at runtime. If WINDOW ever becomes
+     * filterable, this has to travel the same way powBits does.
+     */
     var POW_STALE = 240;
 
     /** Hashes per slice, so a slow device never freezes while solving. */

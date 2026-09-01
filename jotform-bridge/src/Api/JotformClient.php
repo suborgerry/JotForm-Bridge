@@ -71,7 +71,31 @@ final class JotformClient
         'upgrade your account',
     ];
 
-    private const DEFAULT_TIMEOUT = 15;
+    /**
+     * How long to wait for Jotform, in seconds.
+     *
+     * Fifteen is long for a request a visitor is waiting on, and the number
+     * next door argues the opposite case: Turnstile verifies on five, because
+     * a slow check is worse for the visitor than the fail policy behind it.
+     * The difference is that a Turnstile verification is a question, and a
+     * submission is a write.
+     *
+     * Giving up on a write does not undo it. When the socket closes early the
+     * submission may well have landed in Jotform, and all a shorter timeout
+     * buys is that we no longer know whether it did — the visitor is told to
+     * try again, and either loses their answer or files it twice. So on this
+     * path the argument runs the other way: wait long enough to hear the
+     * verdict, because the verdict is the only thing that distinguishes the
+     * two outcomes.
+     *
+     * The same value covers the admin reads (Check Connection, Connect form,
+     * Sync Schema) because nobody is waiting on those but an administrator who
+     * pressed a button and can see that it is working.
+     *
+     * There is no per-call override. One existed as a constructor parameter
+     * that no caller ever passed, which is not a knob but the memory of one.
+     */
+    private const TIMEOUT = 15;
 
     private string $apiKey;
 
@@ -79,14 +103,11 @@ final class JotformClient
 
     private ?Logger $logger;
 
-    private int $timeout;
-
-    public function __construct(string $apiKey, string $baseUrl, ?Logger $logger = null, int $timeout = self::DEFAULT_TIMEOUT)
+    public function __construct(string $apiKey, string $baseUrl, ?Logger $logger = null)
     {
         $this->apiKey  = trim($apiKey);
         $this->baseUrl = untrailingslashit(trim($baseUrl));
         $this->logger  = $logger;
-        $this->timeout = $timeout;
     }
 
     public static function fromSettings(Settings $settings, ?Logger $logger = null): self
@@ -314,7 +335,7 @@ final class JotformClient
         $response = wp_remote_get(
             $url,
             [
-                'timeout' => $this->timeout,
+                'timeout' => self::TIMEOUT,
                 'headers' => [
                     'APIKEY' => $this->apiKey,
                     'Accept' => 'application/json',
@@ -342,7 +363,7 @@ final class JotformClient
         $response = wp_remote_post(
             $this->baseUrl . '/' . ltrim($path, '/'),
             [
-                'timeout' => $this->timeout,
+                'timeout' => self::TIMEOUT,
                 'headers' => [
                     'APIKEY'       => $this->apiKey,
                     'Accept'       => 'application/json',

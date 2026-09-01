@@ -225,10 +225,23 @@ final class Settings
                 return $custom;
             }
 
-            return self::REGION_URLS[self::REGION_STANDARD];
+            return self::regionUrl(self::REGION_STANDARD);
         }
 
-        return self::REGION_URLS[$region];
+        return self::regionUrl($region);
+    }
+
+    /**
+     * The documented base URL for one region.
+     *
+     * Public because the settings screen shows the standard region's address as
+     * the placeholder for the custom field, and it had that address typed into
+     * the markup — a second copy of a value this class exists to be the single
+     * source of.
+     */
+    public static function regionUrl(string $region): string
+    {
+        return self::REGION_URLS[$region] ?? self::REGION_URLS[self::REGION_STANDARD];
     }
 
     public function debugEnabled(): bool

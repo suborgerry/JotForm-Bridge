@@ -19,6 +19,27 @@
 
     var SETTINGS = window.jotformBridgeAdmin || {};
 
+    /**
+     * How long to wait after clearing the live region before writing to it.
+     *
+     * A screen reader announces a change to the region's text. Clearing and
+     * rewriting in the same tick is not two changes but one, and the same
+     * message twice running would be announced once — which is exactly the case
+     * that matters, somebody pressing the same copy button again. One frame is
+     * enough to make them separate; a delay long enough to notice would be a
+     * delay before the visitor is told anything.
+     */
+    var ANNOUNCE_DELAY = 100;
+
+    /**
+     * How long the "Copied" marker stays up, in milliseconds.
+     *
+     * Long enough to be seen after the eye has moved back from the button,
+     * short enough that it is gone before the next copy — otherwise a marker
+     * left over from the previous button says the wrong thing about this one.
+     */
+    var COPIED_VISIBLE = 1500;
+
     /** Every sentence this script says comes from PHP, so it can be translated. */
     function message(key) {
         return (SETTINGS.messages && SETTINGS.messages[key]) || '';
@@ -63,7 +84,7 @@
 
         window.setTimeout(function () {
             region.textContent = text;
-        }, 100);
+        }, ANNOUNCE_DELAY);
     }
 
     /**
@@ -207,7 +228,7 @@
 
         button.__jfbCopyTimer = window.setTimeout(function () {
             button.classList.remove('is-copied');
-        }, 1500);
+        }, COPIED_VISIBLE);
     }
 
     function bindCopyButtons() {
