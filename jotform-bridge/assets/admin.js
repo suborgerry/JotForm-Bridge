@@ -366,7 +366,12 @@
                 var data = (payload && payload.data) || {};
 
                 if (payload && payload.success) {
-                    report(target, 'ok', data.message || '', data.hint || '');
+                    // The state comes from the server rather than from the fact
+                    // that the request succeeded: a form that was found but sits
+                    // in the Jotform trash, or whose definition would not load,
+                    // is a successful lookup with a bad answer, and painting it
+                    // the same green as a working form is how it gets missed.
+                    report(target, data.state || 'ok', data.message || '', data.hint || '');
 
                     return;
                 }

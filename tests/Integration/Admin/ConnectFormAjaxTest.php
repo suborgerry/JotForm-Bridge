@@ -6,6 +6,7 @@ namespace JotformBridge\Tests\Integration\Admin;
 
 use JotformBridge\Admin\IntegrationsPage;
 use JotformBridge\Forms\FormRepository;
+use JotformBridge\Forms\SchemaRepository;
 use JotformBridge\Tests\Integration\TestCase;
 
 /**
@@ -25,7 +26,7 @@ final class ConnectFormAjaxTest extends TestCase
     public function testConnectingResolvesTheTitleAndStoresTheRecord(): void
     {
         $this->actAsAdministrator();
-        $this->answerWith(200, $this->fixture('form'));
+        $this->answerWith(200, $this->fixture('form'), $this->fixture('form-questions'));
 
         $answer = $this->ajax(fn() => $this->connect(self::FORM_ID, wp_create_nonce(IntegrationsPage::ACTION_CONNECT)));
 
@@ -38,6 +39,89 @@ final class ConnectFormAjaxTest extends TestCase
 
         $this->assertNotNull($record, 'The connected form record is what labels the ID in the admin.');
         $this->assertSame('Contact Form', $record['title']);
+    }
+
+    /**
+     * The dead end this button was changed to remove: the editor of an
+     * integration that does not exist yet has no Sync Schema button, so a form
+     * connected there could not be given a definition at all.
+     */
+    public function testConnectingAlsoLoadsTheSchemaOfAFormThatHasNone(): void
+    {
+        $this->actAsAdministrator();
+        $this->answerWith(200, $this->fixture('form'), $this->fixture('form-questions'));
+
+        $answer = $this->ajax(fn() => $this->connect(self::FORM_ID, wp_create_nonce(IntegrationsPage::ACTION_CONNECT)));
+
+        $this->assertTrue($answer['success']);
+        $this->assertSame('ok', $answer['data']['state']);
+        $this->assertStringContainsString('definition was loaded', $answer['data']['hint']);
+        $this->assertStringNotContainsString(
+            'Sync Schema',
+            $answer['data']['hint'],
+            'The reply must not send the administrator to a button the Add Integration screen does not render.'
+        );
+
+        $this->assertTrue(
+            $this->plugin()->schemas()->isSynced(self::FORM_ID),
+            'A connected form has to be renderable without a second action.'
+        );
+    }
+
+    /**
+     * The other half of the rule: connecting refreshes a title, never a stored
+     * schema. Replacing one is Sync Schema's job, and a definition a live site
+     * renders from must not move because somebody re-checked a form ID.
+     */
+    public function testConnectingLeavesAStoredSchemaAlone(): void
+    {
+        $this->actAsAdministrator();
+        $this->syncSchema(self::FORM_ID);
+
+        $stored = get_option(SchemaRepository::optionKey(self::FORM_ID));
+
+        // The questions endpoint is left unmocked on purpose: asking it again
+        // would throw rather than quietly overwrite what is stored.
+        $this->answerWith(200, $this->fixture('form'));
+
+        $answer = $this->ajax(fn() => $this->connect(self::FORM_ID, wp_create_nonce(IntegrationsPage::ACTION_CONNECT)));
+
+        $this->assertTrue($answer['success']);
+        $this->assertSame('ok', $answer['data']['state']);
+        $this->assertStringContainsString('Sync Schema', $answer['data']['hint']);
+        $this->assertSame($stored, get_option(SchemaRepository::optionKey(self::FORM_ID)));
+    }
+
+    /**
+     * A definition that will not load is a warning, not a refusal: the form was
+     * found, which is what the button was pressed to establish.
+     */
+    public function testAFormThatIsFoundButWhoseSchemaFailsIsStillConnected(): void
+    {
+        $this->actAsAdministrator();
+        $this->mockHttp(
+            function (string $url) {
+                if (strpos($url, '/form/' . self::FORM_ID . '/questions') !== false) {
+                    return $this->httpResponse(500, ['responseCode' => 500, 'message' => 'Internal error']);
+                }
+
+                return strpos($url, '/form/' . self::FORM_ID) === false
+                    ? null
+                    : $this->httpResponse(200, $this->fixture('form'));
+            }
+        );
+
+        $answer = $this->ajax(fn() => $this->connect(self::FORM_ID, wp_create_nonce(IntegrationsPage::ACTION_CONNECT)));
+
+        $this->assertTrue($answer['success'], 'The lookup succeeded; only the schema did not.');
+        $this->assertSame('warning', $answer['data']['state']);
+        $this->assertStringContainsString('could not be loaded', $answer['data']['hint']);
+
+        $this->assertTrue(
+            (new FormRepository($this->plugin()->client()))->has(self::FORM_ID),
+            'The form record is what the successful half of the action produced.'
+        );
+        $this->assertFalse($this->plugin()->schemas()->isSynced(self::FORM_ID));
     }
 
     public function testAForgedNonceIsRefusedAndNothingIsAsked(): void
@@ -112,7 +196,7 @@ final class ConnectFormAjaxTest extends TestCase
     {
         $this->actAsAdministrator();
 
-        $this->answerWith(200, $this->fixture('form'));
+        $this->answerWith(200, $this->fixture('form'), $this->fixture('form-questions'));
         $this->ajax(fn() => $this->connect(self::FORM_ID, wp_create_nonce(IntegrationsPage::ACTION_CONNECT)));
 
         $stored = get_option(FormRepository::OPTION);
@@ -130,14 +214,30 @@ final class ConnectFormAjaxTest extends TestCase
     }
 
     /**
-     * @param array<string, mixed> $body
+     * Answers the two calls Connect form now makes, separately.
+     *
+     * `/form/{id}` and `/form/{id}/questions` share a prefix, so a responder
+     * matching on the prefix alone would hand the form fixture back as the
+     * question list — a green test built on an answer Jotform never gives.
+     *
+     * @param array<string, mixed>      $body      What `/form/{id}` answers.
+     * @param array<string, mixed>|null $questions What `/form/{id}/questions`
+     *                                             answers, or null to leave
+     *                                             the schema call unmocked so
+     *                                             that making it fails loudly.
      */
-    private function answerWith(int $status, array $body): void
+    private function answerWith(int $status, array $body, ?array $questions = null): void
     {
         $this->mockHttp(
-            fn(string $url) => strpos($url, '/form/' . self::FORM_ID) === false
-                ? null
-                : $this->httpResponse($status, $body)
+            function (string $url) use ($status, $body, $questions) {
+                if (strpos($url, '/form/' . self::FORM_ID . '/questions') !== false) {
+                    return $questions === null ? null : $this->httpResponse(200, $questions);
+                }
+
+                return strpos($url, '/form/' . self::FORM_ID) === false
+                    ? null
+                    : $this->httpResponse($status, $body);
+            }
         );
     }
 

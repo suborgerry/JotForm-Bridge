@@ -2079,10 +2079,13 @@ These rules cannot be broken without an explicit change of requirements:
 19. The redirect target comes from the Integration, is resolved by the backend
     and must be an internal URL; the frontend never dictates where a redirect
     goes.
-20. The schema is synchronized manually only, by the Sync Schema button, and for
-    one integration at a time. No TTL, no cron, no fetch on a frontend path:
-    rendering and submission read the stored schema or refuse. See "Amendment:
-    manual schema synchronization".
+20. The schema is synchronized manually only — by the Sync Schema button, or by
+    the Connect form button when the named form has no schema stored at all —
+    and for one form at a time. No TTL, no cron, no fetch on a frontend path:
+    rendering and submission read the stored schema or refuse. A stored schema
+    is replaced by Sync Schema and by nothing else. See "Amendment: manual
+    schema synchronization" and "Amendment: Connect form loads a schema that
+    does not exist yet".
 21. The plugin stores no submission values, no IP addresses and no visitor
     identifiers of any kind. Submitted data lives in Jotform and nowhere else.
     What reaches the options table is configuration, form definitions and
@@ -2305,3 +2308,43 @@ What has to hold:
    nonexistent form, another account's form and a bad API key identically. The
    admin names all three possibilities and points at Check Connection; it never
    claims to know which one happened.
+
+---
+
+# Amendment: Connect form loads a schema that does not exist yet
+
+Overturns the clause of "Amendment: manual schema synchronization" that made
+**Sync Schema** the only action allowed to write a schema, and narrows it to the
+only action allowed to *replace* one.
+
+The dead end it removes: **Sync Schema** posts the slug of a saved integration,
+so it is not rendered while one is being created. **Connect form** answered a
+successful lookup with "Press Sync Schema below to load its fields" — naming a
+button that was not on the screen. The administrator had a connected form, no
+schema, and no way to get one without saving an integration the editor had just
+told them was incomplete.
+
+The rule now:
+
+1. **Connect form syncs a form whose schema is not stored.** Connecting a form
+   and then discovering it cannot render is not two decisions; it is one, and
+   on the "Add Integration" screen the second half was unreachable.
+2. **Connect form never replaces a stored schema.** A form that already has one
+   keeps it, and is told that Sync Schema is what refreshes it. Two things
+   depend on that: a live site's definition still never moves without somebody
+   asking for it, which is the whole point of the amendment above; and the
+   schema table on the open editor cannot go stale under the reader, which is
+   the failure "Amendment: template discovery reads the theme on demand" was
+   written about in the other half of the same screen.
+3. **A failed sync is a warning, not a refusal.** The form was found — that is
+   what the button was pressed to establish — so the record is stored, the
+   status line says the definition could not be loaded and quotes the upstream
+   reason, and Sync Schema is still there to try again.
+4. **The status line's colour comes from the server.** A form in the Jotform
+   trash, and a form whose definition would not load, are successful lookups
+   with bad answers; `data.state` carries `warning` for them so they are not
+   painted the same green as a working one.
+
+Unchanged: nothing is fetched by a page view, a save, an activation, an upgrade
+or a submission, and no schema is ever fetched for more than the one form ID
+that was named.

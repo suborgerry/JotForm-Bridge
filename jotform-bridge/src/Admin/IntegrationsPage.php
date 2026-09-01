@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace JotformBridge\Admin;
 
 use JotformBridge\Forms\FormRepository;
+use JotformBridge\Forms\FormSchema;
 use JotformBridge\Forms\SchemaRepository;
 use JotformBridge\Integrations\CompatibilityChecker;
 use JotformBridge\Integrations\Integration;
@@ -23,9 +24,10 @@ if (!defined('ABSPATH')) {
  * "Jotform Bridge → Integrations": the list, the editor and their actions.
  *
  * The screen itself only reads stored state. Jotform is contacted from the
- * explicit per-integration Sync Schema action and from nowhere else, and the
- * filesystem is read whenever the templates are listed. Saving an
- * integration, opening a screen or rendering a form never triggers a fetch.
+ * explicit per-integration actions and from nowhere else — Connect form, Sync
+ * Schema and Send Test Submission — and the filesystem is read whenever the
+ * templates are listed. Saving an integration, opening a screen or rendering a
+ * form never triggers a fetch.
  *
  * The five action handlers were considered for a class of their own, since this
  * is the longest file in the plugin. They stay: every one of them runs the same
@@ -317,7 +319,7 @@ final class IntegrationsPage
         // the schema is the next warning down.
         if ($integration->formId() !== '' && !$this->forms->has($integration->formId())) {
             $warnings[] = __(
-                'This Jotform form has not been connected yet. Press Connect form to check that it exists and to read its title.',
+                'This Jotform form has not been connected yet. Press Connect form to check that it exists and to load its definition.',
                 'jotform-bridge'
             );
         }
@@ -487,7 +489,7 @@ final class IntegrationsPage
     }
 
     /**
-     * Resolves one Jotform form ID into a title, and stores the result.
+     * Resolves one Jotform form ID into a title, and loads its schema.
      *
      * The one place the plugin asks Jotform about a form's existence. It
      * deliberately cannot say *why* a lookup failed: Jotform answers 401 with
@@ -495,6 +497,13 @@ final class IntegrationsPage
      * account and an API key that is wrong, so the reply names all three and
      * points at Check Connection, which is the only thing that separates the
      * last of them from the first two.
+     *
+     * It also syncs the schema of a form that has none — see
+     * connectSchema() and the amendment in AGENTS.md. The editor of an
+     * integration that has not been created yet has no Sync Schema button,
+     * because that action posts the slug of a saved integration, so a form
+     * connected here used to be told to press a button that was not on the
+     * screen. One press now does both halves of "make this form usable".
      */
     public function handleConnectForm(): void
     {
@@ -539,13 +548,24 @@ final class IntegrationsPage
             );
         }
 
-        $form = $response->data();
+        $form   = $response->data();
+        $schema = $this->connectSchema($formId);
+        $hints  = [];
+        $state  = $schema['state'];
+
+        if (strtoupper((string) $form['status']) === FormRepository::STATUS_DELETED) {
+            $hints[] = __('This form is in the Jotform trash. It will not accept submissions until it is restored.', 'jotform-bridge');
+            $state   = 'warning';
+        }
+
+        $hints[] = $schema['hint'];
 
         wp_send_json_success(
             [
                 'id'      => (string) $form['id'],
                 'title'   => (string) $form['title'],
                 'status'  => (string) $form['status'],
+                'state'   => $state,
                 'message' => sprintf(
                     /* translators: 1: Jotform form title, 2: Jotform form status, e.g. ENABLED */
                     __('Connected: %1$s (%2$s)', 'jotform-bridge'),
@@ -554,11 +574,86 @@ final class IntegrationsPage
                         : __('untitled form', 'jotform-bridge'),
                     (string) $form['status']
                 ),
-                'hint'    => strtoupper((string) $form['status']) === FormRepository::STATUS_DELETED
-                    ? __('This form is in the Jotform trash. It will not accept submissions until it is restored.', 'jotform-bridge')
-                    : __('Press Sync Schema below to load its fields, then save the integration.', 'jotform-bridge'),
+                'hint'    => implode(' ', $hints),
             ]
         );
+    }
+
+    /**
+     * Loads the schema of a form that has none, as part of connecting it.
+     *
+     * Two rules, and the second is the one worth stating:
+     *
+     * 1. A form with no stored schema is synced here. Connecting a form and
+     *    then finding it cannot render is not two decisions, it is one, and on
+     *    the "Add Integration" screen the second half is not even reachable.
+     * 2. A form that already has one is left exactly as it was. Refreshing a
+     *    schema stays the Sync Schema button's job: this runs beside a text
+     *    field in an editor that is still open, and a schema table changing
+     *    underneath the page that reports on it is the admin lying about the
+     *    one thing that report exists for. It is also what the amendment on
+     *    manual synchronization is protecting — a definition a site is live on
+     *    never moves without somebody asking for it.
+     *
+     * A failed sync is a warning, never a refusal: the form was found, which is
+     * what the button was pressed to establish.
+     *
+     * @return array{state:string, hint:string}
+     */
+    private function connectSchema(string $formId): array
+    {
+        if ($this->schemas->isSynced($formId)) {
+            return [
+                'state' => 'ok',
+                // Where the button is, not just its name: this reply is read
+                // on the Add Integration screen too, which does not render one.
+                'hint'  => __(
+                    'Its definition is already stored and was left as it is. Sync Schema, on a saved integration, is what refreshes it.',
+                    'jotform-bridge'
+                ),
+            ];
+        }
+
+        $response = $this->schemas->sync($formId);
+
+        if (!$response->isSuccess()) {
+            return [
+                'state' => 'warning',
+                'hint'  => sprintf(
+                    /* translators: %s: the error Jotform or WordPress reported */
+                    __('The form exists, but its definition could not be loaded: %s', 'jotform-bridge'),
+                    $response->errorMessage()
+                ),
+            ];
+        }
+
+        $schema = $response->data()['schema'];
+
+        if ($schema instanceof FormSchema && !$schema->isUsable()) {
+            return [
+                'state' => 'warning',
+                'hint'  => __(
+                    'Its definition was loaded, but the schema has errors that have to be fixed in Jotform. Save the integration to see them listed.',
+                    'jotform-bridge'
+                ),
+            ];
+        }
+
+        $fields = $schema instanceof FormSchema ? count($schema->fields()) : 0;
+
+        return [
+            'state' => 'ok',
+            'hint'  => sprintf(
+                /* translators: %d: number of fields in the loaded schema */
+                _n(
+                    'Its definition was loaded: %d field. Save the integration to finish.',
+                    'Its definition was loaded: %d fields. Save the integration to finish.',
+                    $fields,
+                    'jotform-bridge'
+                ),
+                $fields
+            ),
+        ];
     }
 
     /**

@@ -362,10 +362,21 @@ $jfbReport  = $compatibility['report'] instanceof CompatibilityReport ? $compati
         <div class="notice notice-warning inline">
             <p>
                 <?php
-                echo esc_html__(
-                    'This form has never been synced. Nothing is fetched automatically: press Sync Schema above to load the definition from Jotform. Until then the form does not render and submissions are refused.',
-                    'jotform-bridge'
-                );
+                /* Which button to name depends on which one is on the screen.
+                   Sync Schema posts the slug of a saved integration, so it is
+                   not rendered while one is being created — and this sentence
+                   spent that whole screen pointing at it. Connect form loads
+                   the definition of a form that has none, which is what makes
+                   there be something to point at here. */
+                echo $isNew
+                    ? esc_html__(
+                        'This form has never been synced. Nothing is fetched automatically: press Connect form above, which loads the definition along with the title. Until then the form does not render and submissions are refused.',
+                        'jotform-bridge'
+                    )
+                    : esc_html__(
+                        'This form has never been synced. Nothing is fetched automatically: press Sync Schema above to load the definition from Jotform. Until then the form does not render and submissions are refused.',
+                        'jotform-bridge'
+                    );
                 ?>
             </p>
         </div>

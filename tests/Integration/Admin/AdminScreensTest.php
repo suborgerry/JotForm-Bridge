@@ -76,6 +76,24 @@ final class AdminScreensTest extends TestCase
         $this->assertNoRemovedFeature($html);
     }
 
+    /**
+     * The Add Integration screen has no Sync Schema button — that action posts
+     * the slug of an integration that does not exist yet — so nothing on it may
+     * send the administrator to one. Three stale instructions have reached
+     * users through this screen, and none was a bug in any class.
+     */
+    public function testTheAddScreenNamesOnlyTheButtonsItRenders(): void
+    {
+        $html = $this->renderIntegrations(['view' => 'new']);
+
+        $this->assertStringContainsString('Connect form', $html);
+        $this->assertStringNotContainsString(
+            'Sync Schema',
+            $html,
+            'A screen without the button must not tell anybody to press it.'
+        );
+    }
+
     public function testTheEditorShowsTheSyncedSchemaAsATable(): void
     {
         $this->createIntegration(['slug' => 'contact', 'form_id' => self::FORM_ID]);
