@@ -128,7 +128,7 @@ $jfbReport  = $compatibility['report'] instanceof CompatibilityReport ? $compati
                             inputmode="numeric"
                             pattern="[0-9]*"
                             autocomplete="off"
-                            aria-describedby="jfb-form-status jfb-form-help"
+                            aria-describedby="jfb-form-status"
                         >
                         <button
                             type="button"
@@ -183,15 +183,6 @@ $jfbReport  = $compatibility['report'] instanceof CompatibilityReport ? $compati
                                 </span>
                             <?php endif; ?>
                         <?php endif; ?>
-                    </p>
-
-                    <p class="description" id="jfb-form-help">
-                        <?php
-                        echo esc_html__(
-                            'The digits at the end of the form URL, for example 240000000000001 in form.jotform.com/240000000000001. Connect form asks Jotform for its title; nothing else on this screen contacts Jotform on its own.',
-                            'jotform-bridge'
-                        );
-                        ?>
                     </p>
                 </td>
             </tr>
