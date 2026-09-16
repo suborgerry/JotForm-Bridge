@@ -8,6 +8,7 @@ use JotformBridge\Api\ConnectionState;
 use JotformBridge\Api\JotformClient;
 use JotformBridge\Plugin;
 use JotformBridge\Settings\Settings;
+use JotformBridge\Support\Logger;
 
 if (!defined('ABSPATH')) {
     exit;
@@ -28,6 +29,7 @@ final class SettingsPage
 
     public const ACTION_SAVE  = 'jotform_bridge_save_settings';
     public const ACTION_CHECK = 'jotform_bridge_check_connection';
+    public const ACTION_CLEAN_LOGS = 'jotform_bridge_clean_logs';
 
     private const NOTICE_ARG = 'jfb_notice';
 
@@ -52,6 +54,7 @@ final class SettingsPage
         add_action('admin_menu', [$this, 'registerMenu']);
         add_action('admin_post_' . self::ACTION_SAVE, [$this, 'handleSave']);
         add_action('admin_post_' . self::ACTION_CHECK, [$this, 'handleCheckConnection']);
+        add_action('admin_post_' . self::ACTION_CLEAN_LOGS, [$this, 'handleCleanLogs']);
     }
 
     /**
@@ -80,6 +83,12 @@ final class SettingsPage
         $notice     = $this->currentNotice();
 
         require __DIR__ . '/views/settings-page.php';
+    }
+
+    public function handleCleanLogs(): void
+    {
+        $this->guard(self::ACTION_CLEAN_LOGS);
+        $this->redirect((new Logger($this->settings))->clear() ? 'logs_cleaned' : 'logs_clean_failed');
     }
 
     public function handleSave(): void
@@ -187,6 +196,14 @@ final class SettingsPage
         $connection = $this->connection->get();
 
         $notices = [
+            'logs_cleaned' => [
+                'type' => 'success',
+                'message' => __('Logs cleaned.', 'jotform-bridge'),
+            ],
+            'logs_clean_failed' => [
+                'type' => 'error',
+                'message' => __('Could not clean the logs. Check the log file permissions.', 'jotform-bridge'),
+            ],
             'saved' => [
                 'type'    => 'success',
                 'message' => __('Settings saved.', 'jotform-bridge'),

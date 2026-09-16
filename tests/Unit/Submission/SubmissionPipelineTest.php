@@ -736,11 +736,11 @@ final class SubmissionPipelineTest extends TestCase
 
         $lines = [];
 
-        Functions\when('JotformBridge\Support\error_log')->alias(
-            function (string $line) use (&$lines): bool {
+        Functions\when('JotformBridge\Support\fwrite')->alias(
+            function ($file, string $line) use (&$lines): int {
                 $lines[] = $line;
 
-                return true;
+                return strlen($line);
             }
         );
 

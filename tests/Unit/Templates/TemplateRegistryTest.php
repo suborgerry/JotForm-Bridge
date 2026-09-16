@@ -285,11 +285,11 @@ final class TemplateRegistryTest extends TestCase
         $this->options[Settings::OPTION] = ['debug_logging' => $debug];
         $this->logLines                  = [];
 
-        Functions\when('JotformBridge\Support\error_log')->alias(
-            function (string $line): bool {
+        Functions\when('JotformBridge\Support\fwrite')->alias(
+            function ($file, string $line): int {
                 $this->logLines[] = $line;
 
-                return true;
+                return strlen($line);
             }
         );
     }

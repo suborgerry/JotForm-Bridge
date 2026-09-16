@@ -18,6 +18,8 @@ if (!defined('ABSPATH')) {
  */
 final class Logger
 {
+    private const HEADER = "<?php exit; ?>\n";
+
     private Settings $settings;
 
     public function __construct(Settings $settings)
@@ -50,14 +52,85 @@ final class Logger
             return;
         }
 
-        $line = sprintf('[jotform-bridge][%s] %s', $level, $message);
+        $line = sprintf('[%s UTC][jotform-bridge][%s] %s', gmdate('Y-m-d H:i:s'), $level, $message);
 
         if ($context !== []) {
             $line .= ' ' . wp_json_encode($this->scrub($context));
         }
 
-        // phpcs:ignore WordPress.PHP.DevelopmentFunctions.error_log_error_log
-        error_log($line);
+        if (!$this->write($line . PHP_EOL, false)) {
+            // phpcs:ignore WordPress.PHP.DevelopmentFunctions.error_log_error_log
+            error_log('[jotform-bridge][ERROR] Could not write the plugin log file.');
+        }
+    }
+
+    public function path(): string
+    {
+        return WP_CONTENT_DIR . '/jotform-bridge-logs.php';
+    }
+
+    public function clear(): bool
+    {
+        if (!file_exists($this->path())) {
+            return true;
+        }
+
+        return $this->write('', true);
+    }
+
+    /**
+     * Serialize appends and truncation with the same lock. The PHP header keeps
+     * direct web requests from exposing diagnostic metadata.
+     */
+    private function write(string $line, bool $clear): bool
+    {
+        $path = $this->path();
+
+        if (is_link($path)) {
+            return false;
+        }
+
+        // phpcs:ignore WordPress.WP.AlternativeFunctions.file_system_operations_fopen
+        $file = @fopen($path, 'c+b');
+
+        if ($file === false) {
+            return false;
+        }
+
+        try {
+            if (!flock($file, LOCK_EX)) {
+                return false;
+            }
+
+            if ($clear && !ftruncate($file, 0)) {
+                return false;
+            }
+
+            if (fseek($file, 0, SEEK_END) !== 0) {
+                return false;
+            }
+
+            $data = (ftell($file) === 0 ? self::HEADER : '') . $line;
+            $length = strlen($data);
+            $offset = 0;
+
+            while ($offset < $length) {
+                // phpcs:ignore WordPress.WP.AlternativeFunctions.file_system_operations_fwrite
+                $written = fwrite($file, substr($data, $offset));
+
+                if ($written === false || $written === 0) {
+                    return false;
+                }
+
+                $offset += $written;
+            }
+
+            return fflush($file);
+        } finally {
+            flock($file, LOCK_UN);
+            // phpcs:ignore WordPress.WP.AlternativeFunctions.file_system_operations_fclose
+            fclose($file);
+        }
     }
 
     /**

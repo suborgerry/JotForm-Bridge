@@ -171,6 +171,45 @@ final class SettingsActionsTest extends TestCase
         $this->assertSame(ConnectionState::STATUS_UNKNOWN, (new ConnectionState())->get()['status']);
     }
 
+    public function testCleanLogsClearsEntriesAndKeepsLoggingEnabled(): void
+    {
+        $this->actAsAdministrator();
+        update_option(Settings::OPTION, ['debug_logging' => true]);
+        $logger = new \JotformBridge\Support\Logger(new Settings());
+        $logger->error('Example diagnostic');
+
+        try {
+            $this->submitForm(['_wpnonce' => wp_create_nonce(SettingsPage::ACTION_CLEAN_LOGS)]);
+            $redirect = $this->expectRedirect(fn() => do_action('admin_post_' . SettingsPage::ACTION_CLEAN_LOGS));
+            $this->assertSame('logs_cleaned', $redirect->arg('jfb_notice'));
+            $this->assertSame("<?php exit; ?>\n", file_get_contents($logger->path()));
+            $this->assertTrue((new Settings())->debugEnabled());
+        } finally {
+            @unlink($logger->path());
+        }
+    }
+
+    public function testCleanLogsWithoutNonceOrCapabilityPreservesEntries(): void
+    {
+        $this->actAsAdministrator();
+        $logger = new \JotformBridge\Support\Logger(new Settings());
+        file_put_contents($logger->path(), "<?php exit; ?>\nKeep this entry\n");
+
+        try {
+            $before = file_get_contents($logger->path());
+            $this->expectWpDie(fn() => do_action('admin_post_' . SettingsPage::ACTION_CLEAN_LOGS));
+            $this->assertSame($before, file_get_contents($logger->path()));
+
+            $this->actAsSubscriber();
+            $this->submitForm(['_wpnonce' => wp_create_nonce(SettingsPage::ACTION_CLEAN_LOGS)]);
+            $died = $this->expectWpDie(fn() => do_action('admin_post_' . SettingsPage::ACTION_CLEAN_LOGS));
+            $this->assertSame(403, $died->status());
+            $this->assertSame($before, file_get_contents($logger->path()));
+        } finally {
+            @unlink($logger->path());
+        }
+    }
+
     /**
      * @param array<string, mixed> $values
      */

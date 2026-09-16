@@ -135,7 +135,7 @@ $jfbAll    = $settings->all();
                             value="1"
                             <?php checked($settings->debugEnabled()); ?>
                         >
-                        <?php echo esc_html__('Log Jotform API failures to the PHP error log', 'jotform-bridge'); ?>
+                        <?php echo esc_html__('Write diagnostic logs to a separate plugin log file', 'jotform-bridge'); ?>
                     </label>
                 </td>
             </tr>
@@ -162,6 +162,16 @@ $jfbAll    = $settings->all();
         </table>
 
         <?php submit_button(__('Save Settings', 'jotform-bridge')); ?>
+    </form>
+
+    <h2><?php echo esc_html__('Logs', 'jotform-bridge'); ?></h2>
+    <p class="description">
+        <?php echo esc_html__('Log file: wp-content/jotform-bridge-logs.php. Clean logs removes all entries; logging stays enabled if selected above.', 'jotform-bridge'); ?>
+    </p>
+    <form method="post" action="<?php echo esc_url(admin_url('admin-post.php')); ?>">
+        <input type="hidden" name="action" value="<?php echo esc_attr(SettingsPage::ACTION_CLEAN_LOGS); ?>">
+        <?php wp_nonce_field(SettingsPage::ACTION_CLEAN_LOGS); ?>
+        <?php submit_button(__('Clean logs', 'jotform-bridge'), 'secondary'); ?>
     </form>
 
     <h2><?php echo esc_html__('Connection', 'jotform-bridge'); ?></h2>

@@ -88,3 +88,12 @@ if (!class_exists('WP_Error')) {
         }
     }
 }
+
+if (!defined('WP_CONTENT_DIR')) {
+    define('WP_CONTENT_DIR', sys_get_temp_dir() . '/jfb-unit-' . getmypid());
+    mkdir(WP_CONTENT_DIR);
+    register_shutdown_function(static function (): void {
+        @unlink(WP_CONTENT_DIR . '/jotform-bridge-logs.php');
+        rmdir(WP_CONTENT_DIR);
+    });
+}

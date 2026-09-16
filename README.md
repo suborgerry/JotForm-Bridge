@@ -756,11 +756,15 @@ button — are not fields and are simply not part of the schema.
 
 ## Debugging
 
-Turn on **Debug Logging** on the settings screen. Failures then go to the PHP
-error log with a `[jotform-bridge]` prefix:
+Turn on **Debug Logging** on the settings screen. Failures then go to the dedicated
+`wp-content/jotform-bridge-logs.php` file with UTC timestamps and a
+`[jotform-bridge]` prefix. Its PHP header prevents direct browser access.
+Use **Clean logs** on the settings screen to clear entries without changing
+the logging setting. The content directory must be writable; write failures
+produce a generic warning in the PHP error log:
 
 ```text
-[jotform-bridge][ERROR] Jotform returned a non-2xx status. {"path":"/user/forms","status":401}
+[jotform-bridge][ERROR] Jotform returned a non-2xx status. {"path":"/user","status":401}
 ```
 
 Only technical metadata is logged: a path, a status, an error code, an
