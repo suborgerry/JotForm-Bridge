@@ -192,6 +192,14 @@ double click cannot create two Jotform submissions.
 
 == Changelog ==
 
+= 1.1.0 =
+* Connect form loads missing schemas; automatic rendering is now the default.
+* Added optional email domain restrictions and clearer connection diagnostics.
+* Improved debug logging and removed redundant notices.
+
+= 1.0.0 =
+* Initial release.
+
 = 0.2.1 =
 * Accessibility fixes across both renderers and the admin, from an audit against
   WCAG 2.2 AA.
