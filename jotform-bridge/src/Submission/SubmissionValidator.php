@@ -6,6 +6,7 @@ namespace JotformBridge\Submission;
 
 use JotformBridge\Forms\FieldNormalizer;
 use JotformBridge\Forms\FormSchema;
+use JotformBridge\Settings\Settings;
 
 if (!defined('ABSPATH')) {
     exit;
@@ -420,6 +421,14 @@ final class SubmissionValidator
 
         if ($clean === '' || !is_email($clean) || strlen($clean) > self::MAX_EMAIL_LENGTH) {
             $errors[$path] = __('Enter a valid email address.', 'jotform-bridge');
+
+            return null;
+        }
+
+        $settings = new Settings();
+        $domain = strtolower(substr($clean, (int) strrpos($clean, '@') + 1));
+        if ($settings->popularEmailDomainsOnly() && !in_array($domain, $settings->allowedEmailDomains(), true)) {
+            $errors[$path] = __('Use an email address from an allowed email domain.', 'jotform-bridge');
 
             return null;
         }

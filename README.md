@@ -909,3 +909,19 @@ Architectural invariants worth keeping — they are what the design is:
 * `TemplateRegistry` is an allowlist; a path is renderable only because it is in
   there.
 * Backend validation is authoritative.
+
+### Email domain validation
+
+Settings → Validation provides an optional email-domain allowlist for every
+email field. The restriction is off by default; normal email-format validation
+still applies. The initial list includes Gmail, Outlook/Hotmail/Live/MSN,
+iCloud and Proton domains. These identify established providers, not verified
+mailboxes or a guarantee against spam.
+
+Enter one domain per line, without `@`, URLs or wildcards. Saving lowercases
+and deduplicates valid domains and removes invalid lines. Matching is exact
+and case-insensitive; subdomains need their own entries. Add business domains
+before enabling the restriction if your visitors use company email. An enabled
+empty list rejects every nonempty email address. Rejected domains return the
+usual HTTP 422 field error, displayed through the template's error slots.
+Saving either settings tab preserves the other tab's values.

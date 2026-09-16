@@ -418,6 +418,18 @@ final class AdminScreensTest extends TestCase
         return $this->capture(fn() => $page->render());
     }
 
+    public function testValidationTabShowsDefaultDomainsAndAnUncheckedSwitch(): void
+    {
+        $_GET['tab'] = 'validation';
+        $html = $this->renderSettings();
+        $this->assertStringContainsString('Allow only popular email domains', $html);
+        $this->assertStringContainsString('gmail.com', $html);
+        $this->assertStringContainsString('proton.me', $html);
+        $this->assertStringContainsString('aria-current="page"', $html);
+        $this->assertStringNotContainsString('name="jotform_bridge[region]"', $html);
+        $this->assertDoesNotMatchRegularExpression('/name="jotform_bridge\[popular_email_domains_only\]"[^>]*checked/', $html);
+    }
+
     private function renderSettings(): string
     {
         $this->actAsAdministrator();

@@ -23,6 +23,7 @@ final class SubmissionValidatorTest extends TestCase
     protected function setUp(): void
     {
         parent::setUp();
+        \Brain\Monkey\Functions\when('get_option')->justReturn([]);
 
         $questions = array_values($this->fixture('form-questions')['content']);
 
@@ -88,6 +89,30 @@ final class SubmissionValidatorTest extends TestCase
             ['email'],
             array_keys($this->validator->validate($this->schema, $input)->errors())
         );
+    }
+
+    public function testEmailDomainAllowlistUsesExactCaseInsensitiveMatch(): void
+    {
+        \Brain\Monkey\Functions\when('get_option')->justReturn([
+            'popular_email_domains_only' => true,
+            'allowed_email_domains' => "GMAIL.COM\ngmail.com",
+        ]);
+        $input = $this->valid();
+        $input['email'] = 'jane@GMAIL.COM';
+        $this->assertTrue($this->validator->validate($this->schema, $input)->isValid());
+        foreach (['jane@example.com', 'jane@sub.gmail.com', 'jane@gmail.com.evil.com'] as $email) {
+            $input['email'] = $email;
+            $this->assertArrayHasKey('email', $this->validator->validate($this->schema, $input)->errors());
+        }
+    }
+
+    public function testEnabledEmptyEmailDomainListRefusesEmail(): void
+    {
+        \Brain\Monkey\Functions\when('get_option')->justReturn([
+            'popular_email_domains_only' => true,
+            'allowed_email_domains' => '',
+        ]);
+        $this->assertArrayHasKey('email', $this->validator->validate($this->schema, $this->valid())->errors());
     }
 
     public function testAnUnknownSemanticFieldIsRejectedRatherThanIgnored(): void

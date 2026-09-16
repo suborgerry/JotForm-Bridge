@@ -2,6 +2,7 @@
 
 /**
  * Settings screen markup.
+ * @var string $tab
  *
  * @var \JotformBridge\Settings\Settings                  $settings
  * @var array{status:string, checked_at:int, account:string, message:string} $connection
@@ -34,6 +35,16 @@ $jfbAll    = $settings->all();
         </div>
     <?php endif; ?>
 
+    <nav class="nav-tab-wrapper" aria-label="<?php echo esc_attr__('Settings tabs', 'jotform-bridge'); ?>">
+        <?php foreach (['general' => __('General', 'jotform-bridge'), 'validation' => __('Validation', 'jotform-bridge')] as $jfbTab => $jfbLabel) : ?>
+            <a class="nav-tab<?php echo $tab === $jfbTab ? ' nav-tab-active' : ''; ?>" href="<?php echo esc_url(add_query_arg(['page' => SettingsPage::MENU_SLUG, 'tab' => $jfbTab], admin_url('admin.php'))); ?>" <?php if ($tab === $jfbTab) :
+                ?>aria-current="page"<?php
+                             endif; ?>><?php echo esc_html($jfbLabel); ?></a>
+        <?php endforeach; ?>
+    </nav>
+    <?php if ($tab === 'validation') : ?>
+        <?php require __DIR__ . '/settings-validation.php'; ?>
+    <?php else : ?>
     <form method="post" action="<?php echo esc_url(admin_url('admin-post.php')); ?>">
         <input type="hidden" name="action" value="<?php echo esc_attr(SettingsPage::ACTION_SAVE); ?>">
         <?php wp_nonce_field(SettingsPage::ACTION_SAVE); ?>
@@ -212,7 +223,7 @@ $jfbAll    = $settings->all();
         }
         ?>
     </p>
-    <?php if ($connection['checked_at'] > 0) : ?>
+        <?php if ($connection['checked_at'] > 0) : ?>
         <p class="description">
             <?php
             printf(
@@ -222,7 +233,7 @@ $jfbAll    = $settings->all();
             );
             ?>
         </p>
-    <?php endif; ?>
+        <?php endif; ?>
     <div class="jfb-actions">
         <form method="post" action="<?php echo esc_url(admin_url('admin-post.php')); ?>" class="jfb-action-form">
             <input type="hidden" name="action" value="<?php echo esc_attr(SettingsPage::ACTION_CHECK); ?>">
@@ -256,4 +267,5 @@ $jfbAll    = $settings->all();
         );
         ?>
     </p>
+    <?php endif; ?>
 </div>

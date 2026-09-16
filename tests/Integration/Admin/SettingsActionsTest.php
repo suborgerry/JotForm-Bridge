@@ -39,6 +39,29 @@ final class SettingsActionsTest extends TestCase
         $this->assertTrue($settings->debugEnabled());
     }
 
+    public function testValidationTabSavesNormalizedDomainsWithoutChangingGeneralSettings(): void
+    {
+        $this->actAsAdministrator();
+        (new Settings())->save(['region' => Settings::REGION_EU, 'debug_logging' => '1']);
+        $this->postSettings([
+            'validation_tab' => '1',
+            'popular_email_domains_only' => '1',
+            'allowed_email_domains' => " GMAIL.COM \ngmail.com\r\nexample.org\n@gmail.com\nhttps://evil.com\n*.example.org",
+        ]);
+        $redirect = $this->expectRedirect(fn() => do_action('admin_post_' . SettingsPage::ACTION_SAVE));
+        $settings = new Settings();
+        $this->assertSame('validation', $redirect->arg('tab'));
+        $this->assertTrue($settings->popularEmailDomainsOnly());
+        $this->assertSame(['gmail.com', 'example.org'], $settings->allowedEmailDomains());
+        $this->assertSame(Settings::REGION_EU, $settings->region());
+        $this->assertTrue($settings->debugEnabled());
+        $settings->save(['region' => Settings::REGION_EU]);
+        $this->assertTrue($settings->popularEmailDomainsOnly());
+        $this->assertSame(['gmail.com', 'example.org'], $settings->allowedEmailDomains());
+        $settings->save(['validation_tab' => '1', 'allowed_email_domains' => 'gmail.com']);
+        $this->assertFalse($settings->popularEmailDomainsOnly());
+    }
+
     public function testAnApiKeyPostedWithTheSettingsIsNeverStored(): void
     {
         $this->actAsAdministrator();

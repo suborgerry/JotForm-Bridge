@@ -78,6 +78,8 @@ final class SettingsPage
             wp_die(esc_html__('You are not allowed to access this page.', 'jotform-bridge'));
         }
 
+        // phpcs:ignore WordPress.Security.NonceVerification.Recommended -- read-only tab selection.
+        $tab = isset($_GET['tab']) && $_GET['tab'] === 'validation' ? 'validation' : 'general';
         $settings   = $this->settings;
         $connection = $this->connection->get();
         $notice     = $this->currentNotice();
@@ -103,6 +105,7 @@ final class SettingsPage
             ? wp_unslash($_POST['jotform_bridge'])
             : [];
 
+        $validation = isset($raw['validation_tab']);
         $this->settings->save($raw);
 
         // A region change can point the plugin at a different account, so what
@@ -111,9 +114,11 @@ final class SettingsPage
         // integration already holds, re-read by one press of Connect form, and
         // wiping them would blank every integration's label because somebody
         // toggled debug logging.
-        $this->connection->reset();
+        if (!$validation) {
+            $this->connection->reset();
+        }
 
-        $this->redirect('saved');
+        $this->redirect('saved', $validation ? 'validation' : 'general');
     }
 
     /**
@@ -166,12 +171,13 @@ final class SettingsPage
         check_admin_referer($action);
     }
 
-    private function redirect(string $notice): void
+    private function redirect(string $notice, string $tab = 'general'): void
     {
         wp_safe_redirect(
             add_query_arg(
                 [
                     'page'           => self::MENU_SLUG,
+                    'tab' => $tab,
                     self::NOTICE_ARG => $notice,
                 ],
                 admin_url('admin.php')

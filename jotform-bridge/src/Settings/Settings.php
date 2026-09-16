@@ -133,6 +133,8 @@ final class Settings
     public function defaults(): array
     {
         return [
+            'popular_email_domains_only' => false,
+            'allowed_email_domains' => "gmail.com\noutlook.com\nhotmail.com\nlive.com\nmsn.com\nicloud.com\nme.com\nmac.com\nproton.me\nprotonmail.com\nprotonmail.ch\npm.me",
             'region'                   => self::REGION_STANDARD,
             'base_url'                 => '',
             'debug_logging'            => false,
@@ -257,6 +259,33 @@ final class Settings
         return (bool) $this->all()['delete_data_on_uninstall'];
     }
 
+    public function popularEmailDomainsOnly(): bool
+    {
+        return $this->all()['popular_email_domains_only'] === true;
+    }
+
+    /** @return array<int, string> */
+    public function allowedEmailDomains(): array
+    {
+        $raw = $this->all()['allowed_email_domains'];
+
+        return self::normalizeEmailDomains(is_string($raw) ? $raw : '');
+    }
+
+    /** @return array<int, string> */
+    private static function normalizeEmailDomains(string $raw): array
+    {
+        $domains = [];
+        foreach (preg_split('/\r\n|\r|\n/', $raw) ?: [] as $line) {
+            $domain = strtolower(trim($line));
+            if (strlen($domain) <= 253 && preg_match('/^(?:[a-z0-9](?:[a-z0-9-]{0,61}[a-z0-9])?\.)+[a-z]{2,63}$/D', $domain)) {
+                $domains[] = $domain;
+            }
+        }
+
+        return array_values(array_unique($domains));
+    }
+
     /**
      * Sanitizes raw admin input and persists it.
      *
@@ -270,13 +299,18 @@ final class Settings
         // here can put one back into the option.
         $clean = $this->all();
 
-        $region          = sanitize_key(self::scalar($input, 'region'));
-        $clean['region'] = self::isRegion($region) ? $region : self::REGION_STANDARD;
+        if (isset($input['validation_tab'])) {
+            $clean['popular_email_domains_only'] = !empty($input['popular_email_domains_only']);
+            $clean['allowed_email_domains'] = implode("\n", self::normalizeEmailDomains(self::scalar($input, 'allowed_email_domains')));
+        } else {
+            $region          = sanitize_key(self::scalar($input, 'region'));
+            $clean['region'] = self::isRegion($region) ? $region : self::REGION_STANDARD;
 
-        $clean['base_url'] = self::sanitizeBaseUrl(self::scalar($input, 'base_url'));
+            $clean['base_url'] = self::sanitizeBaseUrl(self::scalar($input, 'base_url'));
 
-        $clean['debug_logging']            = !empty($input['debug_logging']);
-        $clean['delete_data_on_uninstall'] = !empty($input['delete_data_on_uninstall']);
+            $clean['debug_logging']            = !empty($input['debug_logging']);
+            $clean['delete_data_on_uninstall'] = !empty($input['delete_data_on_uninstall']);
+        }
 
         self::$generation++;
 
