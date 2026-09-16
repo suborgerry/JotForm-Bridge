@@ -1,7 +1,7 @@
 <?php
 
 /**
- * Builds HOOKS.md from the docblocks above the plugin's own hook calls.
+ * Builds docs/hooks.md from the docblocks above the plugin's own hook calls.
  *
  * Every filter and action is documented next to the apply_filters() or
  * do_action() that fires it, and nowhere else. That is the right place for the
@@ -10,12 +10,12 @@
  * practice meant they were not discovered.
  *
  * This script exists rather than a hand-written reference because a
- * hand-written one drifts. HOOKS.md is generated output — edit the docblock,
+ * hand-written one drifts. docs/hooks.md is generated output — edit the docblock,
  * not the Markdown.
  *
  * Usage:
- *   php bin/generate-hooks.php           Write HOOKS.md.
- *   php bin/generate-hooks.php --check   Exit 1 if HOOKS.md is out of date.
+ *   php bin/generate-hooks.php           Write docs/hooks.md.
+ *   php bin/generate-hooks.php --check   Exit 1 if docs/hooks.md is out of date.
  *
  * @package JotformBridge
  */
@@ -23,7 +23,7 @@
 declare(strict_types=1);
 
 $root   = dirname(__DIR__);
-$target = $root . '/HOOKS.md';
+$target = $root . '/docs/hooks.md';
 $check  = in_array('--check', array_slice($argv, 1), true);
 
 $sources = collectSources($root . '/jotform-bridge');
@@ -70,16 +70,16 @@ if ($check) {
     $current = is_file($target) ? file_get_contents($target) : '';
 
     if ($current === $markdown) {
-        echo "HOOKS.md is up to date (" . count($hooks) . " hooks).\n";
+        echo "docs/hooks.md is up to date (" . count($hooks) . " hooks).\n";
         exit(0);
     }
 
-    fwrite(STDERR, "error: HOOKS.md is out of date. Run: composer hooks\n");
+    fwrite(STDERR, "error: docs/hooks.md is out of date. Run: composer hooks\n");
     exit(1);
 }
 
 file_put_contents($target, $markdown);
-echo 'Wrote HOOKS.md (' . count($hooks) . " hooks).\n";
+echo 'Wrote docs/hooks.md (' . count($hooks) . " hooks).\n";
 
 /**
  * @return array<int, string>

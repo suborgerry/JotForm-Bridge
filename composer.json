@@ -55,8 +55,8 @@
         "lint": "Check the plugin against phpcs.xml.dist.",
         "analyse": "Check the plugin against phpstan.neon.dist. Types across call boundaries, which phpcs cannot see.",
         "lint:fix": "Apply the fixes phpcs can make on its own.",
-        "hooks": "Regenerate HOOKS.md from the docblocks in src/.",
-        "hooks:check": "Fail if HOOKS.md no longer matches the source.",
+        "hooks": "Regenerate docs/hooks.md from the docblocks in src/.",
+        "hooks:check": "Fail if docs/hooks.md no longer matches the source.",
         "check": "Lint, static analysis, hooks, versions, then the unit suite. The integration suite is a separate command because it downloads WordPress."
     },
     "config": {

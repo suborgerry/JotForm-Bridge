@@ -14,7 +14,7 @@
 #             lifecycle nobody ever runs by hand;
 #   lint    — the code matches phpcs.xml.dist, so the phpcs:ignore annotations
 #             in src/ keep meaning something; it also passes phpstan.neon.dist,
-#             which reads the types phpcs cannot; HOOKS.md still describes the
+#             which reads the types phpcs cannot; docs/hooks.md still describes the
 #             hooks the source actually fires; and the three version strings
 #             still agree with each other;
 #   package — the release ZIP still assembles, and still contains only what it
@@ -136,7 +136,7 @@ jobs:
       - name: Run static analysis
         run: composer analyse
 
-      - name: Check HOOKS.md matches the source
+      - name: Check docs/hooks.md matches the source
         run: composer hooks:check
 
       # Not bookkeeping. Both assets/frontend.js and assets/admin.js carry the
