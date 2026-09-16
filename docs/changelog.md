@@ -2,6 +2,11 @@
 
 [Documentation](README.md)
 
+## Unreleased
+
+* Added local conditional visibility and requirements per integration, with
+  matching browser and server evaluation and a read-only table of saved rules.
+
 ## 1.1.0
 * Connect form loads missing schemas; automatic rendering is now the default.
 * Added optional email domain restrictions and clearer connection diagnostics.

@@ -4,6 +4,7 @@
 
 - [Installation, API key, region and rendering](getting-started.md)
 - [Integrations, synchronization and redirects](integrations.md)
+- [Local conditional logic](conditional-logic.md)
 - [Custom templates and semantic markup](custom-templates.md)
 - [Supported fields, validation and limitations](fields.md)
 - [REST API and JavaScript events](api.md)

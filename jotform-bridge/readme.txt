@@ -15,7 +15,7 @@ Use Jotform as a headless form backend: your own HTML on the site, submissions a
 Use custom PHP templates or automatically generated forms with Jotform as the
 backend. Local integrations bind your markup to Jotform; fields use semantic
 names, and submissions are validated server-side. Includes spam protection and
-optional success redirects. No production dependencies or build step.
+optional success redirects and local conditional field rules. No production dependencies or build step.
 
 Documentation: https://github.com/suborgerry/JotForm-Bridge/blob/main/docs/README.md
 

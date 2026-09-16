@@ -60,7 +60,9 @@ Requires **WordPress 6.4+** and **PHP 8.0+**. No jQuery, framework dependencies,
 Composer installation or asset build is required on the production site.
 
 Supports common text, choice, name and address fields. File uploads, payments,
-date/time fields and Jotform conditional logic are outside the current scope.
+date/time fields and importing Jotform conditional rules are outside the current scope.
+Local [conditional logic](docs/conditional-logic.md) supports field visibility and
+conditional requirements per integration.
 
 ## Learn more
 

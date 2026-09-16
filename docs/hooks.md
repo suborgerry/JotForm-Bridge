@@ -95,7 +95,7 @@ accepted. Return 0 to turn the guard off.
 | --- | --- | --- |
 | `$seconds` | `int` | Duplicate window. |
 
-Fires in `jotform-bridge/src/Submission/SubmissionPipeline.php:374`.
+Fires in `jotform-bridge/src/Submission/SubmissionPipeline.php:380`.
 
 ## `jotform_bridge_global_rate_limits`
 
@@ -204,7 +204,7 @@ Filters the sanitized values just before they are mapped.
 | `$values` | `array<string, string\|array<int, string>>` | Sanitized values. |
 | `$slug` | `string` | Integration slug. |
 
-Fires in `jotform-bridge/src/Submission/SubmissionPipeline.php:203`.
+Fires in `jotform-bridge/src/Submission/SubmissionPipeline.php:209`.
 
 ## `jotform_bridge_template_paths`
 
@@ -261,7 +261,7 @@ Fires after a submission was accepted by Jotform.
 | `$values` | `array<string, string\|array<int, string>>` | Sanitized values. |
 | `$submissionId` | `string` | Jotform submission ID. |
 
-Fires in `jotform-bridge/src/Submission/SubmissionPipeline.php:288`.
+Fires in `jotform-bridge/src/Submission/SubmissionPipeline.php:294`.
 
 ## `jotform_bridge_before_submit`
 
@@ -272,5 +272,5 @@ Fires before a validated submission is sent to Jotform.
 | `$slug` | `string` | Integration slug. |
 | `$values` | `array<string, string\|array<int, string>>` | Sanitized values. |
 
-Fires in `jotform-bridge/src/Submission/SubmissionPipeline.php:240`.
+Fires in `jotform-bridge/src/Submission/SubmissionPipeline.php:246`.
 

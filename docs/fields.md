@@ -32,9 +32,9 @@ button — are not fields and are simply not part of the schema.
 
 * **Field coverage.** Only the field types listed in [Fields and validation](fields.md#supported-field-types). File upload, signature,
   payment and date/time fields are not mapped.
-* **No conditional logic.** Jotform's show/hide conditions and calculations are
-  not evaluated. A template renders every supported field; conditional behaviour
-  is up to your own JavaScript.
+* **No Jotform rule import or calculations.** Jotform conditions are not
+  evaluated automatically. Configure [local conditional logic](conditional-logic.md)
+  on the integration for visibility and conditional requirements.
 * **No multi-page forms.** A Jotform form with page breaks is rendered as one
   form.
 * **No file uploads.** The submission is `application/x-www-form-urlencoded`; a
