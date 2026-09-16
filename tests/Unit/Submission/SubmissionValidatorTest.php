@@ -31,6 +31,50 @@ final class SubmissionValidatorTest extends TestCase
         $this->validator = new SubmissionValidator();
     }
 
+    public function testHiddenRequiredValuesAreIgnoredEvenWhenForged(): void
+    {
+        $rules = [['action' => 'show', 'target' => 'message', 'source' => 'preferred_contact', 'operator' => 'not_equals', 'value' => 'E-mail']];
+        $input = $this->valid();
+        $input['message'] = ['forged' => ['payload']];
+        $result = $this->validator->validate($this->schema, $input, $rules);
+        $this->assertTrue($result->isValid());
+        $this->assertArrayNotHasKey('message', $result->values());
+        unset($input['message']);
+        $this->assertTrue($this->validator->validate($this->schema, $input, $rules)->isValid());
+    }
+
+    public function testVisibleRequiredValuesRemainRequired(): void
+    {
+        $rules = [['action' => 'show', 'target' => 'message', 'source' => 'preferred_contact', 'operator' => 'equals', 'value' => 'E-mail']];
+        $input = $this->valid();
+        unset($input['message']);
+        $this->assertArrayHasKey('message', $this->validator->validate($this->schema, $input, $rules)->errors());
+    }
+
+    public function testConditionalRequirementOverridesTheBaseline(): void
+    {
+        $rules = [['action' => 'require', 'target' => 'message', 'source' => 'preferred_contact', 'operator' => 'not_equals', 'value' => 'E-mail']];
+        $input = $this->valid();
+        unset($input['message']);
+        $this->assertTrue($this->validator->validate($this->schema, $input, $rules)->isValid());
+        $rules[0]['operator'] = 'equals';
+        $this->assertArrayHasKey('message', $this->validator->validate($this->schema, $input, $rules)->errors());
+        $rules[0]['target'] = 'address.city';
+        unset($input['address.city']);
+        $this->assertArrayHasKey('address.city', $this->validator->validate($this->schema, $input, $rules)->errors());
+    }
+
+    public function testInvalidSourcesAndUnknownFieldsStillFailWithConditions(): void
+    {
+        $rules = [['action' => 'show', 'target' => 'message', 'source' => 'preferred_contact', 'operator' => 'equals', 'value' => 'E-mail']];
+        $input = $this->valid();
+        $input['preferred_contact'] = 'forged';
+        $input['unknown'] = 'forged';
+        $errors = $this->validator->validate($this->schema, $input, $rules)->errors();
+        $this->assertArrayHasKey('preferred_contact', $errors);
+        $this->assertArrayHasKey('unknown', $errors);
+    }
+
     public function testACompleteSubmissionPasses(): void
     {
         $result = $this->validator->validate($this->schema, $this->valid());

@@ -45,6 +45,9 @@ final class Assets
      */
     private array $powBits = [];
 
+    /** @var array<string, array{rules:array<int, array<string, string>>, required:array<int, string>}> */
+    private array $conditions = [];
+
     public function register(): void
     {
         if ($this->registered || wp_script_is(self::HANDLE, 'registered')) {
@@ -85,14 +88,21 @@ final class Assets
      *
      * @param string $slug The integration being rendered, so the script can be
      *                     told what its proof of work has to cost.
+     * @param array<int, array<string, string>> $rules Conditional rules.
+     * @param array<int, string> $required Required schema paths.
      */
-    public function enqueue(string $slug = ''): void
+    public function enqueue(string $slug = '', array $rules = [], array $required = []): void
     {
         $this->register();
 
         if ($slug !== '' && !isset($this->powBits[$slug])) {
             $this->powBits[$slug] = ProofOfWork::bits($slug);
 
+            $this->localize();
+        }
+
+        if ($slug !== '' && $rules !== []) {
+            $this->conditions[$slug] = ['rules' => $rules, 'required' => $required];
             $this->localize();
         }
 
@@ -131,7 +141,9 @@ final class Assets
             [
                 'endpoint' => SubmissionController::endpoint(),
                 'powBits'  => (object) $this->powBits,
+                'conditions' => (object) $this->conditions,
                 'messages' => [
+                    'required'    => __('(required)', 'jotform-bridge'),
                     'error'       => __('The form could not be submitted. Please try again.', 'jotform-bridge'),
                     'network'     => __('The form could not be sent. Check your connection and try again.', 'jotform-bridge'),
                     'unsupported' => __('This browser cannot send this form. Please update it, or try a different one.', 'jotform-bridge'),

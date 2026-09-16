@@ -139,7 +139,7 @@ PHP;
             $label = (string) $child['label'] !== '' ? (string) $child['label'] : $key;
 
             $out .= sprintf(
-                "        <p>\n"
+                '        <p data-jotform-field-wrapper="' . $key . "\">\n"
                 . "            <label for=\"%s\">%s</label>\n"
                 . "            <input type=\"text\" id=\"%s\" data-jotform-field=\"%s\" aria-describedby=\"%s-error\"%s>\n"
                 . "            <span class=\"field-error\" id=\"%s-error\" data-jotform-field-error=\"%s\"></span>\n"
@@ -213,7 +213,7 @@ PHP;
         }
 
         return sprintf(
-            "    <p>\n"
+            '    <p data-jotform-field-wrapper="' . $key . "\">\n"
             . "        <label for=\"%s\">%s</label>\n"
             . "        %s\n"
             . "        <span class=\"field-error\" id=\"%s-error\" data-jotform-field-error=\"%s\"></span>\n"
@@ -269,7 +269,7 @@ PHP;
         }
 
         return sprintf(
-            "    <fieldset>\n        <legend>%s</legend>\n%s"
+            '    <fieldset data-jotform-field-wrapper="' . $key . "\">\n        <legend>%s</legend>\n%s"
             . "        <span class=\"field-error\" id=\"%s-error\" data-jotform-field-error=\"%s\"></span>\n"
             . "    </fieldset>\n\n",
             $this->text($label),

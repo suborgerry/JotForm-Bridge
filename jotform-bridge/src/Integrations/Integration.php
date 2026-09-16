@@ -63,10 +63,15 @@ final class Integration
 
     private int $redirectDelay;
 
+    /** @var array<int, array<string, string>> */
+    private array $conditions;
+
     /**
      * The redirect arguments are last and optional on purpose: an integration
      * stored before they existed is a complete integration, and reading one back
      * must not need them.
+     *
+     * @param array<int, array<string, string>> $conditions
      */
     public function __construct(
         string $slug,
@@ -78,8 +83,10 @@ final class Integration
         int $updatedAt = 0,
         string $successAction = self::SUCCESS_MESSAGE,
         int $redirectPageId = 0,
-        int $redirectDelay = 0
+        int $redirectDelay = 0,
+        array $conditions = []
     ) {
+        $this->conditions     = ConditionalLogic::sanitize($conditions);
         $this->slug           = $slug;
         $this->name           = $name;
         $this->formId         = $formId;
@@ -168,7 +175,8 @@ final class Integration
             0,
             $successAction,
             (int) self::scalar($input, 'redirect_page_id'),
-            (int) self::scalar($input, 'redirect_delay')
+            (int) self::scalar($input, 'redirect_delay'),
+            ConditionalLogic::sanitize($input['conditions'] ?? [])
         );
     }
 
@@ -204,7 +212,8 @@ final class Integration
             // version stays valid and never needs a migration.
             self::scalar($data, 'success_action'),
             (int) self::scalar($data, 'redirect_page_id'),
-            (int) self::scalar($data, 'redirect_delay')
+            (int) self::scalar($data, 'redirect_delay'),
+            ConditionalLogic::sanitize($data['conditions'] ?? [])
         );
     }
 
@@ -224,7 +233,14 @@ final class Integration
             'success_action'   => $this->successAction,
             'redirect_page_id' => $this->redirectPageId,
             'redirect_delay'   => $this->redirectDelay,
+            'conditions'       => $this->conditions,
         ];
+    }
+
+    /** @return array<int, array<string, string>> */
+    public function conditions(): array
+    {
+        return $this->conditions;
     }
 
     public function slug(): string

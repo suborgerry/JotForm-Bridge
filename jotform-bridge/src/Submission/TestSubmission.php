@@ -102,7 +102,7 @@ final class TestSubmission
         // Run the real validator over the generated values. If it refuses them,
         // the fault is here or in the stored schema, and saying so is far more
         // useful than sending something and blaming Jotform for the answer.
-        $result = $this->validator->validate($schema, $values);
+        $result = $this->validator->validate($schema, $values, $integration->conditions());
 
         if (!$result->isValid()) {
             return ApiResponse::failure(

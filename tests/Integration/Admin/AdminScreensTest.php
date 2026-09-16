@@ -41,6 +41,20 @@ final class AdminScreensTest extends TestCase
         'Last 7 days',
     ];
 
+    public function testSavedConditionalRulesAreDisplayedWithoutEditableControls(): void
+    {
+        $this->createIntegration(['conditions' => [
+            ['action' => 'show', 'target' => 'message', 'source' => 'preferred_contact', 'operator' => 'equals', 'value' => 'E-mail'],
+        ]]);
+        $this->syncSchema(self::FORM_ID);
+        $html = $this->renderIntegrations(['view' => 'edit', 'integration' => 'contact']);
+        $this->assertStringContainsString('data-jfb-rules-readonly', $html);
+        $this->assertStringContainsString('Show only when', $html);
+        $this->assertStringNotContainsString('jotform_integration[conditions]', $html);
+        $this->assertStringNotContainsString('Add rule', $html);
+        $this->assertStringNotContainsString('Remove rule', $html);
+    }
+
     public function testTheIntegrationsListRendersAndDescribesNothingThatWasRemoved(): void
     {
         $this->createIntegration(['slug' => 'contact', 'name' => 'Contact form', 'form_id' => self::FORM_ID]);

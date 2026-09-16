@@ -9,6 +9,7 @@ use JotformBridge\Forms\FormSchema;
 use JotformBridge\Forms\SchemaRepository;
 use JotformBridge\Integrations\CompatibilityChecker;
 use JotformBridge\Integrations\Integration;
+use JotformBridge\Integrations\ConditionalLogic;
 use JotformBridge\Integrations\IntegrationRepository;
 use JotformBridge\Integrations\RedirectTarget;
 use JotformBridge\Plugin;
@@ -238,6 +239,9 @@ final class IntegrationsPage
         $compatibility = $this->compatibility->check($integration);
         $redirect      = $this->redirects->check($integration);
         $schema        = $integration->formId() !== '' ? $this->schemas->stored($integration->formId()) : null;
+        $conditionErrors = ConditionalLogic::errors($integration->conditions(), $schema);
+        $conditionRows = $integration->conditions();
+
         $schemaMeta    = $integration->formId() !== '' ? $this->schemas->meta($integration->formId()) : null;
         $schemaStale   = $integration->formId() !== '' && $this->schemas->isStale($integration->formId());
         // One record, not a list: the editor names the form this integration
@@ -275,8 +279,19 @@ final class IntegrationsPage
             ? sanitize_key((string) wp_unslash($_POST['original_slug']))
             : '';
 
+        // Rules are read-only in the admin. Never accept them from a request,
+        // including a stale editor or a forged POST. Preserve them on rename.
+        $previous = $originalSlug !== '' ? $this->integrations->get($originalSlug) : null;
+        $raw['conditions'] = $previous !== null ? $previous->conditions() : [];
+
         $integration = Integration::fromInput($raw);
-        $errors      = [];
+        $errors      = ConditionalLogic::errors(
+            $integration->conditions(),
+            $this->schemas->stored($integration->formId())
+        );
+        if ($integration->conditions() !== [] && !$this->schemas->isSynced($integration->formId())) {
+            $errors[] = __('Sync the schema before configuring conditional logic.', 'jotform-bridge');
+        }
 
         // The template select is populated from the registry, so anything else
         // is either a stale form or a forged request.

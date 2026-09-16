@@ -396,6 +396,92 @@
         return fields;
     }
 
+    /** Same independent rule evaluation as ConditionalLogic::state(). */
+    function applyConditions(form) {
+        var slug = form.getAttribute('data-jotform-integration');
+        var config = SETTINGS.conditions && SETTINGS.conditions[slug];
+        if (!config || !config.rules.length) { return; }
+        var fields = serialize(form);
+        var state = Object.create(null);
+        config.rules.forEach(function (rule) {
+            var value = fields[rule.source] || '';
+            var values = (Array.isArray(value) ? value : [value]).map(function (item) {
+                return String(item).trim();
+            }).filter(function (item) { return item !== ''; });
+            var equal = values.indexOf(rule.value) !== -1;
+            var matches = rule.operator === 'equals' ? equal
+                : rule.operator === 'not_equals' ? !equal
+                : rule.operator === 'empty' ? values.length === 0 : values.length > 0;
+            if (!state[rule.target]) { state[rule.target] = {}; }
+            state[rule.target][rule.action] = matches;
+        });
+        Object.keys(state).forEach(function (path) {
+            var actions = state[path];
+            var visible = actions.show !== false;
+            var required = typeof actions.require === 'boolean' ? actions.require : config.required.indexOf(path) !== -1;
+            var elements = form.querySelectorAll(FIELD_SELECTOR);
+            var wrappers = [];
+            for (var i = 0; i < elements.length; i++) {
+                var input = elements[i];
+                if (input.getAttribute('data-jotform-field') !== path) { continue; }
+                if (typeof input.__jfbOriginalDisabled === 'undefined') {
+                    var original = input.getAttribute('data-jotform-condition-original-disabled');
+                    input.__jfbOriginalDisabled = original !== null ? original === 'true' : input.disabled;
+                    input.setAttribute('data-jotform-condition-original-disabled', String(input.__jfbOriginalDisabled));
+                }
+                input.disabled = input.__jfbOriginalDisabled || !visible;
+                // A checkbox group requires any choice, never every checkbox.
+                input.required = visible && required && input.type !== 'checkbox';
+                if (visible && required) { input.setAttribute('aria-required', 'true'); }
+                else { input.removeAttribute('aria-required'); }
+                if (!visible) { input.removeAttribute('aria-invalid'); }
+                var wrapper = input.closest('[data-jotform-field-wrapper], .jfb-field');
+                if (wrapper && form.contains(wrapper) &&
+                    (!wrapper.hasAttribute('data-jotform-field-wrapper') || wrapper.getAttribute('data-jotform-field-wrapper') === path)) {
+                    if (wrappers.indexOf(wrapper) === -1) { wrappers.push(wrapper); }
+                } else {
+                    if (typeof actions.show === 'boolean') { input.hidden = !visible; }
+                    if (input.id) {
+                        var labels = form.querySelectorAll('label[for]');
+                        for (var l = 0; l < labels.length; l++) {
+                            if (labels[l].htmlFor === input.id && typeof actions.show === 'boolean') { labels[l].hidden = !visible; }
+                        }
+                    }
+                }
+            }
+            wrappers.forEach(function (wrapper) {
+                if (typeof actions.show === 'boolean') { wrapper.hidden = !visible; }
+                var label = wrapper.querySelector('legend, label');
+                var marker = label && label.querySelector('.jfb-required');
+                if (!marker && label && required) {
+                    marker = document.createElement('span');
+                    marker.className = 'jfb-required';
+                    marker.textContent = ' ' + message('required');
+                    label.appendChild(marker);
+                }
+                if (marker) { marker.hidden = !required; }
+            });
+            if (!visible) {
+                var slots = form.querySelectorAll('[data-jotform-field-error]');
+                for (var e = 0; e < slots.length; e++) {
+                    if (slots[e].getAttribute('data-jotform-field-error') === path) { slots[e].textContent = ''; }
+                }
+            }
+        });
+    }
+
+    function initConditions(root) {
+        if (root.matches && root.matches(FORM_SELECTOR)) { applyConditions(root); }
+        if (!root.querySelectorAll) { return; }
+        var forms = root.querySelectorAll(FORM_SELECTOR);
+        for (var i = 0; i < forms.length; i++) { applyConditions(forms[i]); }
+    }
+
+    function updateConditions(event) {
+        var form = event.target.closest && event.target.closest(FORM_SELECTOR);
+        if (form && form.getAttribute(BUSY_ATTRIBUTE) !== 'true') { applyConditions(form); }
+    }
+
     /**
      * Collects the anti-abuse values of one form.
      *
@@ -773,6 +859,7 @@
             return;
         }
 
+        applyConditions(form);
         var fields = serialize(form);
         var spam = collectSpam(form);
 
@@ -843,6 +930,7 @@
                     // Only now: the form is emptied, the clock restarts and the
                     // spent proof of work is dropped, all in one place.
                     form.reset();
+                    applyConditions(form);
                     form[STARTED_AT] = 0;
                     form[SOLUTION] = null;
 
@@ -893,6 +981,23 @@
 
                 setBusy(form, false);
             });
+    }
+
+    initConditions(document);
+    document.addEventListener('input', updateConditions, false);
+    document.addEventListener('change', updateConditions, false);
+    document.addEventListener('reset', function (event) {
+        var form = event.target;
+        if (form.matches && form.matches(FORM_SELECTOR)) {
+            window.setTimeout(function () { applyConditions(form); }, 0);
+        }
+    }, false);
+    if (typeof MutationObserver !== 'undefined') {
+        new MutationObserver(function (records) {
+            records.forEach(function (record) {
+                for (var i = 0; i < record.addedNodes.length; i++) { initConditions(record.addedNodes[i]); }
+            });
+        }).observe(document.documentElement, { childList: true, subtree: true });
     }
 
     // One delegated listener, so forms added to the page later work too.

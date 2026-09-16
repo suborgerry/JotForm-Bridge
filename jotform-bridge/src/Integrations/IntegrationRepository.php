@@ -161,7 +161,7 @@ final class IntegrationRepository
      */
     private function validate(Integration $integration, ?string $originalSlug): array
     {
-        $errors = [];
+        $errors = ConditionalLogic::errors($integration->conditions());
 
         if ($integration->name() === '') {
             $errors[] = __('The integration needs a name.', 'jotform-bridge');

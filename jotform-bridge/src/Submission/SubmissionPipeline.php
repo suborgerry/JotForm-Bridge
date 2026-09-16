@@ -7,6 +7,7 @@ namespace JotformBridge\Submission;
 use JotformBridge\Api\JotformClient;
 use JotformBridge\Forms\SchemaRepository;
 use JotformBridge\Integrations\Integration;
+use JotformBridge\Integrations\ConditionalLogic;
 use JotformBridge\Integrations\IntegrationRepository;
 use JotformBridge\Integrations\RedirectTarget;
 use JotformBridge\Support\Logger;
@@ -188,7 +189,12 @@ final class SubmissionPipeline
             return $this->unavailable();
         }
 
-        $result = $this->validator->validate($schema, $fields);
+        if (ConditionalLogic::errors($integration->conditions(), $schema) !== []) {
+            $this->log('Submission blocked: invalid conditional rules.', ['integration' => $slug]);
+            return $this->unavailable();
+        }
+
+        $result = $this->validator->validate($schema, $fields, $integration->conditions());
 
         if (!$result->isValid()) {
             return SubmissionOutcome::invalid(__('Validation failed.', 'jotform-bridge'), $result->errors());

@@ -31,6 +31,35 @@ final class SubmissionRouteTest extends TestCase
      */
     private array $sent = [];
 
+    public function testConditionalHiddenFieldIsExcludedAtTheUpstreamBoundary(): void
+    {
+        $this->givenAForm(['conditions' => [['action' => 'show', 'target' => 'message', 'source' => 'preferred_contact', 'operator' => 'not_equals', 'value' => 'E-mail']]]);
+        $this->acceptUpstream();
+        $body = $this->validBody();
+        $body['fields']['message'] = ['forged'];
+        $response = $this->submitThroughRest('contact', $body);
+        $this->assertSame(200, $response->get_status());
+        parse_str($this->sent[0]['body'], $params);
+        $this->assertArrayNotHasKey('8', $params['submission']);
+    }
+
+    public function testConditionalRequiredFieldCannotBeBypassedThroughRest(): void
+    {
+        $this->givenAForm(['conditions' => [['action' => 'require', 'target' => 'address.city', 'source' => 'preferred_contact', 'operator' => 'equals', 'value' => 'E-mail']]]);
+        $response = $this->submitThroughRest('contact', $this->validBody());
+        $this->assertSame(422, $response->get_status());
+        $this->assertArrayHasKey('address.city', $response->get_data()['errors']);
+        $this->assertSame([], $this->sent);
+    }
+
+    public function testRulesBrokenBySchemaChangesRefuseWithoutAnUpstreamCall(): void
+    {
+        $this->givenAForm(['conditions' => [['action' => 'show', 'target' => 'removed_field', 'source' => 'preferred_contact', 'operator' => 'equals', 'value' => 'E-mail']]]);
+        $response = $this->submitThroughRest('contact', $this->validBody());
+        $this->assertSame(503, $response->get_status());
+        $this->assertSame([], $this->sent);
+    }
+
     public function testTheRouteIsRegisteredAndAnonymous(): void
     {
         $route = '/' . SubmissionController::NAMESPACE . SubmissionController::ROUTE;

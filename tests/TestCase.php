@@ -41,6 +41,8 @@ abstract class TestCase extends PHPUnitTestCase
             static fn($value): string => trim(strip_tags((string) $value))
         );
 
+        Functions\when('wp_check_invalid_utf8')->returnArg();
+
         Functions\when('sanitize_key')->alias(
             static fn($value): string => preg_replace('/[^a-z0-9_\-]/', '', strtolower((string) $value)) ?? ''
         );

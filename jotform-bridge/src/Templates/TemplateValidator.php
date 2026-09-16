@@ -23,8 +23,9 @@ final class TemplateValidator
     /**
      * @param array<int, string> $templateFields Literal identifiers from the template.
      * @param int                $dynamicCount   Identifiers produced by PHP.
+     * @param array<int, string> $conditionalRequired Fields that can become required.
      */
-    public function validate(FormSchema $schema, array $templateFields, int $dynamicCount = 0): CompatibilityReport
+    public function validate(FormSchema $schema, array $templateFields, int $dynamicCount = 0, array $conditionalRequired = []): CompatibilityReport
     {
         $expected = $this->expectedPaths($schema);
         $declared = [];
@@ -40,6 +41,9 @@ final class TemplateValidator
         $rows = [];
 
         foreach ($expected as $path => $meta) {
+            if (in_array($path, $conditionalRequired, true)) {
+                $meta['required'] = true;
+            }
             $rows[] = $this->schemaRow($path, $meta, isset($declared[$path]));
 
             unset($declared[$path]);

@@ -80,7 +80,11 @@ final class CompatibilityChecker
         $report = $this->validator->validate(
             $schema,
             $this->templates->fields($integration->templateSlug()),
-            $this->templates->dynamicCount($integration->templateSlug())
+            $this->templates->dynamicCount($integration->templateSlug()),
+            array_values(array_map(
+                static fn(array $rule): string => $rule['target'],
+                array_filter($integration->conditions(), static fn(array $rule): bool => $rule['action'] === 'require')
+            ))
         );
 
         return [

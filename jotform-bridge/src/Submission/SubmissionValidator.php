@@ -6,6 +6,7 @@ namespace JotformBridge\Submission;
 
 use JotformBridge\Forms\FieldNormalizer;
 use JotformBridge\Forms\FormSchema;
+use JotformBridge\Integrations\ConditionalLogic;
 use JotformBridge\Settings\Settings;
 
 if (!defined('ABSPATH')) {
@@ -100,8 +101,9 @@ final class SubmissionValidator
 
     /**
      * @param array<string, mixed> $input Raw `fields` map from the request.
+     * @param array<int, array<string, string>> $conditions Local integration rules.
      */
-    public function validate(FormSchema $schema, array $input): ValidationResult
+    public function validate(FormSchema $schema, array $input, array $conditions = []): ValidationResult
     {
         $errors = [];
         $values = [];
@@ -110,6 +112,13 @@ final class SubmissionValidator
 
         if ($sizeError !== '') {
             return new ValidationResult([ValidationResult::FORM_KEY => $sizeError], []);
+        }
+
+        if (ConditionalLogic::errors($conditions, $schema) !== []) {
+            return new ValidationResult([ValidationResult::FORM_KEY => __(
+                'This form is temporarily unavailable.',
+                'jotform-bridge'
+            )], []);
         }
 
         $allowed = $this->allowedPaths($schema);
@@ -141,7 +150,25 @@ final class SubmissionValidator
             }
         }
 
-        foreach ($schema->requiredPaths() as $path) {
+        $state = ConditionalLogic::state($conditions, $values);
+        foreach ($state as $path => $actions) {
+            if (isset($actions['show']) && !$actions['show']) {
+                unset($values[$path], $errors[$path]);
+            }
+        }
+        $required = array_fill_keys($schema->requiredPaths(), true);
+        foreach ($state as $path => $actions) {
+            if (isset($actions['require'])) {
+                $required[$path] = $actions['require'];
+            }
+            if (isset($actions['show']) && !$actions['show']) {
+                $required[$path] = false;
+            }
+        }
+        foreach ($required as $path => $isRequired) {
+            if (!$isRequired) {
+                continue;
+            }
             if (isset($values[$path]) || isset($errors[$path])) {
                 continue;
             }

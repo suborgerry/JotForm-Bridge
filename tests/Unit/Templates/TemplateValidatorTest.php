@@ -21,6 +21,14 @@ final class TemplateValidatorTest extends TestCase
         $this->validator = new TemplateValidator();
     }
 
+    public function testAConditionallyRequiredOptionalFieldMustExistInTheTemplate(): void
+    {
+        $schema = $this->schema($this->simpleQuestions());
+        $report = $this->validator->validate($schema, ['email'], 0, ['company']);
+        $this->assertFalse($report->isValid());
+        $this->assertSame('company', $report->errors()[0]['path']);
+    }
+
     public function testATemplateDeclaringEveryFieldIsCompatible(): void
     {
         $schema = $this->schema($this->simpleQuestions());

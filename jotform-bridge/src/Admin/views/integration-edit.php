@@ -324,6 +324,7 @@ $jfbReport  = $compatibility['report'] instanceof CompatibilityReport ? $compati
             </tr>
         </table>
 
+        <?php require __DIR__ . '/partials/conditional-logic.php'; ?>
     </form>
 
 

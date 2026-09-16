@@ -29,6 +29,39 @@ final class IntegrationActionsTest extends TestCase
      */
     private const FLASH_PREFIX = 'jotform_bridge_notice_';
 
+    public function testSavingPreservesLockedRulesAndIgnoresForgedChanges(): void
+    {
+        $this->actAsAdministrator();
+        $this->syncSchema(self::FORM_ID);
+        $rule = ['action' => 'show', 'target' => 'message', 'source' => 'preferred_contact', 'operator' => 'equals', 'value' => 'E-mail'];
+        $this->createIntegration(['conditions' => [$rule]]);
+        $input = ['name' => 'Updated contact', 'slug' => 'contact', 'form_id' => self::FORM_ID, 'mode' => 'auto'];
+        foreach ([null, [], [array_merge($rule, ['value' => 'Phone'])], 'forged'] as $forged) {
+            if ($forged !== null) { $input['conditions'] = $forged; }
+            $this->submitForm(['_wpnonce' => wp_create_nonce(IntegrationsPage::ACTION_SAVE), 'original_slug' => 'contact', 'jotform_integration' => $input]);
+            $this->expectRedirect(fn() => do_action('admin_post_' . IntegrationsPage::ACTION_SAVE));
+            $stored = (new IntegrationRepository())->get('contact');
+            $this->assertSame([$rule], $stored->conditions());
+            $this->assertSame('Updated contact', $stored->name());
+        }
+        $input['slug'] = 'renamed';
+        $this->submitForm(['_wpnonce' => wp_create_nonce(IntegrationsPage::ACTION_SAVE), 'original_slug' => 'contact', 'jotform_integration' => $input]);
+        $this->expectRedirect(fn() => do_action('admin_post_' . IntegrationsPage::ACTION_SAVE));
+        $this->assertSame([$rule], (new IntegrationRepository())->get('renamed')->conditions());
+        $this->assertNull((new IntegrationRepository())->get('contact'));
+    }
+
+    public function testNewIntegrationsIgnoreRulesSuppliedThroughTheAdmin(): void
+    {
+        $this->actAsAdministrator();
+        $input = ['name' => 'Contact', 'slug' => 'contact', 'form_id' => self::FORM_ID, 'mode' => 'auto', 'conditions' => [
+            ['action' => 'show', 'target' => 'message', 'source' => 'email', 'operator' => 'not_empty', 'value' => ''],
+        ]];
+        $this->submitForm(['_wpnonce' => wp_create_nonce(IntegrationsPage::ACTION_SAVE), 'jotform_integration' => $input]);
+        $this->expectRedirect(fn() => do_action('admin_post_' . IntegrationsPage::ACTION_SAVE));
+        $this->assertSame([], (new IntegrationRepository())->get('contact')->conditions());
+    }
+
     public function testSavingStoresTheIntegrationAndReturnsToItsEditor(): void
     {
         $this->actAsAdministrator();

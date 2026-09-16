@@ -7,6 +7,7 @@ namespace JotformBridge\Rendering;
 use JotformBridge\Forms\FormSchema;
 use JotformBridge\Forms\SchemaRepository;
 use JotformBridge\Integrations\Integration;
+use JotformBridge\Integrations\ConditionalLogic;
 use JotformBridge\Integrations\IntegrationRepository;
 use JotformBridge\Plugin;
 use JotformBridge\Rest\SubmissionController;
@@ -82,6 +83,10 @@ final class FormRenderer
             );
         }
 
+        if (ConditionalLogic::errors($integration->conditions(), $schema) !== []) {
+            return $this->diagnostic($slug, __('The saved conditional rules no longer match the synced schema and require maintenance. Rules are read-only in the integration editor.', 'jotform-bridge'));
+        }
+
         $endpoint = SubmissionController::endpoint($integration->slug());
 
         if (!$integration->usesCustomTemplate()) {
@@ -114,7 +119,7 @@ final class FormRenderer
             );
         }
 
-        $this->assets->enqueue($slug);
+        $this->assets->enqueue($slug, $integration->conditions(), $schema->requiredPaths());
 
         return $html;
     }
@@ -143,7 +148,7 @@ final class FormRenderer
             );
         }
 
-        $this->assets->enqueue($integration->slug());
+        $this->assets->enqueue($integration->slug(), $integration->conditions(), $schema->requiredPaths());
 
         return $html;
     }
