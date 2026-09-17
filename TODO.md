@@ -56,32 +56,7 @@ the outbox.
 
 ---
 
-## 3. No way to update the plugin
-
-**Problem.** The plugin is not on wordpress.org, carries no `Update URI` header
-and ships no updater. Every install is a manual ZIP upload. On one site that is
-an annoyance; across a portfolio of client sites it means the fleet drifts and
-security fixes do not land.
-
-**Why it is sharper than it looks.** Version discipline is a correctness
-requirement, not hygiene. `frontend.js` is enqueued with the plugin version in
-its URL, and a browser holding the previous file will keep using it if the URL
-has not changed — a stale script computes no proof of work, and the guard
-refuses the submission. Shipping a release without bumping the version turns
-into refused submissions for a slice of real visitors. `assets/admin.js` has
-the same property: it binds the **Connect form** button, so a stale copy gives
-an administrator a button that does nothing.
-
-**State.** The version-consistency half exists: `bin/version.php --check` fails
-when the three version strings disagree and `--set X.Y.Z` writes all three,
-wired into `composer check` and the CI lint job.
-
-**What is left.** The delivery channel: `Update URI` plus a small update
-server, or `plugin-update-checker` against GitHub Releases.
-
----
-
-## 4. Second review pass with a different model
+## 3. Second review pass with a different model
 
 **Problem.** The plugin, the removals recorded as `Amendment:` sections and the
 fixes in this file were produced by one model. That is a single point of view,

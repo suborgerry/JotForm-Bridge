@@ -12,6 +12,7 @@
 | Settings | option `jotform_bridge_settings` | never | the settings screen |
 | Circuit-breaker state | option `jotform_bridge_quota` | daily counts, 30 days | every accepted submission |
 | Rate-limit and anti-replay buckets | transients | minutes to hours | every submission |
+| The latest GitHub release | site transient `jotform_bridge_update_check` | 12 hours, 1 hour after a failure | WordPress's own update check; **Check again** clears it |
 
 The template list is deliberately absent: it is not stored at all. Only the
 header of each file in `jotform-bridge-templates/` is read, on demand and once per request, which

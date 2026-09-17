@@ -60,6 +60,11 @@ $jfbCleanUpSite = static function (): void {
     delete_option('jotform_bridge_stats');
     delete_option('jotform_bridge_version');
 
+    // The remembered answer of the GitHub update check. A site transient, so
+    // on a network it is one record for the whole installation; deleting it
+    // once per site is harmless.
+    delete_site_transient('jotform_bridge_update_check');
+
     $jfbSettings = get_option('jotform_bridge_settings', []);
 
     if (is_array($jfbSettings) && !empty($jfbSettings['delete_data_on_uninstall'])) {

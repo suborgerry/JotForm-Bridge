@@ -16,6 +16,7 @@ Use custom PHP templates or automatically generated forms with Jotform as the
 backend. Local integrations bind your markup to Jotform; fields use semantic
 names, and submissions are validated server-side. Includes spam protection and
 optional success redirects and local conditional field rules. No production dependencies or build step.
+Updates are delivered from GitHub Releases through the ordinary Updates screen.
 
 Documentation: https://github.com/suborgerry/JotForm-Bridge/blob/main/docs/README.md
 
@@ -33,6 +34,10 @@ Setup guide: https://github.com/suborgerry/JotForm-Bridge/blob/main/docs/getting
 Custom templates: https://github.com/suborgerry/JotForm-Bridge/blob/main/docs/custom-templates.md
 
 == Changelog ==
+
+= 2.0.0 =
+* Updates arrive from GitHub Releases through the ordinary Updates screen; no more manual ZIP uploads.
+* Local conditional visibility and requirements per integration, evaluated in the browser and on the server.
 
 = 1.1.0 =
 * Connect form loads missing schemas; automatic rendering is now the default.

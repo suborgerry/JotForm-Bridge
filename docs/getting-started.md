@@ -22,8 +22,11 @@ the integration and the synced Jotform form definition.
 
 ## Installation
 
-1. **Plugins → Add New → Upload Plugin**, upload the ZIP, activate. Nothing else
-   is needed: no `composer install`, no `npm install`, no `npm run build`.
+1. **Plugins → Add New → Upload Plugin**, upload the ZIP from the [latest
+   release](https://github.com/suborgerry/JotForm-Bridge/releases/latest),
+   activate. Nothing else is needed: no `composer install`, no `npm install`,
+   no `npm run build`. From then on new versions appear on **Dashboard →
+   Updates** like any other plugin, and auto-updates can be switched on for it.
 2. Add the API key to `wp-config.php` (see below). Until it is there, the admin
    screens say so and nothing can talk to Jotform.
 3. **Jotform Bridge → Settings** — choose the API region, save, then press

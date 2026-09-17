@@ -143,6 +143,7 @@ Roughly:
 ├── AGENTS.md
 ├── CLAUDE.md              # imports AGENTS.md; not a second copy
 ├── README.md
+├── .github/workflows/     # ci.yml on every push; release.yml on a vX.Y.Z tag
 ├── prompts/
 ├── composer.json          # dev dependencies and PSR-4 autoload
 ├── phpunit.xml.dist
@@ -1377,6 +1378,8 @@ in-request memos:
 
 * rate limit buckets;
 * duplicate and proof-of-work fingerprints;
+* the remembered answer of the GitHub update check (see "Amendment: updates
+  come from GitHub Releases");
 * memoization within one request (`IntegrationRepository`, `FormRepository`,
   `TemplateRegistry`, `Settings`).
 
@@ -1590,6 +1593,9 @@ Templates/
     TemplateScanner
     TemplateRegistry
     TemplateValidator
+
+Updates/
+    GitHubUpdater
 
 Rendering/
     CustomTemplateRenderer
@@ -2348,3 +2354,78 @@ The rule now:
 Unchanged: nothing is fetched by a page view, a save, an activation, an upgrade
 or a submission, and no schema is ever fetched for more than the one form ID
 that was named.
+
+---
+
+# Amendment: updates come from GitHub Releases
+
+Adds the delivery channel the "Building a release" section left open, and
+closes the TODO entry that said the plugin had no way to update.
+
+The plugin is not on wordpress.org. Until this amendment every install was a
+manual ZIP upload, and across several sites that meant the fleet drifted and a
+fix did not land.
+
+Version discipline is part of this, and it is a correctness requirement rather
+than hygiene: both `assets/frontend.js` and `assets/admin.js` are enqueued with
+the plugin version in their URL, so a release whose version did not move leaves
+browsers on the previous file. A stale `frontend.js` computes no proof of work
+and has its submissions refused; a stale `admin.js` leaves **Connect form**
+inert. `bin/version.php --check` keeps the three version strings agreeing and
+runs in CI; the release workflow adds the tag to that agreement.
+
+Added:
+
+* `Update URI: https://github.com/suborgerry/JotForm-Bridge` in the plugin
+  header. WordPress 5.8+ then leaves the plugin out of the wordpress.org check
+  — a plugin of the same slug published there can never be offered in its
+  place — and asks the `update_plugins_github.com` filter instead;
+* `Updates\GitHubUpdater`, which answers that filter, the `plugins_api` filter
+  behind "View details", and the `delete_site_transient_update_plugins` action
+  behind **Check again**;
+* `.github/workflows/release.yml`, which turns a `vX.Y.Z` tag into a GitHub
+  Release with `jotform-bridge-X.Y.Z.zip` attached;
+* `bin/release-notes.php`, which prints the `readme.txt` changelog entry for one
+  version; the workflow makes it the release body, and the update check shows
+  it as the changelog.
+
+Not added: a library. Core has done the hard half since 5.8, and the plugin's
+half is one class. `plugin-update-checker` would be a third-party dependency
+shipped to every site in order to save that class.
+
+What has to hold:
+
+1. **The package is the built ZIP, never GitHub's source archive.** The update
+   check looks for an asset named exactly `jotform-bridge-{version}.zip` at a
+   URL under `https://github.com/{repository}/releases/download/`, and a
+   release without one is not an update. The source archive unpacks into
+   `JotForm-Bridge-<sha>/` and carries the whole repository, tests included:
+   neither the directory name WordPress expects nor the package "Building a
+   release" allows.
+2. **The tag equals the header, or there is no release.** The workflow refuses a
+   `v2.1.0` on a header that says `2.0.0`. WordPress compares the header, so
+   such a release would never be offered to anybody — and a release whose
+   version did not move is the stale-script failure above.
+3. **The filter is shared with every plugin hosted on GitHub.** The hostname is
+   the whole of the filter name. `GitHubUpdater::check()` compares the
+   `Update URI` path against its own repository, case-insensitively, and
+   returns what it was given for anything else — or another plugin would be
+   offered our package and replaced by it on its next update.
+4. **The answer is cheap state.** A site transient, twelve hours for an answer
+   and one for a failure, cleared by **Check again** through Core's own cache
+   flush. GitHub allows sixty anonymous requests an hour per address, and
+   `wp_update_plugins()` runs from cron and from admin page loads; a site behind
+   a broken proxy must not pay a ten-second timeout on each of them. A failure
+   is logged when debug logging is on and is otherwise "no update", which is a
+   correct state, not an error the admin needs a notice about.
+5. **Only `/releases/latest` is read.** GitHub excludes drafts and pre-releases
+   from it, so a release being written is offered to nobody, and there is no
+   list to page through.
+6. **Nothing in this path touches Jotform**, and nothing in it runs on a
+   frontend page view: `wp_update_plugins()` is Core's, on Core's schedule.
+
+The price is accepted deliberately: the repository has to stay public, since
+Core's downloader sends no credentials. If it ever goes private, the choice is
+between a token in `wp-config.php` on every site, a second public repository
+holding only the releases, and an update server of our own — and that is a
+new decision, not a small change to this one.

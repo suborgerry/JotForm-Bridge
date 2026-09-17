@@ -30,6 +30,7 @@ use JotformBridge\Submission\SubmissionPipeline;
 use JotformBridge\Submission\TestSubmission;
 use JotformBridge\Support\Logger;
 use JotformBridge\Templates\TemplateRegistry;
+use JotformBridge\Updates\GitHubUpdater;
 
 if (!defined('ABSPATH')) {
     exit;
@@ -153,6 +154,11 @@ final class Plugin
         (new Turnstile($this->logger))->register();
 
         (new SubmissionController(static fn(): SubmissionPipeline => self::instance()->pipeline()))->register();
+
+        // Not under is_admin(): the update check also runs from cron, which a
+        // frontend request may be the one to trigger. Registering costs three
+        // hooks; GitHub is asked only when Core performs a check.
+        (new GitHubUpdater($this->logger))->register();
 
         if (is_admin()) {
             // Only on this plugin's own screens; the class decides.

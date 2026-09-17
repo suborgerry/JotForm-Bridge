@@ -59,6 +59,15 @@ if (!defined('JOTFORM_BRIDGE_URL')) {
     define('JOTFORM_BRIDGE_URL', 'https://example.test/wp-content/plugins/jotform-bridge/');
 }
 
+// What the update check tells WordPress a release requires.
+if (!defined('JOTFORM_BRIDGE_MIN_PHP')) {
+    define('JOTFORM_BRIDGE_MIN_PHP', '8.0');
+}
+
+if (!defined('JOTFORM_BRIDGE_MIN_WP')) {
+    define('JOTFORM_BRIDGE_MIN_WP', '6.4');
+}
+
 if (!class_exists('WP_Error')) {
     /**
      * Minimal stand-in for the WordPress error object.

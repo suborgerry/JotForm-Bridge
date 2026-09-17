@@ -34,6 +34,8 @@ final class Runtime
         'jotform_bridge_%',
         '_transient_jotform_bridge_%',
         '_transient_timeout_jotform_bridge_%',
+        '_site_transient_jotform_bridge_%',
+        '_site_transient_timeout_jotform_bridge_%',
     ];
 
     /**

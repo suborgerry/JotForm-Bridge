@@ -1,7 +1,7 @@
 <?php
 /**
  * Plugin Name:       Jotform Bridge
- * Plugin URI:        https://github.com/suborgerry/jotform-bridge
+ * Plugin URI:        https://github.com/suborgerry/JotForm-Bridge
  * Description:       Uses Jotform as a headless form backend for WordPress: custom markup on the site, submissions and data storage on Jotform.
  * Version:           2.0.0
  * Requires at least: 6.4
@@ -11,6 +11,7 @@
  * License URI:       https://www.gnu.org/licenses/gpl-2.0.html
  * Text Domain:       jotform-bridge
  * Domain Path:       /languages
+ * Update URI:        https://github.com/suborgerry/JotForm-Bridge
  *
  * @package JotformBridge
  */

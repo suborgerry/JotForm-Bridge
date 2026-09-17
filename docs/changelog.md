@@ -2,8 +2,11 @@
 
 [Documentation](README.md)
 
-## Unreleased
+## 2.0.0
 
+* Updates arrive from GitHub Releases through the ordinary Updates screen. The
+  plugin header carries `Update URI`, and `Updates\GitHubUpdater` answers Core's
+  check with the ZIP attached to the latest release. No more manual uploads.
 * Added local conditional visibility and requirements per integration, with
   matching browser and server evaluation and a read-only table of saved rules.
 
