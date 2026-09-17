@@ -26,6 +26,7 @@ The repository is the plugin plus its dev harness. Only `jotform-bridge/` ships.
 │       ├── Submission/      # validation, mapping, spam guard, pipeline
 │       ├── Support/         # logger
 │       ├── Templates/       # scanner, registry, validator
+│       ├── Updates/         # the GitHub Releases update check
 │       ├── Autoloader.php   # own PSR-4 loader, so no vendor/ in the release
 │       ├── Plugin.php       # composition root
 │       └── api.php          # jotform_bridge_render() and friends
@@ -34,6 +35,7 @@ The repository is the plugin plus its dev harness. Only `jotform-bridge/` ships.
 │   └── Integration/         # PHPUnit against a real WordPress on SQLite
 ├── bin/install-wp.sh        # downloads that WordPress into .wordpress/
 ├── bin/build-zip.sh         # builds the release ZIP
+├── bin/release-notes.php    # the readme.txt changelog entry for one version
 ├── AGENTS.md                # architectural specification
 └── prompts/                 # the staged prompts this was built from
 ```
@@ -74,13 +76,41 @@ Architectural invariants worth keeping — they are what the design is:
   there.
 * Backend validation is authoritative.
 
-## Updating the version
+## Releasing
+
+Installed copies update themselves from GitHub Releases: the plugin header
+carries `Update URI`, and `Updates\GitHubUpdater` answers WordPress's update
+check with the ZIP attached to the latest release. A release is therefore a
+tag, and the workflow in `.github/workflows/release.yml` does the rest.
 
 ```bash
-php bin/version.php --set 1.1.0
+php bin/version.php --set 2.1.0     # header, constant and readme.txt Stable tag
+# add "= 2.1.0 =" to the changelog in jotform-bridge/readme.txt, and to docs/changelog.md
 composer check
-bin/build-zip.sh
+git commit -am "Release 2.1.0"
+git tag v2.1.0
+git push origin main v2.1.0
 ```
 
-Update [the changelog](changelog.md) before building. The ZIP is written to
-`dist/jotform-bridge-<version>.zip`. Documentation stays in the repository.
+The workflow refuses the tag unless it equals the `Version:` in the plugin
+header — a release whose version did not move leaves browsers on the previous
+`frontend.js`, which computes no proof of work and has its submissions
+refused — and unless `readme.txt` has a changelog entry for it, which becomes
+the release body and the changelog in the "View details" window. It then runs
+`composer check`, builds the ZIP with `bin/build-zip.sh` and publishes the
+release with `jotform-bridge-2.1.0.zip` attached. A failed release is fixed by
+fixing the commit, deleting the tag (`git tag -d v2.1.0 && git push origin
+:v2.1.0`) and pushing it again.
+
+Sites notice within twelve hours, or at once after **Check again** on
+**Dashboard → Updates**. The check reads only the latest non-draft, non-prerelease
+release, and only the asset named `jotform-bridge-<version>.zip`: GitHub's own
+source archive is never offered, since it unpacks into a directory named after
+the commit and carries the whole repository.
+
+To build the ZIP locally without releasing:
+
+```bash
+bin/build-zip.sh                    # dist/jotform-bridge-<version>.zip
+php bin/release-notes.php 2.1.0     # what the release body would be
+```

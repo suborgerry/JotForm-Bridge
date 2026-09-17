@@ -1,0 +1,32 @@
+{
+    "url": "https://api.github.com/repos/suborgerry/JotForm-Bridge/releases/100000001",
+    "html_url": "https://github.com/suborgerry/JotForm-Bridge/releases/tag/v2.1.0",
+    "id": 100000001,
+    "node_id": "RE_kwDOExample",
+    "tag_name": "v2.1.0",
+    "target_commitish": "main",
+    "name": "2.1.0",
+    "draft": false,
+    "prerelease": false,
+    "created_at": "2026-09-17T09:58:12Z",
+    "published_at": "2026-09-17T10:00:00Z",
+    "assets": [
+        {
+            "url": "https://api.github.com/repos/suborgerry/JotForm-Bridge/releases/assets/200000001",
+            "id": 200000001,
+            "node_id": "RA_kwDOExample",
+            "name": "jotform-bridge-2.1.0.zip",
+            "label": "",
+            "content_type": "application/zip",
+            "state": "uploaded",
+            "size": 94211,
+            "download_count": 0,
+            "created_at": "2026-09-17T09:59:40Z",
+            "updated_at": "2026-09-17T09:59:41Z",
+            "browser_download_url": "https://github.com/suborgerry/JotForm-Bridge/releases/download/v2.1.0/jotform-bridge-2.1.0.zip"
+        }
+    ],
+    "tarball_url": "https://api.github.com/repos/suborgerry/JotForm-Bridge/tarball/v2.1.0",
+    "zipball_url": "https://api.github.com/repos/suborgerry/JotForm-Bridge/zipball/v2.1.0",
+    "body": "* Updates arrive from GitHub Releases through the Updates screen.\n* Conditional visibility and requirements per integration."
+}
