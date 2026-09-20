@@ -26,7 +26,7 @@ foreach (['', '-wal', '-shm', '-journal', '.pristine'] as $jfbSuffix) {
     }
 }
 
-if (!is_dir(DB_DIR) && !mkdir(DB_DIR, 0o777, true) && !is_dir(DB_DIR)) {
+if (!is_dir(DB_DIR) && !mkdir(DB_DIR, 0777, true) && !is_dir(DB_DIR)) {
     fwrite(STDERR, 'error: could not create ' . DB_DIR . "\n");
 
     exit(1);
