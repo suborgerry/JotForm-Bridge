@@ -3,7 +3,7 @@
  * Plugin Name:       Jotform Bridge
  * Plugin URI:        https://github.com/suborgerry/JotForm-Bridge
  * Description:       Uses Jotform as a headless form backend for WordPress: custom markup on the site, submissions and data storage on Jotform.
- * Version:           2.0.12
+ * Version:           2.0.13
  * Requires at least: 6.4
  * Requires PHP:      8.0
  * Author:            Jotform Bridge

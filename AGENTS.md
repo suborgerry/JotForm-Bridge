@@ -2427,8 +2427,13 @@ What has to hold:
    returns what it was given for anything else — or another plugin would be
    offered our package and replaced by it on its next update.
 4. **The answer is cheap state.** A site transient, twelve hours for an answer
-   and one for a failure, cleared by **Check again** through Core's own cache
-   flush. GitHub allows sixty anonymous requests an hour per address, and
+   and one for a failure. **Check again** on the Updates screen drops it
+   before Core's check runs — and that has to be done by the plugin itself:
+   `force-check` forces Core's version check only, and clears no plugin
+   transient. The first version assumed it did, and a site sat on a
+   twelve-hour-old "no update" while its owner pressed the button. The
+   `delete_site_transient_update_plugins` action is still honoured for the
+   upgrader and WP-CLI. GitHub allows sixty anonymous requests an hour per address, and
    `wp_update_plugins()` runs from cron and from admin page loads; a site behind
    a broken proxy must not pay a ten-second timeout on each of them. A failure
    is logged when debug logging is on and is otherwise "no update", which is a

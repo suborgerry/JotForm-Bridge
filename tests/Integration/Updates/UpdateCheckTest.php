@@ -106,26 +106,54 @@ final class UpdateCheckTest extends TestCase
     }
 
     /**
-     * "Check again" on the Updates screen goes through wp_clean_plugins_cache(),
-     * which deletes Core's transient. That has to take ours with it, or the
-     * person who asked for a fresh check gets the twelve-hour-old answer.
+     * "Check again" on the Updates screen is `update-core.php?force-check=1`,
+     * and the plugin check it runs is Core's `wp_update_plugins()` on
+     * `load-update-core.php`. That page has to reach GitHub even when the
+     * remembered answer is fresh, or the person who asked for a new check gets
+     * the twelve-hour-old one — which is what happened when this test still
+     * called wp_clean_plugins_cache() directly and never looked at the page.
      */
-    public function testCheckAgainAsksGitHubAgainAndAnOrdinaryCheckDoesNot(): void
+    public function testCheckAgainAsksGitHubAgainAndAnOrdinaryVisitDoesNot(): void
     {
         $this->mockUpdateSources($this->release($this->newerVersion()));
 
         wp_update_plugins();
         $this->assertCount(1, $this->githubRequests());
 
-        // Core's own throttle is what stops this one; ours would too.
-        wp_update_plugins();
+        // The screen a minute later, without the button: Core's throttle on
+        // that page is one minute, and our answer is still fresh.
+        $this->ageCoreCheck();
+        do_action('load-update-core.php');
         $this->assertCount(1, $this->githubRequests());
+        $this->assertNotFalse(get_site_transient(GitHubUpdater::TRANSIENT));
+
+        // The button.
+        $this->ageCoreCheck();
+        $_GET['force-check'] = '1';
+
+        try {
+            do_action('load-update-core.php');
+        } finally {
+            unset($_GET['force-check']);
+        }
+
+        $this->assertCount(2, $this->githubRequests());
+    }
+
+    /**
+     * The upgrader clears Core's plugin cache after installing something, and
+     * so does `wp transient delete update_plugins --network`; both take our
+     * answer with them.
+     */
+    public function testClearingCoresPluginCacheClearsOurs(): void
+    {
+        $this->mockUpdateSources($this->release($this->newerVersion()));
+
+        wp_update_plugins();
+        $this->assertNotFalse(get_site_transient(GitHubUpdater::TRANSIENT));
 
         wp_clean_plugins_cache(true);
         $this->assertFalse(get_site_transient(GitHubUpdater::TRANSIENT));
-
-        wp_update_plugins();
-        $this->assertCount(2, $this->githubRequests());
     }
 
     public function testTheDetailsWindowComesFromTheReleaseNotWordPressOrg(): void
@@ -159,8 +187,11 @@ final class UpdateCheckTest extends TestCase
             function (string $url) use ($release): ?array {
                 $this->requests[] = $url;
 
+                // One body serves both update-check endpoints: the Updates
+                // screen runs the theme check on the same action as the
+                // plugin one.
                 if (str_contains($url, self::WPORG)) {
-                    return $this->httpResponse(200, ['plugins' => [], 'translations' => [], 'no_update' => []]);
+                    return $this->httpResponse(200, ['plugins' => [], 'themes' => [], 'translations' => [], 'no_update' => []]);
                 }
 
                 if (str_contains($url, 'api.github.com/repos/suborgerry/JotForm-Bridge/releases/latest')) {
@@ -172,6 +203,23 @@ final class UpdateCheckTest extends TestCase
                 return null;
             }
         );
+    }
+
+    /**
+     * Moves Core's last plugin check back past the one-minute throttle of the
+     * Updates screen, so a visit to it asks the filter at all. Written directly
+     * rather than deleted: deleting the transient fires the action the plugin
+     * listens on, which is the other path and not the one under test.
+     */
+    private function ageCoreCheck(): void
+    {
+        $current = get_site_transient('update_plugins');
+
+        $this->assertIsObject($current);
+
+        $current->last_checked = time() - 2 * MINUTE_IN_SECONDS;
+
+        set_site_transient('update_plugins', $current);
     }
 
     /**
