@@ -36,8 +36,8 @@ final class TemplateRenderingTest extends TestCase
         $this->child  = $base . '/child/jotform-bridge-templates';
         $this->parent = $base . '/parent/jotform-bridge-templates';
 
-        mkdir($this->child, 0o777, true);
-        mkdir($this->parent, 0o777, true);
+        mkdir($this->child, 0777, true);
+        mkdir($this->parent, 0777, true);
 
         // A child theme with a parent, which is what decides template priority.
         $this->filter('stylesheet_directory', fn(): string => dirname($this->child), 10, 1);
