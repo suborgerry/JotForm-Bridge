@@ -34,6 +34,10 @@ Custom templates: https://github.com/suborgerry/JotForm-Bridge/blob/main/docs/cu
 
 == Changelog ==
 
+= 2.0.11 =
+* The plugin version is written down once, in the plugin header; the constant, the asset URLs and the upgrade routine read it from there.
+* A release is now a version bump merged into main: the workflow creates the tag and the GitHub Release itself.
+
 = 2.0.0 =
 * Updates arrive from GitHub Releases through the ordinary Updates screen; no more manual ZIP uploads.
 * Local conditional visibility and requirements per integration, evaluated in the browser and on the server.
