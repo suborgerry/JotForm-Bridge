@@ -2,6 +2,19 @@
 
 [Documentation](README.md)
 
+## 2.0.11
+
+* The plugin version is written down once, in the `Version:` line of the plugin
+  header. `JOTFORM_BRIDGE_VERSION` reads it from there at boot, `readme.txt`
+  carries no `Stable tag`, and `bin/version.php` is gone with nothing left to
+  keep in step.
+* A release is a version bump merged into `main`. The workflow reads the header,
+  and when no tag exists for that version yet, runs the checks, builds the ZIP
+  and creates the tag and the GitHub Release. Nobody pushes a tag by hand.
+* `composer.json` pins the Composer platform to PHP 8.0, so the lock file always
+  resolves for the floor the plugin header promises, whatever PHP the developer
+  runs.
+
 ## 2.0.0
 
 * Updates arrive from GitHub Releases through the ordinary Updates screen. The
