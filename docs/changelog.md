@@ -2,6 +2,18 @@
 
 [Documentation](README.md)
 
+## 2.0.13
+
+* **Check again** on the Updates screen now reaches GitHub. `force-check` only
+  forces Core's version check and clears no plugin transient, so the updater
+  answered from its own twelve-hour cache and a release published after the
+  last check was not offered until that expired. The updater now drops its
+  cache on `load-update-core.php` when the forced check is requested, before
+  Core asks. The integration test that was meant to cover this called
+  `wp_clean_plugins_cache()` directly; it now goes through the page action.
+* Integration tests run on PHP 8.0 again: three `0o777` literals, which are
+  PHP 8.1 syntax, were `0777`.
+
 ## 2.0.11
 
 * The plugin version is written down once, in the `Version:` line of the plugin

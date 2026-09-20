@@ -32,9 +32,16 @@ if (!defined('ABSPATH')) {
  * "Storage and caching" in AGENTS.md. The GitHub API allows sixty anonymous
  * requests an hour per address, and `wp_update_plugins()` runs on the plugins
  * screen, on cron and on every admin page load once its own throttle expires,
- * so the answer is kept for twelve hours and a failure for one. "Check again"
- * on the Updates screen clears Core's transient and, through the same action,
- * ours — so a person who asks for a fresh check gets one.
+ * so the answer is kept for twelve hours and a failure for one.
+ *
+ * "Check again" on the Updates screen has to get past that, and it does not
+ * do so by itself: `force-check` forces Core's *version* check only. Core's
+ * plugin check still runs on that page, throttled to a minute, and asks the
+ * filter — which would answer from the transient. So the forced check is
+ * noticed here and the transient dropped before Core asks. The first version
+ * of this class assumed "Check again" cleared Core's plugin transient and, via
+ * the action below, ours; it does neither, and a site sat on a twelve-hour-old
+ * answer while its owner pressed the button.
  */
 final class GitHubUpdater
 {
@@ -84,10 +91,29 @@ final class GitHubUpdater
         add_filter('update_plugins_' . self::HOST, [$this, 'check'], 10, 3);
         add_filter('plugins_api', [$this, 'information'], 10, 3);
 
-        // Fired by wp_clean_plugins_cache(): "Check again" on the Updates
-        // screen, and the upgrader after it installed something. Both are
-        // moments a stale answer would be wrong.
+        // Fired by wp_clean_plugins_cache(): the upgrader after it installed
+        // something, and `wp transient delete update_plugins --network`. Both
+        // are moments a stale answer would be wrong.
         add_action('delete_site_transient_update_plugins', [$this, 'forget']);
+
+        // Before Core's own wp_update_plugins() on the same action, at 10.
+        add_action('load-update-core.php', [$this, 'forgetOnForcedCheck'], 9);
+    }
+
+    /**
+     * Drops the remembered answer when the Updates screen was asked to check
+     * again, so the check Core is about to run reaches GitHub.
+     *
+     * The parameter is the one Core itself reads on that screen, with no nonce
+     * of its own: it starts a read-only check, and the only thing it changes
+     * is a cache.
+     */
+    public function forgetOnForcedCheck(): void
+    {
+        // phpcs:ignore WordPress.Security.NonceVerification.Recommended -- see above.
+        if (!empty($_GET['force-check'])) {
+            $this->forget();
+        }
     }
 
     /**
