@@ -143,7 +143,7 @@ Roughly:
 ├── AGENTS.md
 ├── CLAUDE.md              # imports AGENTS.md; not a second copy
 ├── README.md
-├── .github/workflows/     # ci.yml on every push; release.yml on a vX.Y.Z tag
+├── .github/workflows/     # ci.yml on every push; release.yml on a version bump on main
 ├── prompts/
 ├── composer.json          # dev dependencies and PSR-4 autoload
 ├── phpunit.xml.dist
@@ -2371,8 +2371,16 @@ than hygiene: both `assets/frontend.js` and `assets/admin.js` are enqueued with
 the plugin version in their URL, so a release whose version did not move leaves
 browsers on the previous file. A stale `frontend.js` computes no proof of work
 and has its submissions refused; a stale `admin.js` leaves **Connect form**
-inert. `bin/version.php --check` keeps the three version strings agreeing and
-runs in CI; the release workflow adds the tag to that agreement.
+inert.
+
+The version is therefore written down **once**, in the `Version:` line of the
+plugin header, which is the one place WordPress reads it from.
+`JOTFORM_BRIDGE_VERSION` is derived from that line at boot with
+`get_file_data()`, and `readme.txt` carries no `Stable tag` — the plugin is not
+on wordpress.org, and a second literal only existed to disagree with the first.
+The first version of this amendment kept three literals in step with a script
+and a CI check; a release could fail on bookkeeping alone, and it was replaced
+by having nothing to keep in step.
 
 Added:
 
@@ -2383,8 +2391,9 @@ Added:
 * `Updates\GitHubUpdater`, which answers that filter, the `plugins_api` filter
   behind "View details", and the `delete_site_transient_update_plugins` action
   behind **Check again**;
-* `.github/workflows/release.yml`, which turns a `vX.Y.Z` tag into a GitHub
-  Release with `jotform-bridge-X.Y.Z.zip` attached;
+* `.github/workflows/release.yml`, which runs on every push to `main`, reads
+  the header, and — when no tag `vX.Y.Z` exists for that version yet — creates
+  the tag and a GitHub Release with `jotform-bridge-X.Y.Z.zip` attached;
 * `bin/release-notes.php`, which prints the `readme.txt` changelog entry for one
   version; the workflow makes it the release body, and the update check shows
   it as the changelog.
@@ -2402,10 +2411,14 @@ What has to hold:
    `JotForm-Bridge-<sha>/` and carries the whole repository, tests included:
    neither the directory name WordPress expects nor the package "Building a
    release" allows.
-2. **The tag equals the header, or there is no release.** The workflow refuses a
-   `v2.1.0` on a header that says `2.0.0`. WordPress compares the header, so
-   such a release would never be offered to anybody — and a release whose
-   version did not move is the stale-script failure above.
+2. **The tag is derived from the header, never pushed by hand.** WordPress
+   compares the header, so a tag that disagreed with it would be a release
+   offered to nobody — and a release whose version did not move is the
+   stale-script failure above. Both are impossible rather than checked: the
+   workflow creates the tag from the header, and a header that did not move is
+   not a release at all. A release is a version bump merged into `main`, and
+   the only thing that can stop it is a missing changelog entry in
+   `readme.txt` or a failing `composer check`.
 3. **The filter is shared with every plugin hosted on GitHub.** The hostname is
    the whole of the filter name. `GitHubUpdater::check()` compares the
    `Update URI` path against its own repository, case-insensitively, and

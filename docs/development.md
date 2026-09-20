@@ -81,26 +81,31 @@ Architectural invariants worth keeping — they are what the design is:
 Installed copies update themselves from GitHub Releases: the plugin header
 carries `Update URI`, and `Updates\GitHubUpdater` answers WordPress's update
 check with the ZIP attached to the latest release. A release is therefore a
-tag, and the workflow in `.github/workflows/release.yml` does the rest.
+version bump on `main`, and the workflow in `.github/workflows/release.yml`
+does the rest.
 
 ```bash
-php bin/version.php --set 2.1.0     # header, constant and readme.txt Stable tag
+# set "Version: 2.1.0" in the header of jotform-bridge/jotform-bridge.php
 # add "= 2.1.0 =" to the changelog in jotform-bridge/readme.txt, and to docs/changelog.md
 composer check
 git commit -am "Release 2.1.0"
-git tag v2.1.0
-git push origin main v2.1.0
+# merge into main
 ```
 
-The workflow refuses the tag unless it equals the `Version:` in the plugin
-header — a release whose version did not move leaves browsers on the previous
-`frontend.js`, which computes no proof of work and has its submissions
-refused — and unless `readme.txt` has a changelog entry for it, which becomes
-the release body and the changelog in the "View details" window. It then runs
-`composer check`, builds the ZIP with `bin/build-zip.sh` and publishes the
-release with `jotform-bridge-2.1.0.zip` attached. A failed release is fixed by
-fixing the commit, deleting the tag (`git tag -d v2.1.0 && git push origin
-:v2.1.0`) and pushing it again.
+The version is written down once, in the plugin header. The
+`JOTFORM_BRIDGE_VERSION` constant reads it from there at boot, so the asset
+URLs, the upgrade routine and the schema's "synced by" stamp cannot disagree
+with what WordPress compares on update.
+
+On every push to `main` the workflow reads that header. If a tag `v2.1.0`
+already exists it does nothing; otherwise it runs `composer check`, takes the
+`= 2.1.0 =` entry from `readme.txt` as the release body — which the plugin
+shows in the "View details" window, and which is the one thing that stops a
+release when it is missing — builds the ZIP with `bin/build-zip.sh`, creates
+the tag and publishes the release with `jotform-bridge-2.1.0.zip` attached.
+Nobody pushes a tag by hand, so the tag cannot disagree with the header, and a
+push that did not move the version is not a release. A failed release is fixed
+by fixing `main`: nothing was tagged, and the next push tries again.
 
 Sites notice within twelve hours, or at once after **Check again** on
 **Dashboard → Updates**. The check reads only the latest non-draft, non-prerelease
