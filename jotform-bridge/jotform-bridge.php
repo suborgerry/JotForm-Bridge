@@ -28,7 +28,13 @@ if (defined('JOTFORM_BRIDGE_VERSION')) {
     return;
 }
 
-define('JOTFORM_BRIDGE_VERSION', '2.0.0');
+// The version is written down once, in the header above, because that is
+// the one place WordPress reads it from. Everything else — the asset URLs, the
+// upgrade routine, the schema's "synced by" stamp — takes it from here, so the
+// number can never disagree with itself. Reading it costs one 8 KB read of a
+// file already in the page cache, which is nothing beside what wp-settings.php
+// has just loaded.
+define('JOTFORM_BRIDGE_VERSION', (string) get_file_data(__FILE__, ['Version' => 'Version'])['Version']);
 define('JOTFORM_BRIDGE_FILE', __FILE__);
 define('JOTFORM_BRIDGE_DIR', plugin_dir_path(__FILE__));
 define('JOTFORM_BRIDGE_URL', plugin_dir_url(__FILE__));

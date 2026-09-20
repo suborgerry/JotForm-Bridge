@@ -9,8 +9,8 @@
  * "constant not found" and the real findings are lost in the noise.
  *
  * The values are deliberately not the real ones. PHPStan needs the type and
- * nothing else, and a genuine version string here would be a fourth copy of
- * the one bin/version.php exists to keep singular.
+ * nothing else, and a genuine version string here would be a second copy of
+ * the one in the plugin header, free to drift from it.
  *
  * The constants a site defines in wp-config.php — JOTFORM_BRIDGE_TURNSTILE_*
  * and JOTFORM_BRIDGE_TRUSTED_PROXY_HEADER — are deliberately absent. Every use

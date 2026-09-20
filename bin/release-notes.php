@@ -9,9 +9,9 @@
  * are the ones written in readme.txt, and nowhere else: one place to write
  * them, and no second copy in the release form to drift.
  *
- * A version with no entry is a failure, not an empty release. bin/version.php
- * leaves the changelog alone on purpose — a version is often bumped before the
- * notes exist — but by the time a tag is pushed they have to.
+ * A version with no entry is a failure, not an empty release. A version is
+ * often bumped before the notes exist, and that is fine on a branch — but by
+ * the time the bump reaches main, and so the release workflow, they have to.
  *
  * Usage:
  *   php bin/release-notes.php 2.1.0        Print the entry for 2.1.0.

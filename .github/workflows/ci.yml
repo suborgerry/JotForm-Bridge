@@ -15,8 +15,7 @@
 #   lint    — the code matches phpcs.xml.dist, so the phpcs:ignore annotations
 #             in src/ keep meaning something; it also passes phpstan.neon.dist,
 #             which reads the types phpcs cannot; docs/hooks.md still describes the
-#             hooks the source actually fires; and the three version strings
-#             still agree with each other;
+#             hooks the source actually fires;
 #   package — the release ZIP still assembles, and still contains only what it
 #             is supposed to.
 #
@@ -138,13 +137,6 @@ jobs:
 
       - name: Check docs/hooks.md matches the source
         run: composer hooks:check
-
-      # Not bookkeeping. Both assets/frontend.js and assets/admin.js carry the
-      # version in their URL, so a release whose version did not move leaves
-      # browsers on the previous file — a stale frontend.js computes no proof of
-      # work and its submissions are refused.
-      - name: Check the version strings agree
-        run: composer version:check
 
   package:
     name: Release package

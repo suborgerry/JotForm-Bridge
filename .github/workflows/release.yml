@@ -1,24 +1,27 @@
 # Release.
 #
-# Pushing a tag of the form vX.Y.Z publishes a GitHub Release with the plugin
-# ZIP attached. That ZIP is what Updates\GitHubUpdater points every installed
-# copy at: the update check reads the latest release, looks for an asset named
-# jotform-bridge-X.Y.Z.zip, and hands its URL to WordPress. No asset, no update.
+# A release is a version bump on main. Every push to main reads `Version:` from
+# the plugin header; if no tag vX.Y.Z exists for it yet, the workflow runs the
+# checks, builds the plugin ZIP, creates the tag and publishes a GitHub Release
+# with the ZIP attached. That ZIP is what Updates\GitHubUpdater points every
+# installed copy at: the update check reads the latest release, looks for an
+# asset named jotform-bridge-X.Y.Z.zip, and hands its URL to WordPress. No
+# asset, no update.
 #
-# Two things are checked before anything is published, and both stop the
-# release rather than warn:
+# The tag is created here, from the header, and never pushed by hand. That is
+# what makes "the tag disagrees with the header" impossible rather than
+# checked: there is one version, the header, and the tag is derived from it.
+# It also makes the stale-script failure impossible: both assets/*.js carry the
+# version in their URL, so a release whose header did not move would leave
+# browsers on the previous frontend.js — but a header that did not move is not
+# a release at all, and the workflow exits without doing anything.
 #
-#   - the tag must equal the Version: in the plugin header. Both assets/*.js
-#     carry the version in their URL, so a release whose header did not move
-#     leaves browsers on the previous frontend.js — which computes no proof of
-#     work and has its submissions refused. A tag that says 2.1.0 on a header
-#     that says 2.0.0 would also never be offered as an update to anybody, since
-#     WordPress compares the header, not the tag;
-#   - readme.txt must carry a changelog entry for the version. It becomes the
-#     release body, which the plugin shows in the "View details" window.
+# One thing is checked before anything is published, and it stops the release:
+# readme.txt must carry a changelog entry for the version. It becomes the
+# release body, which the plugin shows in the "View details" window.
 #
-# A failed release is fixed by fixing the commit, deleting the tag and pushing
-# it again: `git tag -d vX.Y.Z && git push origin :vX.Y.Z`.
+# A failed release is fixed by fixing main. Nothing has been tagged, so there
+# is nothing to delete; the next push to main tries again.
 #
 # Everything runs the same commands a person runs locally: composer check,
 # bin/release-notes.php, bin/build-zip.sh.
@@ -27,21 +30,49 @@ name: Release
 
 on:
   push:
-    tags:
-      - 'v[0-9]+.[0-9]+.[0-9]+'
+    branches:
+      - main
 
 permissions:
   contents: write
 
+# Two pushes to main in quick succession must not race each other to the same
+# tag. The second waits for the first, then sees the tag and exits.
+concurrency:
+  group: release
+  cancel-in-progress: false
+
 jobs:
   release:
-    name: Publish ${{ github.ref_name }}
+    name: Publish
     runs-on: ubuntu-latest
 
     steps:
       - uses: actions/checkout@v4
 
+      - name: Read the version from the plugin header
+        id: version
+        run: |
+          set -euo pipefail
+          version="$(grep -m1 '^ \* Version:' jotform-bridge/jotform-bridge.php | awk '{print $3}')"
+
+          if [[ ! "${version}" =~ ^[0-9]+\.[0-9]+\.[0-9]+$ ]]; then
+            echo "error: the plugin header says Version: '${version}', which is not X.Y.Z" >&2
+            exit 1
+          fi
+
+          if git ls-remote --exit-code --tags origin "refs/tags/v${version}" >/dev/null; then
+            echo "v${version} is already released; nothing to do."
+            echo "release=false" >> "${GITHUB_OUTPUT}"
+          else
+            echo "Releasing ${version}."
+            echo "release=true" >> "${GITHUB_OUTPUT}"
+          fi
+
+          echo "version=${version}" >> "${GITHUB_OUTPUT}"
+
       - name: Set up PHP
+        if: steps.version.outputs.release == 'true'
         uses: shivammathur/setup-php@v2
         with:
           # The floor the plugin header promises. The checks have to pass on
@@ -51,52 +82,40 @@ jobs:
           tools: composer:v2
 
       - name: Install dependencies
+        if: steps.version.outputs.release == 'true'
         uses: ramsey/composer-install@v3
 
-      - name: Check the tag against the plugin header
-        run: |
-          set -euo pipefail
-          tag="${GITHUB_REF_NAME#v}"
-
-          # The three version strings agree with each other first, so the
-          # header is safe to treat as the one that speaks for all of them.
-          php bin/version.php --check
-
-          header="$(grep -m1 '^ \* Version:' jotform-bridge/jotform-bridge.php | awk '{print $3}')"
-
-          if [[ "${tag}" != "${header}" ]]; then
-            echo "error: tag ${GITHUB_REF_NAME} but the plugin header says ${header}" >&2
-            echo "Run 'php bin/version.php --set ${tag}', commit, then move the tag." >&2
-            exit 1
-          fi
-
-          echo "Releasing ${header}."
-
-      # A tag does not skip CI. The same tests, lint and static analysis as on
-      # a branch; a release that would have failed them is not a release.
+      # The same tests, lint and static analysis as on a branch; a release that
+      # would have failed them is not a release.
       - name: Run the checks
+        if: steps.version.outputs.release == 'true'
         run: composer check
 
       - name: Extract the release notes
-        run: php bin/release-notes.php "${GITHUB_REF_NAME}" > "${RUNNER_TEMP}/notes.md"
+        if: steps.version.outputs.release == 'true'
+        run: php bin/release-notes.php "${{ steps.version.outputs.version }}" > "${RUNNER_TEMP}/notes.md"
 
       - name: Build the ZIP
+        if: steps.version.outputs.release == 'true'
         run: bin/build-zip.sh
 
       - name: Publish the release
+        if: steps.version.outputs.release == 'true'
         env:
           GH_TOKEN: ${{ github.token }}
+          VERSION: ${{ steps.version.outputs.version }}
         run: |
           set -euo pipefail
-          version="${GITHUB_REF_NAME#v}"
-          archive="dist/jotform-bridge-${version}.zip"
+          archive="dist/jotform-bridge-${VERSION}.zip"
 
           if [[ ! -f "${archive}" ]]; then
             echo "error: ${archive} was not built" >&2
             exit 1
           fi
 
-          gh release create "${GITHUB_REF_NAME}" "${archive}" \
-            --title "${version}" \
-            --notes-file "${RUNNER_TEMP}/notes.md" \
-            --verify-tag
+          # --target pins the tag to the commit this run checked out, so the
+          # release cannot land on a later push that raced it.
+          gh release create "v${VERSION}" "${archive}" \
+            --target "${GITHUB_SHA}" \
+            --title "${VERSION}" \
+            --notes-file "${RUNNER_TEMP}/notes.md"

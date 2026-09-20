@@ -38,9 +38,9 @@ if (!defined('DAY_IN_SECONDS')) {
 // report it as synced by an older release, and LifecycleTest exercises the
 // upgrade path — so a literal here that had drifted from the real version would
 // leave those tests asserting against a number no release ever carried.
-// bin/version.php keeps the three shipped copies agreeing; this is the fourth,
-// and the only one that can be derived cheaply, because it is read once per
-// suite rather than once per request.
+// The plugin derives it from the same header with get_file_data(), which is a
+// WordPress function and so is not available here; this is the same read
+// without WordPress.
 if (!defined('JOTFORM_BRIDGE_VERSION')) {
     $jfbHeader = (string) file_get_contents(__DIR__ . '/../jotform-bridge/jotform-bridge.php');
 
