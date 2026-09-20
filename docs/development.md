@@ -98,14 +98,15 @@ URLs, the upgrade routine and the schema's "synced by" stamp cannot disagree
 with what WordPress compares on update.
 
 On every push to `main` the workflow reads that header. If a tag `v2.1.0`
-already exists it does nothing; otherwise it runs `composer check`, takes the
-`= 2.1.0 =` entry from `readme.txt` as the release body — which the plugin
-shows in the "View details" window, and which is the one thing that stops a
-release when it is missing — builds the ZIP with `bin/build-zip.sh`, creates
-the tag and publishes the release with `jotform-bridge-2.1.0.zip` attached.
-Nobody pushes a tag by hand, so the tag cannot disagree with the header, and a
-push that did not move the version is not a release. A failed release is fixed
-by fixing `main`: nothing was tagged, and the next push tries again.
+already exists it does nothing; otherwise it runs `composer check`, builds the
+ZIP with `bin/build-zip.sh`, creates the tag and publishes the release with
+`jotform-bridge-2.1.0.zip` attached. The release body is the `= 2.1.0 =` entry
+from `readme.txt`, which the plugin shows in the "View details" window; when
+there is none, GitHub generates the notes from the commits and the release goes
+out all the same. Nobody pushes a tag by hand, so the tag cannot disagree with
+the header, and a push that did not move the version is not a release. The only
+thing that stops a release is a failing `composer check`, and that is fixed by
+fixing `main`: nothing was tagged, and the next push tries again.
 
 Sites notice within twelve hours, or at once after **Check again** on
 **Dashboard → Updates**. The check reads only the latest non-draft, non-prerelease

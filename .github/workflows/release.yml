@@ -16,9 +16,10 @@
 # browsers on the previous frontend.js — but a header that did not move is not
 # a release at all, and the workflow exits without doing anything.
 #
-# One thing is checked before anything is published, and it stops the release:
-# readme.txt must carry a changelog entry for the version. It becomes the
-# release body, which the plugin shows in the "View details" window.
+# The release body is the changelog entry for the version in readme.txt, which
+# the plugin shows in the "View details" window. A version with no entry is
+# released all the same, with notes GitHub generates from the commits: a
+# missing paragraph is not a reason to keep a fix off every site.
 #
 # A failed release is fixed by fixing main. Nothing has been tagged, so there
 # is nothing to delete; the next push to main tries again.
@@ -93,7 +94,16 @@ jobs:
 
       - name: Extract the release notes
         if: steps.version.outputs.release == 'true'
-        run: php bin/release-notes.php "${{ steps.version.outputs.version }}" > "${RUNNER_TEMP}/notes.md"
+        id: notes
+        env:
+          VERSION: ${{ steps.version.outputs.version }}
+        run: |
+          if php bin/release-notes.php "${VERSION}" > "${RUNNER_TEMP}/notes.md"; then
+            echo "source=readme" >> "${GITHUB_OUTPUT}"
+          else
+            echo "readme.txt has no changelog entry for ${VERSION}; GitHub will generate the notes." >&2
+            echo "source=generated" >> "${GITHUB_OUTPUT}"
+          fi
 
       - name: Build the ZIP
         if: steps.version.outputs.release == 'true'
@@ -113,9 +123,15 @@ jobs:
             exit 1
           fi
 
+          if [[ "${{ steps.notes.outputs.source }}" == "readme" ]]; then
+            notes=(--notes-file "${RUNNER_TEMP}/notes.md")
+          else
+            notes=(--generate-notes)
+          fi
+
           # --target pins the tag to the commit this run checked out, so the
           # release cannot land on a later push that raced it.
           gh release create "v${VERSION}" "${archive}" \
             --target "${GITHUB_SHA}" \
             --title "${VERSION}" \
-            --notes-file "${RUNNER_TEMP}/notes.md"
+            "${notes[@]}"

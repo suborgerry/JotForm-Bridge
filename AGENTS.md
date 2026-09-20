@@ -2417,8 +2417,10 @@ What has to hold:
    stale-script failure above. Both are impossible rather than checked: the
    workflow creates the tag from the header, and a header that did not move is
    not a release at all. A release is a version bump merged into `main`, and
-   the only thing that can stop it is a missing changelog entry in
-   `readme.txt` or a failing `composer check`.
+   the only thing that can stop it is a failing `composer check`. A missing
+   changelog entry in `readme.txt` is not a reason: the release goes out with
+   notes GitHub generates from the commits, because a paragraph nobody wrote
+   must not keep a fix off every site.
 3. **The filter is shared with every plugin hosted on GitHub.** The hostname is
    the whole of the filter name. `GitHubUpdater::check()` compares the
    `Update URI` path against its own repository, case-insensitively, and
