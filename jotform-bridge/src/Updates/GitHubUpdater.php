@@ -11,65 +11,27 @@ if (!defined('ABSPATH')) {
 }
 
 /**
- * Tells WordPress when a newer release exists on GitHub.
- *
- * The plugin is not on wordpress.org, so without this every install is a
- * manual ZIP upload and a fleet of sites drifts apart. Core has done the hard
- * half since 5.8: a plugin whose header carries `Update URI` is left alone by
- * the wordpress.org check and, instead, `update_plugins_{hostname}` is asked
- * whether there is anything newer. Answer it with a version and a package URL
- * and the Updates screen, the "update now" link and the installer all work as
- * they do for any other plugin. No library is needed for that.
- *
- * The package is the ZIP the release workflow attached to the GitHub Release —
- * never GitHub's own source archive. The source archive unpacks into
- * `JotForm-Bridge-<sha>/` and carries the whole repository, tests included,
- * which is neither the directory name WordPress expects nor the package
- * AGENTS.md allows to ship. A release with no matching asset is therefore not
- * an update at all.
- *
- * The answer is a site transient with a TTL: cheap state, in the sense of
- * "Storage and caching" in AGENTS.md. The GitHub API allows sixty anonymous
- * requests an hour per address, and `wp_update_plugins()` runs on the plugins
- * screen, on cron and on every admin page load once its own throttle expires,
- * so the answer is kept for twelve hours and a failure for one.
- *
- * "Check again" on the Updates screen has to get past that, and it does not
- * do so by itself: `force-check` forces Core's *version* check only. Core's
- * plugin check still runs on that page, throttled to a minute, and asks the
- * filter — which would answer from the transient. So the forced check is
- * noticed here and the transient dropped before Core asks. The first version
- * of this class assumed "Check again" cleared Core's plugin transient and, via
- * the action below, ours; it does neither, and a site sat on a twelve-hour-old
- * answer while its owner pressed the button.
+ * Answers Core's `update_plugins_github.com` check from the latest GitHub
+ * Release. The package is the `jotform-bridge-{version}.zip` asset attached to
+ * the release, never the source archive. The answer is kept in a site
+ * transient (CACHE_TTL, RETRY_TTL on failure) and dropped on "Check again".
  */
 final class GitHubUpdater
 {
-    /**
-     * The repository the releases come from, as `owner/name`.
-     */
+    /** The repository the releases come from, as `owner/name`. */
     public const REPOSITORY = 'suborgerry/JotForm-Bridge';
 
-    /**
-     * The host in the `Update URI` header, and therefore the filter suffix.
-     */
+    /** The host in the `Update URI` header, and therefore the filter suffix. */
     public const HOST = 'github.com';
 
     public const SLUG = 'jotform-bridge';
 
     public const TRANSIENT = 'jotform_bridge_update_check';
 
-    /**
-     * How long a good answer is kept.
-     */
+    /** How long a good answer is kept. */
     public const CACHE_TTL = 12 * HOUR_IN_SECONDS;
 
-    /**
-     * How long a failed check is kept before GitHub is asked again. Shorter,
-     * because the failure may have been GitHub's, but not zero: a site behind a
-     * broken outbound proxy must not pay a ten-second timeout on every admin
-     * page load.
-     */
+    /** How long a failed check is kept before GitHub is asked again. */
     public const RETRY_TTL = HOUR_IN_SECONDS;
 
     private const API = 'https://api.github.com/repos/%s/releases/latest';
@@ -91,43 +53,27 @@ final class GitHubUpdater
         add_filter('update_plugins_' . self::HOST, [$this, 'check'], 10, 3);
         add_filter('plugins_api', [$this, 'information'], 10, 3);
 
-        // Fired by wp_clean_plugins_cache(): the upgrader after it installed
-        // something, and `wp transient delete update_plugins --network`. Both
-        // are moments a stale answer would be wrong.
+        // Fired by wp_clean_plugins_cache(): the upgrader and WP-CLI.
         add_action('delete_site_transient_update_plugins', [$this, 'forget']);
 
-        // Before Core's own wp_update_plugins() on the same action, at 10.
+        // Before Core's wp_update_plugins() on the same action, at 10.
         add_action('load-update-core.php', [$this, 'forgetOnForcedCheck'], 9);
     }
 
-    /**
-     * Drops the remembered answer when the Updates screen was asked to check
-     * again, so the check Core is about to run reaches GitHub.
-     *
-     * The parameter is the one Core itself reads on that screen, with no nonce
-     * of its own: it starts a read-only check, and the only thing it changes
-     * is a cache.
-     */
+    /** Drops the remembered answer on "Check again", before Core's own check runs. */
     public function forgetOnForcedCheck(): void
     {
-        // phpcs:ignore WordPress.Security.NonceVerification.Recommended -- see above.
+        // phpcs:ignore WordPress.Security.NonceVerification.Recommended -- Core's own nonce-less parameter; only a cache is cleared.
         if (!empty($_GET['force-check'])) {
             $this->forget();
         }
     }
 
     /**
-     * Answers Core's update check for one plugin hosted on github.com.
-     *
-     * The hostname is the whole of what the filter name says, so every plugin
-     * whose `Update URI` points at GitHub arrives here. Only the one naming
-     * this repository is ours; the rest pass through untouched, or another
-     * plugin would be offered our package.
-     *
-     * Core compares the version itself and files the answer under `response`
-     * or `no_update` accordingly, so the current release is returned whether or
-     * not it is newer. The `no_update` entry is what gives the plugin row its
-     * "View details" link and its auto-update toggle.
+     * Answers Core's update check. The filter is shared by every plugin hosted
+     * on github.com, so anything not naming this repository passes through.
+     * Core compares the version itself, so the current release is returned
+     * whether or not it is newer.
      *
      * @param array<string, mixed>|false $update     What an earlier callback answered.
      * @param array<string, mixed>       $pluginData The parsed plugin header.
@@ -160,9 +106,6 @@ final class GitHubUpdater
 
     /**
      * Answers the "View details" window for this plugin.
-     *
-     * Without it the link Core renders beside an available update opens
-     * wordpress.org's information for a slug that does not exist there.
      *
      * @param object|array<string, mixed>|false $result What an earlier callback answered.
      * @param object|array<string, mixed>       $args   The request; `slug` is what matters.
@@ -197,18 +140,13 @@ final class GitHubUpdater
             'requires_php'  => JOTFORM_BRIDGE_MIN_PHP,
             'last_updated'  => $release['published'],
             'sections'      => [
-                // The release notes are the changelog section of readme.txt,
-                // which is plain text with one item per line. Rendered as such:
-                // there is no Markdown parser in Core and none is worth adding
-                // for this.
+                // Plain text, one item per line.
                 'changelog' => nl2br(esc_html($release['notes'])),
             ],
         ];
     }
 
-    /**
-     * Drops the remembered answer so the next check asks GitHub.
-     */
+    /** Drops the remembered answer so the next check asks GitHub. */
     public function forget(): void
     {
         delete_site_transient(self::TRANSIENT);
@@ -234,9 +172,7 @@ final class GitHubUpdater
             return false;
         }
 
-        // GitHub treats owner and repository names case-insensitively, and so
-        // does the comparison; a trailing slash or ".git" is somebody's habit,
-        // not a different repository.
+        // Case-insensitive; a trailing slash or ".git" is ignored.
         $path = preg_replace('#(\.git)?/*$#', '', $path) ?? $path;
 
         return strtolower($host) === self::HOST
@@ -253,9 +189,7 @@ final class GitHubUpdater
         $cached = get_site_transient(self::TRANSIENT);
 
         if (is_array($cached) && array_key_exists('release', $cached)) {
-            // A stored null is a remembered "nothing to offer"; anything else
-            // has to have the shape this version writes, or it is treated as
-            // absent — an older version's transient is not worth reading.
+            // A stored null is a remembered "nothing to offer".
             return $this->isRelease($cached['release']) ? $cached['release'] : null;
         }
 
@@ -287,11 +221,7 @@ final class GitHubUpdater
     }
 
     /**
-     * Asks GitHub for the latest release and reads out what the update needs.
-     *
-     * `/releases/latest` is what makes this safe to point at: GitHub already
-     * excludes drafts and pre-releases from it, so a release being written is
-     * not offered to anybody.
+     * Asks GitHub for the latest release (drafts and pre-releases excluded).
      *
      * @return array{release: array{version: string, url: string, package: string, notes: string, published: string}|null, ttl: int}
      */
@@ -318,8 +248,7 @@ final class GitHubUpdater
 
         $status = (int) wp_remote_retrieve_response_code($response);
 
-        // No release has been published yet. Not a failure, and not worth
-        // asking again within the hour.
+        // No release published yet; not a failure.
         if ($status === 404) {
             return ['release' => null, 'ttl' => self::CACHE_TTL];
         }
@@ -342,9 +271,7 @@ final class GitHubUpdater
 
         $version = ltrim($body['tag_name'], 'vV');
 
-        // From here on the answer is a real release, and a defect in it is a
-        // defect in the release rather than in the connection; it is kept for
-        // the full period like any other answer.
+        // A defective release is kept for the full period like any other answer.
         if (preg_match('/^\d+\.\d+\.\d+$/', $version) !== 1) {
             $this->logger->error('The latest release is not tagged with a version.', [
                 'tag' => $body['tag_name'],
@@ -378,12 +305,8 @@ final class GitHubUpdater
     }
 
     /**
-     * The download URL of the ZIP bin/build-zip.sh built for this version.
-     *
-     * The name is checked exactly, and so is where the URL points: an asset is
-     * uploaded by whoever can write to the repository, but the URL Core will
-     * download and unpack into wp-content/plugins/ still has to be a GitHub
-     * release asset of this repository and nothing else.
+     * The download URL of the built ZIP: exact asset name, under this
+     * repository's release downloads.
      *
      * @param array<string, mixed> $release
      */

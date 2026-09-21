@@ -11,26 +11,10 @@ if (!defined('ABSPATH')) {
 }
 
 /**
- * What templates exist right now, and the allowlist of files the plugin will
- * ever render.
- *
- * A path is renderable only because it is in here, and it is in here only
- * because TemplateScanner found it inside a trusted directory. Nothing else may
- * be treated as a template.
- *
- * The list is read from the filesystem on demand and never stored. It used to
- * be a cached option refreshed by a "Rescan Templates" button, which meant a
- * developer could drop a file into the theme, not see it in the select, and
- * have no way of knowing why — and, worse, could edit a template and leave the
- * compatibility report describing the previous version. Discovery is cheap
- * enough not to need a cache: only the header of each file is read, and only
- * when something actually asks.
- *
- * Two levels, memoized per request:
- *
- *  - the header scan, which answers "what exists" and "which file is this slug";
- *  - the field analysis, which reads a whole file and is asked for only by the
- *    compatibility report on an admin screen.
+ * The templates on disk, and the allowlist of files the plugin will render.
+ * Read from the theme on demand and memoized per request only: the header
+ * scan answers what exists, the field analysis reads a whole file and is
+ * used by the admin compatibility report.
  *
  * @phpstan-type Registry array{
  *     templates: array<string, array<string, mixed>>,
@@ -45,17 +29,11 @@ final class TemplateRegistry
     /** @var Registry|null In-request memo of the header scan. */
     private ?array $discovered = null;
 
-    /**
-     * Where a rejected template file goes now that no screen lists one.
-     *
-     * Null on the frontend and in tests, where nothing is listening.
-     */
+    /** Receives the diagnostics of rejected template files. */
     private ?Logger $logger;
 
     /**
-     * In-request memo of the field analysis, by slug. A compatibility check
-     * asks for the identifiers and the dynamic count separately, and reading
-     * the file twice for that would be silly.
+     * In-request memo of the field analysis, by slug.
      *
      * @var array<string, array{fields: array<int, string>, dynamic: int}>
      */
@@ -90,12 +68,7 @@ final class TemplateRegistry
         return $this->get($slug) !== null;
     }
 
-    /**
-     * The one place allowed to answer "which file renders this template?".
-     *
-     * Returns null when the slug is unknown or the file has since disappeared,
-     * so a caller can never be handed a path that is not currently valid.
-     */
+    /** The file that renders a template; null when unknown or gone. */
     public function file(string $slug): ?string
     {
         $entry = $this->get($slug);
@@ -110,8 +83,6 @@ final class TemplateRegistry
     }
 
     /**
-     * The semantic identifiers a template declares, read from the file now.
-     *
      * @return array<int, string>
      */
     public function fields(string $slug): array
@@ -151,12 +122,7 @@ final class TemplateRegistry
         return $this->all() === [];
     }
 
-    /**
-     * Drops the in-request memos.
-     *
-     * Only useful to a long-running process — WP-CLI, a test — that changes
-     * files and then asks again within the same request.
-     */
+    /** Drops the in-request memos. */
     public function flush(): void
     {
         $this->discovered = null;
@@ -200,19 +166,7 @@ final class TemplateRegistry
     }
 
     /**
-     * A file that was skipped, and why.
-     *
-     * This used to be a "Template diagnostics" list at the foot of the
-     * integrations screen, which nobody could act on: it printed a level and a
-     * message, threw the code, the file and the slug away, and showed a notice
-     * about a parent-theme template no integration had ever been bound to. The
-     * reader it was plausibly for is the developer who has just added a file
-     * and is asking why it is not in the select — and that person is better
-     * served by a log line naming the file than by a sentence on a screen about
-     * something else.
-     *
-     * Notices are dropped rather than logged: an overridden template is the
-     * child-theme mechanism working, not an incident.
+     * Logs skipped files; notices (an overridden template) are dropped.
      *
      * @param array<int, array<string, string>> $diagnostics
      */

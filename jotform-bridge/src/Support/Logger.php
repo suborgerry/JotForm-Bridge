@@ -10,12 +10,7 @@ if (!defined('ABSPATH')) {
     exit;
 }
 
-/**
- * Opt-in debug logging.
- *
- * Only technical metadata is logged. Credentials and full submission payloads
- * must never reach the log.
- */
+/** Opt-in debug logging of technical metadata; never credentials or payloads. */
 final class Logger
 {
     private const HEADER = "<?php exit; ?>\n";
@@ -78,10 +73,7 @@ final class Logger
         return $this->write('', true);
     }
 
-    /**
-     * Serialize appends and truncation with the same lock. The PHP header keeps
-     * direct web requests from exposing diagnostic metadata.
-     */
+    /** Locked append or truncation; the PHP header blocks direct web reads. */
     private function write(string $line, bool $clear): bool
     {
         $path = $this->path();
@@ -134,7 +126,7 @@ final class Logger
     }
 
     /**
-     * Defensive filter so a careless caller cannot leak the API key.
+     * Redacts secret-looking keys and the API key itself.
      *
      * @param array<string, scalar|null> $context
      *

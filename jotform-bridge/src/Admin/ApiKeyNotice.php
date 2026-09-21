@@ -11,20 +11,12 @@ if (!defined('ABSPATH')) {
     exit;
 }
 
-/**
- * Tells an administrator how to supply the API key when the constant is missing.
- *
- * The key lives in wp-config.php and nowhere else, so a missing one cannot be
- * fixed from a form: the only useful thing the admin area can do is say what to
- * write and where.
- */
+/** Tells an administrator how to supply the API key when the constant is missing. */
 final class ApiKeyNotice
 {
     public const CAPABILITY = Plugin::CAPABILITY;
 
-    /**
-     * The line an administrator has to paste into wp-config.php.
-     */
+    /** The line to paste into wp-config.php. */
     public const SNIPPET = "define( 'JOTFORM_API_KEY', 'your-api-key' );";
 
     private Settings $settings;
@@ -58,11 +50,7 @@ final class ApiKeyNotice
         );
     }
 
-    /**
-     * Shown on the plugin's own screens and on the plugin list, where the
-     * administrator is already looking at Jotform Bridge. The settings screen
-     * is excluded: it carries the same instructions in the API Key row.
-     */
+    /** On the plugin's screens and the plugin list; not on Settings, which has its own row. */
     private function shouldRender(): bool
     {
         if ($this->settings->hasApiKey() || !current_user_can(self::CAPABILITY)) {

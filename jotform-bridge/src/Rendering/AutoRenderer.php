@@ -15,40 +15,19 @@ if (!defined('ABSPATH')) {
 }
 
 /**
- * Builds a form directly from the Normalized Schema.
- *
- * This is the fallback renderer: it exists so an integration can go live before
- * anybody has written a theme template, not so it can compete with one. The
- * markup is therefore deliberately plain — semantic elements, predictable
- * classes, no layout opinions and no CSS shipped with it — and it speaks exactly
- * the same `data-jotform-*` contract the frontend script and the custom
- * templates already use.
- *
- * Fields the plugin cannot map are skipped rather than half-rendered: a visitor
- * must never fill in an input whose value would be dropped on the way to
- * Jotform. The admin screen reports those fields separately.
+ * Builds a plain, accessible form directly from the Normalized Schema, using
+ * the same `data-jotform-*` contract as custom templates. Unsupported fields
+ * are skipped.
  */
 final class AutoRenderer
 {
-    /**
-     * Filter name for replacing or wrapping the markup of a single field.
-     */
+    /** Filter for replacing or wrapping the markup of one field. */
     public const FILTER_FIELD_HTML = 'jotform_bridge_auto_field_html';
 
-    /**
-     * Distinguishes several forms on one page, so element IDs stay unique even
-     * when the same integration is rendered twice. One renderer serves the whole
-     * request, which is what makes the counter meaningful.
-     */
+    /** Per-request counter keeping element IDs unique across several forms. */
     private int $instances = 0;
 
-    /**
-     * Hides text visually while leaving it in the accessibility tree.
-     *
-     * The same declarations WordPress core uses for `.screen-reader-text`,
-     * written inline because the plugin ships no stylesheet of its own — see
-     * `requiredMark()`.
-     */
+    /** Core's `.screen-reader-text` declarations, inlined. */
     private const SR_ONLY_STYLE = 'position:absolute;width:1px;height:1px;'
         . 'margin:-1px;padding:0;border:0;overflow:hidden;clip-path:inset(50%);'
         . 'clip:rect(1px,1px,1px,1px);white-space:nowrap;';
@@ -118,16 +97,9 @@ final class AutoRenderer
             /**
              * Filters the markup of one automatically rendered field.
              *
-             * The intended use is adding a wrapper or a description without
-             * taking over the whole form. The returned string is printed as is,
-             * which makes this the one place where the plugin hands the output
-             * over to somebody else's code.
-             *
-             * `$html` is finished, escaped markup. `$field` is not: it is the
-             * normalized schema entry, and its `label` and `options[*].label`
-             * are text as Jotform reports it, which may legitimately contain a
-             * quote or an angle bracket. Anything taken out of `$field` and put
-             * into markup has to be escaped by the callback:
+             * The returned string is printed as is. `$html` is escaped markup;
+             * `$field` is the raw normalized entry, so anything taken from it
+             * has to be escaped by the callback:
              *
              *     add_filter(
              *         'jotform_bridge_auto_field_html',
@@ -138,13 +110,6 @@ final class AutoRenderer
              *         10,
              *         2
              *     );
-             *
-             * The values in `$field` are deliberately left raw, because every
-             * other consumer escapes them at the moment it prints them — see
-             * `Templates\TemplateScaffold::text()`, which does the same job for
-             * the generated starter template. Escaping them here instead would
-             * mean the same array key held escaped text in one context and raw
-             * text in every other.
              *
              * @param string               $html        Escaped field markup.
              * @param array<string, mixed> $field       Normalized field; its text is raw.
@@ -171,26 +136,12 @@ final class AutoRenderer
             esc_attr($slug),
             self::noscript(),
             implode('', $parts),
-            // Every automatically rendered form carries the decoy, and the
-            // challenge widget when one is configured. A custom template decides
-            // for itself, through $honeypot and $turnstile in its context.
             Honeypot::markup($prefix) . Turnstile::markup(),
             esc_html__('Submit', 'jotform-bridge')
         );
     }
 
-    /**
-     * What a visitor without JavaScript is told.
-     *
-     * The form is sent by the plugin's script: the inputs carry semantic
-     * identifiers rather than `name` attributes, so a browser submitting this
-     * form on its own posts an empty body to the REST endpoint and lands on a
-     * JSON error page. Saying so first is the difference between a form that
-     * cannot work here and a form that looks broken.
-     *
-     * Public so a custom template can print the same line — it is in the
-     * rendering context as `$noscript`.
-     */
+    /** The no-JavaScript notice; also exposed to custom templates as `$noscript`. */
     public static function noscript(): string
     {
         return sprintf(
@@ -203,8 +154,6 @@ final class AutoRenderer
     }
 
     /**
-     * One field that maps to a single semantic path.
-     *
      * @param array<string, mixed> $field
      */
     private function scalar(array $field, string $prefix): string
@@ -256,7 +205,7 @@ final class AutoRenderer
     }
 
     /**
-     * A radio or checkbox group: several inputs sharing one semantic path.
+     * A radio or checkbox group sharing one semantic path.
      *
      * @param array<string, mixed> $field
      */
@@ -287,25 +236,14 @@ final class AutoRenderer
                 esc_attr($id),
                 esc_attr((string) $option['value']),
                 esc_attr($key),
-                // Every input of the group describes itself by the one error
-                // slot below it. Without this the server's message is written
-                // into an element nothing points at: a screen reader announces
-                // the group as invalid and never says why, which was the whole
-                // point of sending a message per field.
                 esc_attr($id . '-error'),
-                // A required radio group is satisfied by any one of its inputs,
-                // so the attribute belongs on each of them. A required checkbox
-                // group is not: `required` there would demand every single box,
-                // so the requirement is left to the server.
+                // `required` on every checkbox would demand every box; radios only.
                 $required && $type === FieldNormalizer::TYPE_RADIO ? ' required' : '',
                 esc_html((string) $option['label'])
             );
         }
 
-        // No `aria-required` on the fieldset: it maps to the `group` role,
-        // which does not support the attribute, so it is invalid ARIA and is
-        // ignored. The requirement is already carried by the legend, which
-        // states it in text, and by the `required` attribute on each radio.
+        // No `aria-required` on the fieldset: the `group` role does not support it.
         return sprintf(
             '<fieldset class="jfb-field jfb-field--%1$s">%2$s%3$s%4$s</fieldset>',
             esc_attr($type),
@@ -316,8 +254,7 @@ final class AutoRenderer
     }
 
     /**
-     * A composite field: the parent is a grouping only, the children are the
-     * inputs and each of them carries its own semantic path.
+     * A composite field: a fieldset whose children each carry their own path.
      *
      * @param array<string, mixed> $field
      */
@@ -364,8 +301,7 @@ final class AutoRenderer
      */
     private function options(array $field, bool $required): string
     {
-        // An empty first option is what makes a required select enforceable and
-        // keeps the browser from pre-selecting an answer nobody gave.
+        // The empty first option makes a required select enforceable.
         $html = sprintf(
             '<option value=""%1$s>%2$s</option>',
             $required ? ' disabled selected' : ' selected',
@@ -408,13 +344,7 @@ final class AutoRenderer
             return '';
         }
 
-        // The class is kept so a theme that already styles `.screen-reader-text`
-        // keeps control, and the same rules are repeated inline because nothing
-        // guarantees the class exists: the plugin ships no frontend stylesheet,
-        // and the definition a site usually gets comes from core's block
-        // library CSS, which themes and performance plugins routinely remove.
-        // Without it this text is not hidden but printed, and every required
-        // label reads "First Name *(required)".
+        // Inline style as well as the class: nothing guarantees a theme defines it.
         return sprintf(
             ' <span class="jfb-required"><span aria-hidden="true">*</span>'
             . '<span class="screen-reader-text" style="%1$s">%2$s</span></span>',
@@ -423,9 +353,6 @@ final class AutoRenderer
         );
     }
 
-    /**
-     * The attributes every input, textarea and select shares.
-     */
     private function controlAttributes(string $id, bool $required): string
     {
         return sprintf(
@@ -435,9 +362,7 @@ final class AutoRenderer
         );
     }
 
-    /**
-     * The slot the frontend script writes this field's server error into.
-     */
+    /** The slot the frontend script writes this field's server error into. */
     private function errorSlot(string $id, string $key): string
     {
         return sprintf(
@@ -476,15 +401,7 @@ final class AutoRenderer
     }
 
     /**
-     * The text a field is labelled with.
-     *
-     * Jotform allows a question with no label at all, and an empty `<label>` is
-     * an association to nothing: the control ends up with no accessible name,
-     * or — where the field is required — with the required marker as its whole
-     * name, which passes every checker and tells a visitor nothing. The
-     * semantic key is the honest fallback: it is stable, it is what the
-     * template author already types, and it is visible in the admin schema
-     * table beside the field it belongs to.
+     * The field's label, falling back to its semantic key when Jotform has none.
      *
      * @param array<string, mixed> $field
      */
@@ -495,10 +412,6 @@ final class AutoRenderer
         return $label !== '' ? $label : $this->fallbackLabel((string) $field['key']);
     }
 
-    /**
-     * Jotform does not always send a label or a sub-label; the machine-readable
-     * name is a better placeholder than nothing.
-     */
     private function fallbackLabel(string $key): string
     {
         return ucwords(str_replace(['.', '_', 'addr '], [' ', ' ', 'address '], $key));

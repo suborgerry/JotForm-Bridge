@@ -8,29 +8,13 @@ if (!defined('ABSPATH')) {
     exit;
 }
 
-/**
- * The only place that reads or writes the integrations option.
- *
- * Storage is a single WordPress option keyed by slug, which makes the
- * uniqueness of the public identifier a property of the storage rather than
- * something every caller has to remember to check. No custom table.
- */
+/** The only place that reads or writes the integrations option, keyed by slug. */
 final class IntegrationRepository
 {
     public const OPTION = 'jotform_bridge_integrations';
 
     /**
-     * In-request memo, like the one FormRepository keeps.
-     *
-     * Rendering a page and then submitting from it both ask for the same slug,
-     * and the admin list asks once per row, so the read, the hydration and the
-     * sort were being repeated for an answer that cannot change: this class is
-     * the only thing in the plugin that writes the option, so nothing can move
-     * it under us within one request.
-     *
-     * Sharing the hydrated objects between callers is safe because Integration
-     * is immutable — withSlug() and withTimestamps() each return
-     * a new instance and nothing assigns to a field after construction.
+     * In-request memo; Integration is immutable, so sharing instances is safe.
      *
      * @var array<string, Integration>|null
      */
@@ -95,8 +79,7 @@ final class IntegrationRepository
     /**
      * Creates or replaces one integration.
      *
-     * @param string|null $originalSlug Slug being edited, so a rename can free
-     *                                  the old key. Null when creating.
+     * @param string|null $originalSlug Slug being edited; null when creating.
      *
      * @return array<int, string> Validation errors; empty means saved.
      */

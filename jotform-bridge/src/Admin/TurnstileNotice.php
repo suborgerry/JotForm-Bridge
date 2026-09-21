@@ -12,36 +12,17 @@ if (!defined('ABSPATH')) {
 }
 
 /**
- * Says whether the optional challenge is on, and how to switch it on.
- *
- * Built along the same lines as ApiKeyNotice: the keys live in wp-config.php,
- * so the only useful thing the admin area can do is say what to write and
- * where. The tone is different though, and deliberately so. A missing API key
- * means the plugin does not work; a missing challenge means one optional layer
- * is off, which is a perfectly reasonable state to be in. So this is a plain
- * line of information, not a warning and not a campaign: no colour beyond the
- * default, no call to action, and the instructions folded away until somebody
- * asks for them. Nothing to dismiss either — there is nothing to escape from,
- * and a state worth reading stays readable.
- *
- * The one case that does get a warning is half a configuration: with only one
- * of the two constants defined the challenge silently does nothing, and
- * silently doing nothing is exactly what a security control must never do.
+ * Says whether the optional challenge is on and how to switch it on. Plain
+ * information when off; a warning when only one of the two constants is set.
  */
 final class TurnstileNotice
 {
     public const CAPABILITY = Plugin::CAPABILITY;
 
-    /**
-     * The lines an administrator has to paste into wp-config.php.
-     */
+    /** The lines to paste into wp-config.php. */
     public const SNIPPET = "define( 'JOTFORM_BRIDGE_TURNSTILE_SITE_KEY', 'your-site-key' );\n"
         . "define( 'JOTFORM_BRIDGE_TURNSTILE_SECRET', 'your-secret-key' );";
 
-    /**
-     * Where the keys come from. Free, and does not require moving the domain
-     * to Cloudflare — a point worth making, because most people assume it does.
-     */
     public const DASHBOARD_URL = 'https://dash.cloudflare.com/?to=/:account/turnstile';
 
     public function register(): void
@@ -68,9 +49,6 @@ final class TurnstileNotice
         $this->renderStatus();
     }
 
-    /**
-     * One sentence of state, with the setup steps behind a disclosure.
-     */
     private function renderStatus(): void
     {
         printf(

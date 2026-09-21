@@ -8,19 +8,10 @@ if (!defined('ABSPATH')) {
     exit;
 }
 
-/**
- * Outcome of validating one submission.
- *
- * Holds the sanitized values on success and a per-field error map on failure.
- * The map is exactly what the REST response contract exposes, so no other layer
- * has to reshape it.
- */
+/** Outcome of validating one submission: sanitized values, or a per-field error map. */
 final class ValidationResult
 {
-    /**
-     * Error key used for problems that belong to the request as a whole rather
-     * than to one field.
-     */
+    /** Error key for problems with the request as a whole. */
     public const FORM_KEY = '_form';
 
     /** @var array<string, string> Semantic path => message. */
@@ -53,8 +44,7 @@ final class ValidationResult
     }
 
     /**
-     * Only meaningful when the result is valid; a failed validation must never
-     * hand values on to the mapper.
+     * Empty unless the result is valid.
      *
      * @return array<string, string|array<int, string>>
      */

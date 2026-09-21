@@ -9,27 +9,14 @@ if (!defined('ABSPATH')) {
 }
 
 /**
- * Resolves the address a submission came from.
- *
- * `REMOTE_ADDR` is the only source trusted by default, because it is the only
- * one the site cannot be lied to about. Behind a CDN or a reverse proxy it is
- * the proxy's address — every visitor then shares one bucket — so a forwarded
- * header can be used instead, but only when the site owner has said which one:
+ * Resolves the visitor address. `REMOTE_ADDR` by default; a forwarded header
+ * only when the site owner names one:
  *
  *     define( 'JOTFORM_BRIDGE_TRUSTED_PROXY_HEADER', 'CF-Connecting-IP' );
- *
- * That opt-in is the whole point. A forwarded header is client-controlled: read
- * unconditionally, it would let an attacker not only rotate past a rate limit
- * but also spend somebody else's budget by claiming their address. Only the
- * person who knows what sits in front of the site knows whether the header can
- * be believed, so the plugin refuses to guess — the same rule the API key
- * follows.
  */
 final class ClientIp
 {
-    /**
-     * Constant naming the forwarded header to trust, if any.
-     */
+    /** Constant naming the forwarded header to trust, if any. */
     public const HEADER_CONSTANT = 'JOTFORM_BRIDGE_TRUSTED_PROXY_HEADER';
 
     /**
@@ -57,11 +44,8 @@ final class ClientIp
     }
 
     /**
-     * The `$_SERVER` key of the configured header, or an empty string.
-     *
-     * Accepts either the HTTP form (`CF-Connecting-IP`) or the CGI form
-     * (`HTTP_CF_CONNECTING_IP`), because both spellings are what people have in
-     * their notes.
+     * The `$_SERVER` key of the configured header, or ''. Accepts the HTTP form
+     * (`CF-Connecting-IP`) and the CGI form (`HTTP_CF_CONNECTING_IP`).
      */
     public static function trustedHeader(): string
     {
@@ -84,13 +68,7 @@ final class ClientIp
         return preg_match('/^[A-Z0-9_]+$/', $normalized) === 1 ? $normalized : '';
     }
 
-    /**
-     * The left-most address of a comma-separated forwarded chain.
-     *
-     * That entry is the one closest to the visitor. It is also the one a
-     * visitor can forge, which is exactly why reading the header at all is
-     * opt-in.
-     */
+    /** The left-most valid address of a comma-separated forwarded chain. */
     private static function firstAddress(string $raw): string
     {
         foreach (explode(',', $raw) as $candidate) {

@@ -9,83 +9,30 @@ if (!defined('ABSPATH')) {
 }
 
 /**
- * Caps how often one address may post to the submission endpoint.
- *
- * This protects the site, not the Jotform account: it stops a single source
- * from spending the server's time on validation and the account's quota on
- * junk. A distributed flood walks straight past it, which is what QuotaGuard is
- * for — the two are deliberately separate mechanisms with separate jobs.
- *
- * Every attempt is counted, including the ones that go on to fail validation.
- * Counting only successes would make probing the form free, which is precisely
- * the activity worth making expensive.
- *
- * There are two scopes. The site-wide one is charged before the integration is
- * even looked up, so that probing the endpoint for valid slugs costs the same
- * as submitting: without it, an unknown slug answers 404 for free and the whole
- * guard can be sidestepped by never naming a real form. The per-integration one
- * is charged after, and is the tighter of the two.
- *
- * Fixed windows on transients, not a sliding log: the storage is one integer per
- * window per address, it expires on its own, and the worst case — a burst
- * landing on a window boundary — costs at most one extra window's allowance.
- * That is the right trade for a guard whose job is to stop floods, not to meter
- * traffic precisely.
+ * Caps how often one address may post to the submission endpoint. Every
+ * attempt counts. Two scopes: site-wide (charged before the integration is
+ * looked up) and per integration. Fixed windows stored as transients.
  */
 final class RateLimiter
 {
     public const TRANSIENT_PREFIX = 'jotform_bridge_rate_';
 
-    /**
-     * Submissions allowed from one address per minute.
-     *
-     * Five, because a person who genuinely needs to send the same form twice
-     * in a minute exists — a typo spotted immediately, a second enquiry about
-     * a different thing — and a person who needs to send it six times does
-     * not. The minute window is what stops a burst; the hour below is what
-     * stops a slow drip that never trips it.
-     */
+    /** Per-integration allowance for one address. */
     public const DEFAULT_PER_MINUTE = 5;
+    public const DEFAULT_PER_HOUR   = 30;
 
-    /**
-     * Submissions allowed from one address per hour.
-     *
-     * Deliberately far below six times the per-minute allowance. A source
-     * sending steadily just under the minute limit for an hour is not a
-     * visitor, whatever any single minute of it looks like.
-     */
-    public const DEFAULT_PER_HOUR = 30;
-
-    /**
-     * Requests allowed from one address per minute across every integration.
-     *
-     * Looser than the per-integration budget, because a site may legitimately
-     * have several forms on one page, and tighter than the sum of them, because
-     * nobody fills in six different forms in a minute.
-     */
+    /** Site-wide allowance for one address, across every integration. */
     public const DEFAULT_GLOBAL_PER_MINUTE = 15;
+    public const DEFAULT_GLOBAL_PER_HOUR   = 60;
 
-    /**
-     * Requests allowed from one address per hour across every integration.
-     *
-     * Not the sum of the per-integration hourly budgets, and not meant to be:
-     * a site with six forms does not have visitors who use six forms. This is
-     * the ceiling on what one address can cost the server in an hour, whatever
-     * it names.
-     */
-    public const DEFAULT_GLOBAL_PER_HOUR = 60;
-
-    /**
-     * Bucket name for the site-wide scope. Not a valid slug, so it can never
-     * collide with a per-integration bucket.
-     */
+    /** Bucket name for the site-wide scope; never a valid slug. */
     private const GLOBAL_SCOPE = '*';
 
     private const MINUTE = 60;
     private const HOUR   = 3600;
 
     /**
-     * The site-wide budget, charged before the integration is resolved.
+     * The site-wide budget.
      *
      * @param string $ip Visitor address; an empty string disables the check.
      *
@@ -116,9 +63,7 @@ final class RateLimiter
     private function consume(string $scope, string $ip, array $limits): int
     {
         if ($ip === '') {
-            // Without an address every visitor would share one bucket, and the
-            // guard would turn into a site-wide outage the first time a burst
-            // arrived. Refusing to guess is the safer failure.
+            // Without an address every visitor would share one bucket.
             return 0;
         }
 
@@ -148,9 +93,7 @@ final class RateLimiter
         }
 
         if ($wait > 0) {
-            // Nothing is recorded for a refused attempt: the window that
-            // refused it is already full, and the other one must not be
-            // charged for a submission that never happened.
+            // A refused attempt is not recorded.
             return $wait;
         }
 
@@ -225,12 +168,7 @@ final class RateLimiter
         ];
     }
 
-    /**
-     * The bucket key: scope, address and window, hashed.
-     *
-     * Only a hash is stored, so no address ever ends up in the options table —
-     * the same rule the duplicate guard already follows.
-     */
+    /** Bucket key: scope, address and window, hashed so no address is stored. */
     private function key(string $scope, string $ip, int $window): string
     {
         return self::TRANSIENT_PREFIX . md5($scope . '|' . $ip . '|' . $window . '|' . $this->windowStart($window));

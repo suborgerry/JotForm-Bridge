@@ -23,9 +23,6 @@ if (!defined('ABSPATH')) {
 $jfbNewUrl = add_query_arg(['page' => $page, 'view' => 'new'], admin_url('admin.php'));
 ?>
 <div class="wrap jfb-integrations">
-    <?php // An h1, like every other screen in wp-admin and every other screen
-          // of this plugin: it is how a page announces which page it is, and
-          // how somebody navigating by heading finds the top of it. ?>
     <h1 class="wp-heading-inline"><?php echo esc_html__('Integrations', 'jotform-bridge'); ?></h1>
     <a href="<?php echo esc_url($jfbNewUrl); ?>" class="page-title-action">
         <?php echo esc_html__('Add New', 'jotform-bridge'); ?>
@@ -67,9 +64,6 @@ $jfbNewUrl = add_query_arg(['page' => $page, 'view' => 'new'], admin_url('admin.
                     admin_url('admin.php')
                 );
 
-                // A template lives in the theme, so it can be renamed or
-                // deleted long after the integration was set up. The row says
-                // so instead of leaving the integration looking healthy.
                 $jfbTemplateMissing = $jfbIntegration->usesCustomTemplate()
                     && !$templates->has($jfbIntegration->templateSlug());
                 ?>
@@ -85,10 +79,6 @@ $jfbNewUrl = add_query_arg(['page' => $page, 'view' => 'new'], admin_url('admin.
                         <?php if ($jfbRow['form_title'] !== '') : ?>
                             <?php echo esc_html($jfbRow['form_title']); ?>
                         <?php elseif ($jfbIntegration->formId() !== '') : ?>
-                            <?php /* A form ID that was typed but never resolved: show the ID,
-                                     which is the part that actually does the work, and say
-                                     what is missing rather than naming a list that no longer
-                                     exists. */ ?>
                             <code><?php echo esc_html($jfbIntegration->formId()); ?></code>
                             <br>
                             <span class="description">
@@ -110,7 +100,6 @@ $jfbNewUrl = add_query_arg(['page' => $page, 'view' => 'new'], admin_url('admin.
                                 <br>
                                 <code><?php echo esc_html($jfbIntegration->templateSlug()); ?></code>
                             <?php elseif ($jfbIntegration->templateSlug() !== '') : ?>
-                                <?php // The slug is kept as stored so a template that went missing stays identifiable. ?>
                                 <code><?php echo esc_html($jfbIntegration->templateSlug()); ?></code>
                                 <br>
                                 <span class="description jfb-broken-note">
@@ -139,18 +128,11 @@ $jfbNewUrl = add_query_arg(['page' => $page, 'view' => 'new'], admin_url('admin.
                             title="<?php echo esc_attr__('Copy to clipboard', 'jotform-bridge'); ?>"
                         >
                             <code><?php echo esc_html($jfbShortcode); ?></code>
-                            <?php // Faded in rather than taken out of the flow, so it stays in the
-                                  // accessibility tree at zero opacity and would otherwise be part
-                                  // of the button's name before anybody pressed it. The copy is
-                                  // announced through the live region above instead. ?>
                             <span class="jfb-copied" aria-hidden="true"><?php echo esc_html__('Copied', 'jotform-bridge'); ?></span>
                         </button>
                     </td>
                     <td>
                         <?php
-                        // An integration stored before the timestamps existed
-                        // has neither, and the creation time is the closest
-                        // truth available for one that was never edited.
                         $jfbModified = $jfbIntegration->updatedAt() > 0
                             ? $jfbIntegration->updatedAt()
                             : $jfbIntegration->createdAt();
@@ -204,9 +186,7 @@ $jfbNewUrl = add_query_arg(['page' => $page, 'view' => 'new'], admin_url('admin.
                     <td><code><?php echo esc_html((string) $jfbTemplate['slug']); ?></code></td>
                     <td>
                         <?php
-                        // Shown the same way as the scanned directories above: the
-                        // theme name and the directory place the file, and the rest
-                        // of an absolute path only makes the column harder to read.
+                        // theme/directory/file, not the absolute path.
                         $jfbFile = (string) $jfbTemplate['file'];
                         $jfbDir  = dirname($jfbFile);
                         ?>

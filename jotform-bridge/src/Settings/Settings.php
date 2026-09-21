@@ -9,20 +9,14 @@ if (!defined('ABSPATH')) {
 }
 
 /**
- * Reads and writes the plugin settings option.
- *
- * The API key is deliberately not part of that option: it comes from the
- * JOTFORM_API_KEY constant and from nowhere else, so it never reaches the
- * database. It is masked on output and the raw value is only handed to
- * JotformClient.
+ * Reads and writes the plugin settings option. The API key is not part of it:
+ * it comes from the JOTFORM_API_KEY constant only.
  */
 final class Settings
 {
     public const OPTION = 'jotform_bridge_settings';
 
-    /**
-     * The only place the plugin ever reads an API key from.
-     */
+    /** The only source of the API key. */
     public const KEY_CONSTANT = 'JOTFORM_API_KEY';
 
     public const SOURCE_CONSTANT = 'constant';
@@ -33,16 +27,7 @@ final class Settings
     public const REGION_HIPAA    = 'hipaa';
     public const REGION_CUSTOM   = 'custom';
 
-    /**
-     * Hosts a custom base URL may point at.
-     *
-     * The custom region exists for Jotform deployments the plugin does not know
-     * the address of — a new region, an enterprise host. It is not a general
-     * "send my API key wherever" setting, and left unrestricted that is exactly
-     * what it was: one settings save, and every request carries the key to
-     * somebody else's server. An administrator who genuinely needs another host
-     * can add it in code, where the decision is visible and reviewable.
-     */
+    /** Hosts a custom base URL may point at (the API key is sent there). */
     private const DEFAULT_ALLOWED_HOSTS = ['jotform.com'];
 
     /**
@@ -57,14 +42,7 @@ final class Settings
     ];
 
     /**
-     * The region slugs, with no labels attached.
-     *
-     * Separate from regions() on purpose. Validating a stored value must not
-     * need a translated string: the settings are read while the plugin boots,
-     * on plugins_loaded, and asking for a label there makes WordPress load the
-     * text domain before init — which since WordPress 6.7 is a
-     * _doing_it_wrong() notice on every admin request, and a translation that
-     * is not applied anyway.
+     * Region slugs without labels; usable before the text domain is loaded.
      *
      * @var array<int, string>
      */
@@ -76,27 +54,16 @@ final class Settings
     ];
 
     /**
-     * In-request memo. Six methods on this class read the option, and Logger
-     * asks whether debugging is on for every line it writes.
+     * In-request memo of the option.
      *
      * @var array<string, mixed>|null
      */
     private ?array $memo = null;
 
-    /**
-     * Which generation of the option the memo was taken from.
-     */
+    /** Generation the memo was taken from. */
     private int $memoGeneration = -1;
 
-    /**
-     * Bumped by every write, including the static one.
-     *
-     * purgeStoredKey() is static, so it can change the option without any
-     * instance knowing. Today that only happens during upgrade, before anything
-     * has read the settings — but relying on that would make correctness a
-     * property of the call order rather than of this class. A counter every
-     * instance checks costs three lines and does not care about ordering.
-     */
+    /** Bumped by every write, so every instance's memo is invalidated. */
     private static int $generation = 0;
 
     /**
@@ -114,13 +81,8 @@ final class Settings
             $stored = [];
         }
 
-        // A site upgraded from a version that still kept a key in the option
-        // carries one until purgeStoredKey() runs; it is never a key source.
-        unset($stored['api_key']);
-
-        // Written by versions that tracked the account's monthly allowance.
-        // The plugin no longer does, so the value is not carried forward.
-        unset($stored['monthly_quota']);
+        // Legacy keys from earlier versions; never read.
+        unset($stored['api_key'], $stored['monthly_quota']);
 
         $this->memoGeneration = self::$generation;
 
@@ -142,17 +104,13 @@ final class Settings
         ];
     }
 
-    /**
-     * Whether a string names a region the plugin knows.
-     */
     public static function isRegion(string $region): bool
     {
         return in_array($region, self::REGION_SLUGS, true);
     }
 
     /**
-     * The labels for the settings screen. Nothing but a view may call this: it
-     * translates, and so cannot be used before init.
+     * Region labels for the settings screen; translates, so not usable before init.
      *
      * @return array<string, string> Region slug => human readable label.
      */
@@ -166,9 +124,7 @@ final class Settings
         ];
     }
 
-    /**
-     * The configured API key, or an empty string when the constant is missing.
-     */
+    /** The API key, or '' when the constant is missing. */
     public function apiKey(): string
     {
         if (!$this->hasConstantKey()) {
@@ -188,9 +144,7 @@ final class Settings
         return $this->apiKey() !== '';
     }
 
-    /**
-     * Never render the key back to the browser; only a hint of it.
-     */
+    /** The last four characters of the key, masked. */
     public function maskedApiKey(): string
     {
         $key = $this->apiKey();
@@ -212,9 +166,7 @@ final class Settings
         return self::isRegion($region) ? $region : self::REGION_STANDARD;
     }
 
-    /**
-     * Single place where the Jotform API base URL is built.
-     */
+    /** The single place the Jotform API base URL is built. */
     public function baseUrl(): string
     {
         $region = $this->region();
@@ -233,14 +185,7 @@ final class Settings
         return self::regionUrl($region);
     }
 
-    /**
-     * The documented base URL for one region.
-     *
-     * Public because the settings screen shows the standard region's address as
-     * the placeholder for the custom field, and it had that address typed into
-     * the markup — a second copy of a value this class exists to be the single
-     * source of.
-     */
+    /** The documented base URL for one region. */
     public static function regionUrl(string $region): string
     {
         return self::REGION_URLS[$region] ?? self::REGION_URLS[self::REGION_STANDARD];
@@ -251,9 +196,6 @@ final class Settings
         return (bool) $this->all()['debug_logging'];
     }
 
-    /**
-     * Whether uninstalling may delete the integrations and the settings too.
-     */
     public function deletesDataOnUninstall(): bool
     {
         return (bool) $this->all()['delete_data_on_uninstall'];
@@ -295,8 +237,6 @@ final class Settings
      */
     public function save(array $input): array
     {
-        // all() has already dropped any legacy key, so nothing carried over
-        // here can put one back into the option.
         $clean = $this->all();
 
         if (isset($input['validation_tab'])) {
@@ -319,11 +259,7 @@ final class Settings
         return $clean;
     }
 
-    /**
-     * The custom base URL is the one setting that decides where the API key is
-     * sent, so it is restricted rather than merely escaped: an absolute http(s)
-     * URL, on an allowed host, and nothing after the path.
-     */
+    /** An absolute http(s) URL on an allowed host, with nothing after the path. */
     public static function sanitizeBaseUrl(string $raw): string
     {
         $raw = trim($raw);
@@ -349,8 +285,7 @@ final class Settings
             return '';
         }
 
-        // Credentials, query and fragment have no meaning for an API base URL
-        // and would only travel along with every request.
+        // Credentials, query and fragment are dropped.
         $rebuilt = $scheme . '://' . strtolower((string) $parts['host']);
 
         if (isset($parts['port'])) {
@@ -364,13 +299,7 @@ final class Settings
         return untrailingslashit($rebuilt);
     }
 
-    /**
-     * Whether a host may receive the API key.
-     *
-     * An entry matches the host itself and any subdomain of it, and nothing
-     * else: "notjotform.com" must not pass because it ends with the same
-     * letters.
-     */
+    /** Whether a host may receive the API key; an entry matches itself and its subdomains. */
     public static function isAllowedHost(string $host): bool
     {
         $host = strtolower(trim($host, " \t\n\r\0\x0B."));
@@ -413,10 +342,7 @@ final class Settings
     }
 
     /**
-     * Reads one value out of a raw request slice, ignoring arrays and objects.
-     *
-     * A `settings[region][]=x` request must not become the string "Array": it is
-     * simply not a value this form can carry.
+     * One scalar value out of a raw request slice; arrays are ignored.
      *
      * @param array<string, mixed> $input
      */
@@ -425,12 +351,7 @@ final class Settings
         return isset($input[$key]) && is_scalar($input[$key]) ? trim((string) $input[$key]) : '';
     }
 
-    /**
-     * Removes a key left in the option by an earlier version of the plugin.
-     *
-     * Runs on upgrade rather than on read: a key that once reached the database
-     * has to be taken out of it, not merely ignored on the way back.
-     */
+    /** Removes a key left in the option by an earlier version; runs on upgrade. */
     public static function purgeStoredKey(): void
     {
         $stored = get_option(self::OPTION, []);

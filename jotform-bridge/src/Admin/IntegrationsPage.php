@@ -24,18 +24,8 @@ if (!defined('ABSPATH')) {
 /**
  * "Jotform Bridge → Integrations": the list, the editor and their actions.
  *
- * The screen itself only reads stored state. Jotform is contacted from the
- * explicit per-integration actions and from nowhere else — Connect form, Sync
- * Schema and Send Test Submission — and the filesystem is read whenever the
- * templates are listed. Saving an integration, opening a screen or rendering a
- * form never triggers a fetch.
- *
- * The five action handlers were considered for a class of their own, since this
- * is the longest file in the plugin. They stay: every one of them runs the same
- * four steps — guard(), do the work, flash(), redirect() — and moving them out
- * would produce two classes joined by those four private helpers, which is more
- * structure describing the same thing rather than less. Length here is five
- * short handlers, not one long anything.
+ * Screens read stored state only. Jotform is contacted solely by the explicit
+ * actions: Connect form, Sync Schema and Send Test Submission.
  */
 final class IntegrationsPage
 {
@@ -47,27 +37,12 @@ final class IntegrationsPage
     public const ACTION_SYNC    = 'jotform_bridge_sync_schema';
     public const ACTION_TEST    = 'jotform_bridge_test_submission';
 
-    /**
-     * "Connect form" — the only asynchronous action in the admin.
-     *
-     * It answers over admin-ajax rather than through admin-post because it
-     * resolves one field of a form that is still being filled in: a redirect
-     * would either lose everything typed so far or have to save it, and neither
-     * is what pressing a button beside a text field should mean.
-     */
+    /** "Connect form", answered over admin-ajax. */
     public const ACTION_CONNECT = 'jotform_bridge_connect_form';
 
     private const FLASH_PREFIX = 'jotform_bridge_notice_';
 
-    /**
-     * Where the top-level menu sits, below Settings and above Tools.
-     *
-     * Fractional, and deliberately. WordPress keys the menu array by this
-     * value, so two plugins choosing the same whole number do not end up
-     * adjacent — one silently replaces the other, and which one depends on
-     * plugin load order. Whole numbers are exactly what everybody picks, which
-     * is what makes them the collision.
-     */
+    /** Below Settings, above Tools; fractional to avoid menu-key collisions. */
     private const MENU_POSITION = 58.7;
 
     private IntegrationRepository $integrations;
@@ -82,10 +57,7 @@ final class IntegrationsPage
 
     private RedirectTarget $redirects;
 
-    /**
-     * Null when the page was built without a Jotform client to send with, in
-     * which case the action is not registered and the button is not offered.
-     */
+    /** Null without a Jotform client; the test action is then not offered. */
     private ?TestSubmission $tests;
 
     public function __construct(
@@ -140,11 +112,7 @@ final class IntegrationsPage
         );
     }
 
-    /**
-     * Brand mark for the top-level menu, inlined as a data URI.
-     *
-     * Falls back to a Dashicon if the asset is missing.
-     */
+    /** Menu icon as a data URI, or a Dashicon when the asset is missing. */
     private function menuIcon(): string
     {
         $path = JOTFORM_BRIDGE_DIR . 'assets/menu-icon.svg';
@@ -198,9 +166,7 @@ final class IntegrationsPage
         $notice = $flash;
         $page   = self::MENU_SLUG;
 
-        // The templates table reads the reverse of the integration list: one
-        // template can back several integrations, so each slug collects every
-        // integration bound to it rather than a single one.
+        // Template slug → the integrations bound to it.
         $templateUsage = [];
 
         foreach ($integrations as $integration) {
@@ -228,7 +194,7 @@ final class IntegrationsPage
             $this->redirect([]);
         }
 
-        // A failed save hands the submitted values back so nothing is retyped.
+        // A failed save hands the submitted values back.
         if ($flash !== null && !empty($flash['input']) && is_array($flash['input'])) {
             $integration = Integration::fromInput($flash['input']);
         }
@@ -244,15 +210,10 @@ final class IntegrationsPage
 
         $schemaMeta    = $integration->formId() !== '' ? $this->schemas->meta($integration->formId()) : null;
         $schemaStale   = $integration->formId() !== '' && $this->schemas->isStale($integration->formId());
-        // One record, not a list: the editor names the form this integration
-        // points at and knows nothing about any other form on the account.
         $connectedForm = $integration->formId() !== '' ? $this->forms->get($integration->formId()) : null;
         $templates     = $this->templates->choices();
         $canTest       = $this->tests !== null;
 
-        // Offered whenever there is a schema to build it from, in either
-        // rendering mode: an auto-rendered integration moving to a template is
-        // exactly when this is most useful.
         $scaffold     = $schema !== null ? (new TemplateScaffold())->build($integration, $schema) : '';
         $scaffoldFile = $schema !== null ? (new TemplateScaffold())->fileName($integration) : '';
         $notice       = $flash;
@@ -265,8 +226,6 @@ final class IntegrationsPage
     {
         $this->guard(self::ACTION_SAVE);
 
-        // The nonce and the capability are checked by guard() above, and every
-        // value is sanitized field by field in Integration::fromInput().
         // phpcs:ignore WordPress.Security.NonceVerification.Missing -- verified in guard().
         $raw = isset($_POST['jotform_integration']) && is_array($_POST['jotform_integration'])
             // phpcs:ignore WordPress.Security.NonceVerification.Missing, WordPress.Security.ValidatedSanitizedInput.InputNotSanitized -- verified in guard(); sanitized in fromInput().
@@ -279,8 +238,7 @@ final class IntegrationsPage
             ? sanitize_key((string) wp_unslash($_POST['original_slug']))
             : '';
 
-        // Rules are read-only in the admin. Never accept them from a request,
-        // including a stale editor or a forged POST. Preserve them on rename.
+        // Conditions are never accepted from the request; preserved on rename.
         $previous = $originalSlug !== '' ? $this->integrations->get($originalSlug) : null;
         $raw['conditions'] = $previous !== null ? $previous->conditions() : [];
 
@@ -293,8 +251,6 @@ final class IntegrationsPage
             $errors[] = __('Sync the schema before configuring conditional logic.', 'jotform-bridge');
         }
 
-        // The template select is populated from the registry, so anything else
-        // is either a stale form or a forged request.
         if (
             $integration->usesCustomTemplate()
             && $integration->templateSlug() !== ''
@@ -321,17 +277,9 @@ final class IntegrationsPage
             );
         }
 
-        // Saving never fetches. A form nobody has synced yet is reported as
-        // exactly that, so the one action that talks to Jotform stays the one
-        // the administrator pressed on purpose.
+        // Saving never fetches; unconnected and unsynced forms are warnings.
         $warnings = [];
 
-        // An unconnected form ID is a warning rather than a refusal. The field
-        // is free text now, and refusing to store digits the administrator
-        // typed — because a button beside them was not pressed — would make the
-        // form feel broken. Nothing can go quietly wrong either way: an
-        // integration whose schema was never synced does not render at all, and
-        // the schema is the next warning down.
         if ($integration->formId() !== '' && !$this->forms->has($integration->formId())) {
             $warnings[] = __(
                 'This Jotform form has not been connected yet. Press Connect form to check that it exists and to load its definition.',
@@ -346,8 +294,7 @@ final class IntegrationsPage
             );
         }
 
-        // A broken redirect target does not stop the save — the page may be
-        // published later — but the admin is told before a visitor finds out.
+        // A broken redirect target is a warning, not a refusal.
         $target = $this->redirects->check($integration);
 
         if (RedirectTarget::isBroken($target)) {
@@ -374,11 +321,7 @@ final class IntegrationsPage
         $formId      = $integration !== null ? $integration->formId() : '';
 
         if ($this->integrations->delete($slug)) {
-            // The store holds the forms integrations use, so a form the last
-            // integration referencing it has just taken with it has nothing
-            // left to name. The schema is left alone: it is a manual sync the
-            // administrator paid for, and a new integration on the same form
-            // should not have to pay for it again.
+            // Drop the form record when nothing names it any more; the schema stays.
             if ($formId !== '' && !$this->isFormInUse($formId)) {
                 $this->forms->forget($formId);
             }
@@ -391,14 +334,7 @@ final class IntegrationsPage
         $this->redirect([]);
     }
 
-    /**
-     * The only action in the plugin that fetches a form definition.
-     *
-     * It is per integration on purpose: syncing one form is a decision about
-     * one contract between a template and a Jotform form, and a site with ten
-     * integrations should never have nine of them move because somebody wanted
-     * the tenth updated.
-     */
+    /** Sync Schema: fetches and stores the definition of one integration's form. */
     public function handleSyncSchema(): void
     {
         $this->guard(self::ACTION_SYNC);
@@ -442,14 +378,7 @@ final class IntegrationsPage
         $this->redirect($return);
     }
 
-    /**
-     * Sends one real submission to Jotform and reports exactly what came back.
-     *
-     * The only action in the plugin that writes to the account. It is not a
-     * simulation on purpose: the failures worth catching — a form ID pointing
-     * elsewhere, a key without write access, a field Jotform has since made
-     * required — are invisible until something is actually sent.
-     */
+    /** Sends one real submission to Jotform and reports what came back. */
     public function handleTestSubmission(): void
     {
         $this->guard(self::ACTION_TEST);
@@ -472,8 +401,6 @@ final class IntegrationsPage
         $response = $this->tests->send($integration);
 
         if (!$response->isSuccess()) {
-            // The upstream message goes straight through: reading it is the
-            // entire reason for pressing the button.
             $this->flash(
                 'error',
                 __('The test submission was not accepted.', 'jotform-bridge'),
@@ -504,21 +431,9 @@ final class IntegrationsPage
     }
 
     /**
-     * Resolves one Jotform form ID into a title, and loads its schema.
-     *
-     * The one place the plugin asks Jotform about a form's existence. It
-     * deliberately cannot say *why* a lookup failed: Jotform answers 401 with
-     * the same message for a form that does not exist, a form owned by another
-     * account and an API key that is wrong, so the reply names all three and
-     * points at Check Connection, which is the only thing that separates the
-     * last of them from the first two.
-     *
-     * It also syncs the schema of a form that has none — see
-     * connectSchema() and the amendment in AGENTS.md. The editor of an
-     * integration that has not been created yet has no Sync Schema button,
-     * because that action posts the slug of a saved integration, so a form
-     * connected here used to be told to press a button that was not on the
-     * screen. One press now does both halves of "make this form usable".
+     * Connect form: resolves a form ID into a title and, when the form has no
+     * stored schema yet, syncs it. A 401 is ambiguous (missing form, foreign
+     * form or bad key) and is reported as such.
      */
     public function handleConnectForm(): void
     {
@@ -595,23 +510,8 @@ final class IntegrationsPage
     }
 
     /**
-     * Loads the schema of a form that has none, as part of connecting it.
-     *
-     * Two rules, and the second is the one worth stating:
-     *
-     * 1. A form with no stored schema is synced here. Connecting a form and
-     *    then finding it cannot render is not two decisions, it is one, and on
-     *    the "Add Integration" screen the second half is not even reachable.
-     * 2. A form that already has one is left exactly as it was. Refreshing a
-     *    schema stays the Sync Schema button's job: this runs beside a text
-     *    field in an editor that is still open, and a schema table changing
-     *    underneath the page that reports on it is the admin lying about the
-     *    one thing that report exists for. It is also what the amendment on
-     *    manual synchronization is protecting — a definition a site is live on
-     *    never moves without somebody asking for it.
-     *
-     * A failed sync is a warning, never a refusal: the form was found, which is
-     * what the button was pressed to establish.
+     * Syncs the schema of a form that has none; a stored schema is never
+     * replaced here. A failed sync is a warning, not a refusal.
      *
      * @return array{state:string, hint:string}
      */
@@ -620,8 +520,6 @@ final class IntegrationsPage
         if ($this->schemas->isSynced($formId)) {
             return [
                 'state' => 'ok',
-                // Where the button is, not just its name: this reply is read
-                // on the Add Integration screen too, which does not render one.
                 'hint'  => __(
                     'Its definition is already stored and was left as it is. Sync Schema, on a saved integration, is what refreshes it.',
                     'jotform-bridge'
@@ -671,9 +569,7 @@ final class IntegrationsPage
         ];
     }
 
-    /**
-     * Capability + nonce check shared by every mutating action.
-     */
+    /** Capability and nonce check shared by every mutating action. */
     private function guard(string $action): void
     {
         if (!current_user_can(self::CAPABILITY)) {
@@ -684,10 +580,7 @@ final class IntegrationsPage
     }
 
     /**
-     * Where an action issued from the editor should return to.
-     *
-     * A form that posts `return_view` decides; anything else lands on the list,
-     * which is where the per-row buttons live.
+     * Where an action returns to: the editor when `return_view` says so, else the list.
      *
      * @return array<string, string>
      */
@@ -715,14 +608,7 @@ final class IntegrationsPage
             : ['view' => 'new'];
     }
 
-    /**
-     * A timestamp in the site's own date format and timezone.
-     *
-     * Both tables on the list screen print one, and they have to agree with the
-     * rest of the admin rather than invent a format of their own. Called from
-     * the view, which is included inside a method of this class and therefore
-     * shares its scope.
-     */
+    /** A timestamp in the site's date format and timezone; used by the views. */
     private function formatDateTime(int $timestamp): string
     {
         $date = (string) get_option('date_format', 'Y-m-d');
@@ -731,12 +617,7 @@ final class IntegrationsPage
         return (string) wp_date(trim($date . ' ' . $time), $timestamp);
     }
 
-    /**
-     * Whether any stored integration still points at this Jotform form.
-     *
-     * Several integrations sharing one form is a requirement, not an accident,
-     * so deleting one of them must not take the shared record with it.
-     */
+    /** Whether any stored integration still points at this form. */
     private function isFormInUse(string $formId): bool
     {
         foreach ($this->integrations->all() as $integration) {
@@ -755,9 +636,6 @@ final class IntegrationsPage
 
     /**
      * Stores a one-shot notice for the redirect target.
-     *
-     * Kept out of the URL so that validation detail and the submitted values
-     * survive the redirect without ending up in the browser history.
      *
      * @param array<int, string>   $messages
      * @param array<string, mixed> $input
@@ -799,12 +677,7 @@ final class IntegrationsPage
     }
 
     /**
-     * Answers the request and ends it. Every guard clause on this screen leans
-     * on that: the code after one reads its value as still set, because a
-     * missing one has already left the process.
-     *
-     * `never` is a docblock rather than a native return type because the plugin
-     * supports PHP 8.0, where the type does not exist.
+     * Redirects to the plugin screen and ends the request.
      *
      * @param array<string, string> $args
      *

@@ -12,32 +12,15 @@ if (!defined('ABSPATH')) {
 }
 
 /**
- * The admin surface of the quota guard: the warning, the trip, and the way out.
- *
- * A circuit breaker nobody is told about is worse than none — the forms would
- * simply stop working for reasons that only appear in a log the site does not
- * write by default. So the trip is a persistent notice, not a log line, and it
- * carries the button that clears it: a legitimate spike is a thing that happens,
- * and the site owner has to be able to say so.
- *
- * Nothing here contacts Jotform: the notice describes state the guard already
- * holds.
+ * The admin surface of the quota guard: the low-allowance warning, the trip
+ * notice and the reset button. Never contacts Jotform.
  */
 final class QuotaNotice
 {
     public const CAPABILITY   = Plugin::CAPABILITY;
     public const ACTION_RESET = 'jotform_bridge_reset_quota';
 
-    /**
-     * How few API calls Jotform has to report before the site owner is told.
-     *
-     * A day's allowance is in the thousands, so a hundred is roughly the last
-     * few minutes of a busy form — late enough not to nag on an ordinary day,
-     * early enough that syncing a schema or a handful of submissions still fit
-     * before the account stops answering. The number is deliberately not
-     * filterable: this is the last warning before the forms stop working, and a
-     * site that has turned it down has no second one.
-     */
+    /** Remaining API calls below which the site owner is warned. */
     private const WARN_BELOW = 100;
 
     private QuotaGuard $quota;
@@ -68,9 +51,6 @@ final class QuotaNotice
         $this->renderWarning();
     }
 
-    /**
-     * Clears the trip and lets the forms accept submissions again.
-     */
     public function handleReset(): void
     {
         if (!current_user_can(self::CAPABILITY)) {
@@ -117,9 +97,6 @@ final class QuotaNotice
             );
         }
 
-        // Clearing a ceiling the site set for itself is a judgement call about
-        // traffic. Clearing one Jotform imposed only makes sense once the
-        // account side has actually changed, so the advice differs.
         $advice = $this->fromUpstream($status['reason'])
             ? __(
                 'Visitors are seeing the generic "please try again later" message. Clearing this only helps once the account itself has room again — otherwise Jotform will simply refuse the next one too.',
@@ -146,10 +123,7 @@ final class QuotaNotice
             || $reason === QuotaGuard::REASON_UPSTREAM_API_LIMIT;
     }
 
-    /**
-     * The one warning left: Jotform's own count of API calls left for today,
-     * which it reports on every answer and costs nothing to carry.
-     */
+    /** Warns when Jotform's reported daily API allowance runs low. */
     private function renderWarning(): void
     {
         $status = $this->quota->status();

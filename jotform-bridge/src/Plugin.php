@@ -36,27 +36,13 @@ if (!defined('ABSPATH')) {
     exit;
 }
 
-/**
- * Composition root.
- *
- * Holds the services and wires them into WordPress. No business logic lives here.
- */
+/** Composition root: holds the services and wires them into WordPress. */
 final class Plugin
 {
-    /**
-     * Version the caches were last built for. Not user configuration: it is
-     * bookkeeping, and losing it only costs one rebuild.
-     */
+    /** Plugin version the upgrade step last ran for. */
     public const VERSION_OPTION = 'jotform_bridge_version';
 
-    /**
-     * Who may configure this plugin, and who may see why a form did not render.
-     *
-     * Stated once. It used to be written out six times — five admin classes
-     * with a constant each and one bare literal in the renderer — which is five
-     * places to miss when the answer changes and one that would have been
-     * missed by anybody searching for the constant rather than the string.
-     */
+    /** Who may configure the plugin and see why a form did not render. */
     public const CAPABILITY = 'manage_options';
 
     private static ?Plugin $instance = null;
@@ -122,13 +108,7 @@ final class Plugin
             }
         );
 
-        // Everything below is registered through a closure rather than by
-        // handing WordPress a built object. The hooks have to exist on every
-        // request; the services behind them are needed on almost none of them —
-        // not in the admin, not during cron, not on a REST call belonging to
-        // another plugin. Building them anyway would also mean that a fault
-        // anywhere in the graph takes down every request on the site, including
-        // the admin screens somebody would use to fix it.
+        // Frontend services are built lazily, inside the callbacks.
         add_action(
             'wp_enqueue_scripts',
             static function (): void {
@@ -143,37 +123,24 @@ final class Plugin
             }
         );
 
-        // The shipped anti-abuse providers register themselves on the spam
-        // extension point, exactly like a third-party one would. Registering is
-        // free: a form without the matching markup never triggers them.
+        // Shipped spam providers register on the same filter a third-party one would.
         (new Honeypot())->register();
         (new MinimumTime())->register();
         (new ProofOfWork())->register();
-
-        // Registers itself only when the site has configured keys for it.
         (new Turnstile($this->logger))->register();
 
         (new SubmissionController(static fn(): SubmissionPipeline => self::instance()->pipeline()))->register();
 
-        // Not under is_admin(): the update check also runs from cron, which a
-        // frontend request may be the one to trigger. Registering costs three
-        // hooks; GitHub is asked only when Core performs a check.
+        // Not under is_admin(): the update check also runs from cron.
         (new GitHubUpdater($this->logger))->register();
 
         if (is_admin()) {
-            // Only on this plugin's own screens; the class decides.
             (new AdminAssets())->register();
-
             (new ApiKeyNotice($this->settings))->register();
-
-            // A tripped circuit breaker has to be visible and clearable.
             (new QuotaNotice($this->quota()))->register();
-
-            // Says how to switch the challenge on, once, and how to finish the
-            // job if only half of it was done.
             (new TurnstileNotice())->register();
 
-            // Registration order decides the submenu order: Integrations first.
+            // Registration order decides the submenu order.
             (new IntegrationsPage(
                 $this->integrations(),
                 $this->forms(),
@@ -206,9 +173,6 @@ final class Plugin
         return $this->connection;
     }
 
-    /**
-     * Built lazily so a settings change during the request is picked up.
-     */
     public function client(): JotformClient
     {
         if ($this->client === null) {
@@ -263,9 +227,7 @@ final class Plugin
         return $this->assets;
     }
 
-    /**
-     * The service behind both `jotform_bridge_render()` and the shortcode.
-     */
+    /** The service behind both `jotform_bridge_render()` and the shortcode. */
     public function renderer(): FormRenderer
     {
         if ($this->renderer === null) {
@@ -281,9 +243,6 @@ final class Plugin
         return $this->renderer;
     }
 
-    /**
-     * The account-wide submission circuit breaker.
-     */
     public function quota(): QuotaGuard
     {
         if ($this->quota === null) {
@@ -310,14 +269,9 @@ final class Plugin
     }
 
     /**
-     * Activation does the least it can get away with: no schema fetch, no
-     * filesystem scan, no default integrations. Everything the plugin needs is
-     * built on demand, so there is nothing here that could fatal on a site with
-     * no API key yet.
+     * Purges legacy storage and records the version. No fetch, no scan.
      *
-     * @param bool $networkWide True when the plugin was activated for a whole
-     *                          multisite network, in which case the hook fires
-     *                          once rather than once per site.
+     * @param bool $networkWide True for a network-wide activation, which fires once.
      */
     public static function onActivate(bool $networkWide = false): void
     {
@@ -332,25 +286,13 @@ final class Plugin
         );
     }
 
-    /**
-     * Nothing to tear down: the plugin keeps no derived state that outlives a
-     * request, and configuration is never touched on deactivation.
-     */
+    /** Nothing to tear down; configuration is never touched on deactivation. */
     public static function onDeactivate(bool $networkWide = false): void
     {
     }
 
     /**
-     * Runs one lifecycle step against every site it applies to.
-     *
-     * Options are per site, and the activation hook fires once for a whole
-     * network rather than once per site in it, so a network activation that
-     * only touched the current blog would leave every other one carrying state
-     * from whatever version was there before.
-     *
-     * Only activation and deactivation need this. maybeUpgrade() runs on
-     * `plugins_loaded`, which happens inside one site's context on every
-     * request, so each site upgrades itself the first time it is visited.
+     * Runs one lifecycle step on every site of a network activation.
      *
      * @param callable(): void $step
      */
@@ -371,34 +313,22 @@ final class Plugin
         }
     }
 
-    /**
-     * Removes storage older versions used and this one does not.
-     *
-     * Runs on activation as well as on the version bump, because "deactivate,
-     * update, activate" is how a lot of people upgrade and it must clean up the
-     * same things.
-     */
+    /** Removes storage older versions used; runs on activation and on upgrade. */
     private static function purgeLegacyStorage(): void
     {
         SchemaRepository::purgeLegacyTransients();
 
         delete_transient(FormRepository::LEGACY_TRANSIENT);
 
-        // The account form list and everything that existed to manage it. The
-        // plugin no longer asks Jotform what forms an account has: a form is
-        // connected by ID on the integration that uses it, so there is no list
-        // to store, nothing to truncate at a thousand rows, and no trashed form
-        // to hide from a list it is no longer in.
+        // Account form list.
         delete_option(FormRepository::LEGACY_OPTION);
         delete_option(FormRepository::LEGACY_META_OPTION);
         delete_option(FormRepository::LEGACY_HIDDEN_OPTION);
 
-        // Versions up to 0.1.0 cached the template scan. The scan is now read
-        // from the theme on demand, so the option is dead weight.
+        // Template scan cache.
         delete_option('jotform_bridge_templates');
 
-        // The per-integration submission tally was removed with the screens
-        // that read it; nothing writes this option any more.
+        // Submission tally.
         delete_option('jotform_bridge_stats');
     }
 
@@ -412,15 +342,7 @@ final class Plugin
         return is_array($sites) ? array_map('intval', $sites) : [];
     }
 
-    /**
-     * Discards derived state after an upgrade.
-     *
-     * Synced schemas survive: a new version may normalize them differently, but
-     * that is reported as "synced by an older version — re-sync recommended" on
-     * the integration screen rather than acted on behind the site owner's back.
-     * The one thing rewritten here is the settings option: a key stored by a
-     * version that still accepted one has to leave the database.
-     */
+    /** Purges legacy storage once per version; synced schemas survive. */
     private static function maybeUpgrade(): void
     {
         $stored = get_option(self::VERSION_OPTION, '');

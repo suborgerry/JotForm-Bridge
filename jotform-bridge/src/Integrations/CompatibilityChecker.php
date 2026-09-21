@@ -13,13 +13,7 @@ if (!defined('ABSPATH')) {
     exit;
 }
 
-/**
- * Answers "can this integration render?" from cached state only.
- *
- * Compatibility is derived, never stored: it is a function of the synced schema
- * and the scanned registry, and deriving it on demand is cheaper than keeping a
- * third copy of the truth in sync. Jotform is never contacted from here.
- */
+/** Derives "can this integration render?" from the stored schema and the registry. */
 final class CompatibilityChecker
 {
     public const STATE_OK          = 'ok';
@@ -61,9 +55,7 @@ final class CompatibilityChecker
         }
 
         if (!$integration->usesCustomTemplate()) {
-            // The automatic renderer outputs exactly the semantic paths the
-            // schema supports, so validating the schema against that list is
-            // not an approximation — it is what the visitor will get.
+            // The auto renderer outputs exactly the supported semantic paths.
             $report = $this->validator->validate($schema, $schema->semanticPaths());
 
             return [

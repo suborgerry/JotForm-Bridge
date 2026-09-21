@@ -15,12 +15,8 @@ if (!defined('ABSPATH')) {
 }
 
 /**
- * "Jotform Bridge → Settings" admin screen and its actions.
- *
- * The screen only reads stored state; Jotform is contacted from the explicit
- * Check Connection action and from nowhere else. It shows no list of forms:
- * the plugin never asks what forms an account has, and a form is connected by
- * its ID on the integration that uses it.
+ * "Jotform Bridge → Settings" screen and its actions. Jotform is contacted by
+ * Check Connection only.
  */
 final class SettingsPage
 {
@@ -57,9 +53,6 @@ final class SettingsPage
         add_action('admin_post_' . self::ACTION_CLEAN_LOGS, [$this, 'handleCleanLogs']);
     }
 
-    /**
-     * The top-level menu belongs to IntegrationsPage; Settings is its sibling.
-     */
     public function registerMenu(): void
     {
         add_submenu_page(
@@ -97,8 +90,6 @@ final class SettingsPage
     {
         $this->guard(self::ACTION_SAVE);
 
-        // The nonce and the capability are checked by guard() above, and every
-        // value is sanitized by Settings::save().
         // phpcs:ignore WordPress.Security.NonceVerification.Missing -- verified in guard().
         $raw = isset($_POST['jotform_bridge']) && is_array($_POST['jotform_bridge'])
             // phpcs:ignore WordPress.Security.NonceVerification.Missing, WordPress.Security.ValidatedSanitizedInput.InputNotSanitized -- verified in guard(); sanitized in save().
@@ -108,12 +99,7 @@ final class SettingsPage
         $validation = isset($raw['validation_tab']);
         $this->settings->save($raw);
 
-        // A region change can point the plugin at a different account, so what
-        // was learned from GET /user no longer stands. The connected-form
-        // records are left alone on purpose: each one is a title for an ID an
-        // integration already holds, re-read by one press of Connect form, and
-        // wiping them would blank every integration's label because somebody
-        // toggled debug logging.
+        // A region change may point at another account; connected-form records stay.
         if (!$validation) {
             $this->connection->reset();
         }
@@ -121,22 +107,7 @@ final class SettingsPage
         $this->redirect('saved', $validation ? 'validation' : 'general');
     }
 
-    /**
-     * The one action on this screen that contacts Jotform: GET /user.
-     *
-     * It used to reload the account form list as well, under the name "Sync
-     * with Jotform". The list is gone — forms are connected one at a time in
-     * the integration editor — but the key check emphatically is not, and this
-     * is the reason it kept a button of its own rather than being folded into
-     * Connect form.
-     *
-     * Jotform answers a bad form ID, somebody else's form and a wrong API key
-     * with the identical 401 "You're not authorized to use (/form-id)". So a
-     * failing Connect form cannot tell a site owner which of the three they are
-     * looking at. GET /user can: it does not mention a form, so if it succeeds
-     * the key is good and the ID is the problem. Without this button that
-     * distinction is unavailable anywhere in the plugin.
-     */
+    /** Check Connection: GET /user, which proves the key independently of any form ID. */
     public function handleCheckConnection(): void
     {
         $this->guard(self::ACTION_CHECK);
@@ -159,9 +130,7 @@ final class SettingsPage
         $this->redirect('connected');
     }
 
-    /**
-     * Capability + nonce check shared by every mutating action.
-     */
+    /** Capability and nonce check shared by every mutating action. */
     private function guard(string $action): void
     {
         if (!current_user_can(self::CAPABILITY)) {

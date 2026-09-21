@@ -9,19 +9,13 @@ if (!defined('ABSPATH')) {
 }
 
 /**
- * Converts one raw Jotform question into one normalized field.
+ * Converts one raw Jotform question into one normalized field. The only place
+ * that knows `control_*` types, pipe-delimited options and sub-field names.
  *
- * This is the only place in the plugin that knows about `control_*` types,
- * pipe-delimited options and Jotform sub-field vocabulary. Everything above it
- * works against the Normalized Schema.
- *
- * Sources for the Jotform specifics used here:
- *  - GET /form/{formID}/questions  — https://www.jotform.com/apidocs-v1/
- *  - per-type property reference   — https://api.jotform.com/docs/properties/
+ * Reference: https://www.jotform.com/apidocs-v1/ and https://api.jotform.com/docs/properties/
  */
 final class FieldNormalizer
 {
-    // Normalized types. Deliberately frontend-agnostic.
     public const TYPE_TEXT        = 'text';
     public const TYPE_TEXTAREA    = 'textarea';
     public const TYPE_EMAIL       = 'email';
@@ -35,8 +29,6 @@ final class FieldNormalizer
     public const TYPE_UNSUPPORTED = 'unsupported';
 
     /**
-     * Jotform control types we can normalize, mapped to our own type.
-     *
      * @var array<string, string>
      */
     private const TYPE_MAP = [
@@ -53,8 +45,7 @@ final class FieldNormalizer
     ];
 
     /**
-     * Layout and system elements: they carry no answer, so they are not fields
-     * at all. They are skipped rather than reported as unsupported.
+     * Layout and system elements; skipped, not reported as unsupported.
      *
      * @var array<int, string>
      */
@@ -71,10 +62,7 @@ final class FieldNormalizer
     ];
 
     /**
-     * Full Name children. `first` and `last` always exist; the rest are opt-in
-     * per the `prefix` / `middle` / `suffix` properties.
-     *
-     * Child key => Jotform property that enables it (null = always present).
+     * Full Name children: child key => Jotform property that enables it (null = always present).
      *
      * @var array<string, string|null>
      */
@@ -87,12 +75,7 @@ final class FieldNormalizer
     ];
 
     /**
-     * Address children. The `subfields` property lists the enabled sub-inputs
-     * with its own short tokens; the answer/prefill vocabulary uses the longer
-     * names. Both come from Jotform — the answer names are the ones that end up
-     * in submission payloads, so they are the semantic child keys.
-     *
-     * subfields token => semantic child key.
+     * Address children: `subfields` token => answer key (the semantic child key).
      *
      * @var array<string, string>
      */
@@ -106,7 +89,7 @@ final class FieldNormalizer
     ];
 
     /**
-     * Fallback when `subfields` is absent: Jotform's default address layout.
+     * Jotform's default address layout, used when `subfields` is absent.
      *
      * @var array<int, string>
      */
@@ -114,15 +97,12 @@ final class FieldNormalizer
 
     /**
      * Address sub-inputs that stay optional even when the field is required.
-     * Jotform does not enforce the second street line.
      *
      * @var array<int, string>
      */
     private const ADDRESS_OPTIONAL = ['addr_line2'];
 
     /**
-     * Normalizes a single question.
-     *
      * @param array<string, mixed> $question Raw question as returned by the API.
      *
      * @return array<string, mixed>|null Null for layout/system elements.
@@ -186,8 +166,6 @@ final class FieldNormalizer
                 break;
 
             case self::TYPE_PHONE:
-                // Documented as a single input; country code and input mask are
-                // presentation details kept for later validation/mapping.
                 $field['meta']['country_code'] = $this->isYes($question['countryCode'] ?? null);
                 $field['meta']['input_mask']   = isset($question['inputMaskValue'])
                     && $this->isEnabled($question['inputMask'] ?? null)
@@ -209,8 +187,6 @@ final class FieldNormalizer
     }
 
     /**
-     * Jotform reports `required` as the string "Yes"/"No".
-     *
      * @param array<string, mixed> $question
      */
     private function isRequired(array $question): bool
@@ -239,10 +215,7 @@ final class FieldNormalizer
     }
 
     /**
-     * Options arrive as a single pipe-delimited string.
-     *
-     * The raw value is what a submission must send back, so it is preserved
-     * verbatim; the label is only for rendering.
+     * Options arrive as one pipe-delimited string; values are kept verbatim.
      *
      * @param array<string, mixed> $question
      *
@@ -348,7 +321,6 @@ final class FieldNormalizer
         return [
             'key'      => SemanticKey::child($parentKey, $child),
             'child'    => $child,
-            // The Jotform answer key, kept for submission mapping in stage 4.
             'jotform'  => $child,
             'label'    => $sublabels[$child] ?? '',
             'required' => $required,

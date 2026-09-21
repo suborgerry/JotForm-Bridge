@@ -8,12 +8,7 @@ if (!defined('ABSPATH')) {
     exit;
 }
 
-/**
- * The result of comparing one template against one Normalized Schema.
- *
- * It carries both the verdict and the per-field detail the diagnostics table
- * renders, so the admin screen never has to re-derive anything.
- */
+/** The result of comparing one template against one Normalized Schema: verdict and per-field rows. */
 final class CompatibilityReport
 {
     public const STATUS_COMPATIBLE = 'compatible';
@@ -142,7 +137,7 @@ final class CompatibilityReport
     }
 
     /**
-     * Short, human readable summary lines for the admin notices.
+     * Summary lines for the admin notices.
      *
      * @return array<int, string>
      */
@@ -159,9 +154,6 @@ final class CompatibilityReport
         return $messages;
     }
 
-    /**
-     * Human readable label for one row outcome.
-     */
     public static function label(string $status): string
     {
         $labels = [

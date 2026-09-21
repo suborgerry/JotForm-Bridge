@@ -1,32 +1,20 @@
 /**
  * Jotform Bridge frontend.
  *
- * Vanilla JavaScript, no dependencies, no build step. It progressively enhances
- * any form marked with `data-jotform-bridge`: it serializes the semantic fields
- * declared through `data-jotform-field`, posts them as JSON to the plugin REST
- * endpoint and reports the server's answer back into the markup.
+ * Vanilla JavaScript, no build step. Enhances any `form[data-jotform-bridge]`:
+ * serializes `data-jotform-field` elements, posts them as JSON to the REST
+ * endpoint and writes the answer back into the markup. Anti-spam values
+ * (`data-jotform-spam`, elapsed time, proof of work) travel in a separate
+ * `spam` container.
  *
- * Beside the semantic fields it carries a second, separate channel: any element
- * marked with `data-jotform-spam` is collected into `spam`, together with how
- * long the visitor has had the form open and a small proof of work. None of it
- * passes through the field validator. That is what an anti-abuse provider — a honeypot,
- * a challenge token — travels in, because a value that is not part of the
- * Jotform form must not be sent as if it were.
- *
- * The theme stays in charge of the UX. This script imposes no popup and no
- * animation; it only toggles state attributes and dispatches events the theme
- * can listen to:
+ * No popup, no animation. State is exposed through attributes and events:
  *
  *   jotformbridge:before-submit  { integration, fields }
  *   jotformbridge:success        { integration, fields, message, redirect }
  *   jotformbridge:error          { integration, message, errors, status }
  *
- * The one thing it does impose is the redirect the integration is configured
- * with — and only that one: the URL comes from the server's answer, is never
- * read from the markup, and calling preventDefault() on the success event
- * cancels it so the theme can build its own flow.
- *
- * The form never knows the Jotform form ID, the question IDs or the API key.
+ * The configured redirect comes from the server response only and is
+ * cancelled by preventDefault() on the success event.
  */
 (function () {
     'use strict';
@@ -38,52 +26,19 @@
     var ERROR_CONTAINER = '[data-jotform-errors]';
     var BUSY_ATTRIBUTE = 'data-jotform-busy';
 
-    /**
-     * Property the first-interaction timestamp is parked on.
-     *
-     * A property rather than an attribute: it must not be serialized into the
-     * markup, cached with the page, or visible to anything reading the DOM as
-     * text.
-     */
+    // Form properties (not attributes): first-interaction timestamp, computed
+    // proof of work and its in-progress flag.
     var STARTED_AT = '__jotformBridgeStartedAt';
-
-    /** Where a computed proof of work is parked, and its in-progress flag. */
     var SOLUTION = '__jotformBridgeSolution';
     var SOLVING = '__jotformBridgeSolving';
 
-    /**
-     * Leading zero bits a proof of work must have, when PHP has not said.
-     *
-     * Sixteen is about 65,000 hashes on average: a fraction of a second on a
-     * phone, and a wall for anything trying to send thousands of submissions.
-     *
-     * The server decides what it accepts, and it says so per integration in
-     * SETTINGS.powBits — the same filtered number the guard checks against.
-     * This constant is only what to use when that is missing, which is the
-     * default the guard falls back to as well.
-     */
+    /** Proof-of-work difficulty when SETTINGS.powBits has no entry for the slug. */
     var POW_BITS = 16;
 
-    /**
-     * How long a computed solution stays usable here, in seconds.
-     *
-     * This is the second number in this file that has a counterpart in PHP,
-     * and the relationship is required rather than tidy: it has to stay
-     * comfortably under ProofOfWork::WINDOW, which is what the guard will
-     * still accept. Reuse a solution the server has aged out and the
-     * submission is refused with no way for the visitor to tell why — the
-     * form simply stops working after a few minutes on the page.
-     *
-     * The margin is wide (240 against 600) because the two clocks are not the
-     * same clock, and because the solve that follows a stale one takes time of
-     * its own on a slow device. Unlike the difficulty, this is not sent from
-     * PHP: the window has no filter, so there is one value on each side and
-     * nothing that can move them apart at runtime. If WINDOW ever becomes
-     * filterable, this has to travel the same way powBits does.
-     */
+    /** Seconds a computed solution stays reusable; must stay under ProofOfWork::WINDOW. */
     var POW_STALE = 240;
 
-    /** Hashes per slice, so a slow device never freezes while solving. */
+    /** Hashes per timer slice, so solving never freezes the page. */
     var POW_BATCH = 4096;
 
     var SHA256_K = [
@@ -97,13 +52,7 @@
         0x748f82ee, 0x78a5636f, 0x84c87814, 0x8cc70208, 0x90befffa, 0xa4506ceb, 0xbef9a3f7, 0xc67178f2
     ];
 
-    /**
-     * SHA-256 of a byte array.
-     *
-     * Written out rather than taken from crypto.subtle, which is asynchronous:
-     * one promise per hash would cost more than the hash does, and the whole
-     * point here is to run tens of thousands of them.
-     */
+    /** Synchronous SHA-256 of a byte array. */
     function sha256(bytes) {
         var h = [0x6a09e667, 0xbb67ae85, 0x3c6ef372, 0xa54ff53a, 0x510e527f, 0x9b05688c, 0x1f83d9ab, 0x5be0cd19];
         var length = bytes.length;
@@ -166,9 +115,7 @@
         return out;
     }
 
-    /**
-     * UTF-8 bytes of a string. The server hashes the same bytes.
-     */
+    /** UTF-8 bytes of a string. */
     function utf8(value) {
         var out = [];
 
@@ -207,14 +154,7 @@
         return rest === 0 || (hash[whole] >> (8 - rest)) === 0;
     }
 
-    /**
-     * What this integration's proof of work has to cost.
-     *
-     * PHP evaluates jotform_bridge_pow_bits per slug and hands the answers over
-     * in SETTINGS.powBits, so the two sides cannot disagree. A slug missing
-     * from the map is a form whose page did not localize — the default is what
-     * the guard uses too, so a submission still stands a chance.
-     */
+    /** Proof-of-work difficulty for one integration, as localized by PHP. */
     function powBitsFor(integration) {
         var map = SETTINGS.powBits || {};
         var bits = map[integration];
@@ -223,13 +163,8 @@
     }
 
     /**
-     * Finds a number that makes sha256("slug|timestamp|nonce") start with
-     * the number of zero bits the server asks this integration for.
-     *
-     * Sliced across timers rather than run in one go: the work is short, but on
-     * a slow phone a single loop would still be a visible freeze, and freezing
-     * the page of somebody filling in a contact form is not an acceptable way
-     * to make life harder for a bot.
+     * Finds a nonce making sha256("slug|timestamp|nonce") start with the
+     * required zero bits. Sliced across timers to keep the page responsive.
      */
     function solve(integration, done) {
         var timestamp = Math.floor(Date.now() / 1000);
@@ -254,14 +189,7 @@
         slice();
     }
 
-    /**
-     * Hands over a fresh proof of work, computing one if there is not one ready.
-     *
-     * A solution is normally waiting by the time anyone presses submit, because
-     * solving starts the moment the form is first touched. The submit path only
-     * has to wait when a form was filled in very quickly, or so slowly that the
-     * one computed at the start has aged out.
-     */
+    /** Hands over a fresh proof of work, computing one if none is ready. */
     function withSolution(form, integration, done) {
         var ready = form[SOLUTION];
         var now = Math.floor(Date.now() / 1000);
@@ -278,9 +206,7 @@
         });
     }
 
-    /**
-     * Starts solving in the background, once per form.
-     */
+    /** Starts solving in the background, once per form. */
     function prepareSolution(form) {
         var integration = form.getAttribute('data-jotform-integration') || '';
 
@@ -296,21 +222,7 @@
         });
     }
 
-    /**
-     * One of the sentences PHP handed over, never one written here.
-     *
-     * An English string in this file is a string no `.po` can reach, and the
-     * one that used to sit at the end of this function was the worst place for
-     * it: the only way to reach a fallback is for the localized object to be
-     * missing, so the single case where it showed was the single case where it
-     * was guaranteed to be untranslated.
-     *
-     * There is nothing to fall back to instead, and that is the honest answer.
-     * A settings object this script cannot find means wp_localize_script did
-     * not run, which also means no endpoint — the form is not going to send
-     * whatever this returns. Both callers already treat an empty message as
-     * nothing to show and nothing to move focus to.
-     */
+    /** A localized message from PHP; empty when none was localized. */
     function message(key) {
         var messages = SETTINGS.messages || {};
 
@@ -328,11 +240,8 @@
     }
 
     /**
-     * Collects the semantic values of one form.
-     *
-     * Only elements carrying data-jotform-field take part, so ordinary theme
-     * inputs (honeypots, layout helpers) are ignored. Multi-value fields keep
-     * their array shape; everything else is a single string.
+     * Collects the semantic values of one form. Multi-value fields are arrays,
+     * everything else a string.
      */
     function serialize(form) {
         var fields = {};
@@ -362,9 +271,7 @@
             }
 
             if (type === 'checkbox') {
-                // A group of checkboxes shares one semantic path and produces a
-                // list; a lone checkbox is a list of zero or one value too, so
-                // the server always sees the same shape.
+                // Checkboxes always produce a list, even a lone one.
                 if (!Array.isArray(fields[path])) {
                     fields[path] = [];
                 }
@@ -483,19 +390,9 @@
     }
 
     /**
-     * Collects the anti-abuse values of one form.
-     *
-     * These are deliberately kept out of `fields`: the server validates every
-     * semantic path against the Jotform schema and rejects the ones it does not
-     * know, so a honeypot or a challenge token sent as a field would fail every
-     * submission. They travel in their own container instead, which only the
-     * spam extension point ever reads.
-     *
-     * A checkbox contributes whether it is checked, a control contributes its
-     * value, and an element that is not a control at all contributes the value
-     * of the control inside it. That last case is what a challenge widget needs:
-     * it writes its token into an input it creates itself, so the attribute has
-     * to go on the container it is told to fill.
+     * Collects the anti-spam values of one form into their own container.
+     * A non-control element contributes the value of the input inside it
+     * (challenge widgets write their token into an input they create).
      */
     function collectSpam(form) {
         var spam = {};
@@ -537,20 +434,7 @@
         return spam;
     }
 
-    /**
-     * How long the visitor has had this form open, counted from the moment they
-     * first touched it.
-     *
-     * Measured on the client on purpose. Stamping a server-side timestamp into
-     * the markup would be defeated by full-page caching — every visitor would
-     * receive the same, already-old stamp — and issuing one per page view would
-     * mean an extra request before the form is even used. A client-side number
-     * can be forged, but forging it takes a script that runs the page, and a
-     * script that runs the page is not what this check is aimed at.
-     *
-     * Null when the form was never touched, which the server reads as "not
-     * measured" rather than as "instant".
-     */
+    /** Seconds since the form was first touched; null when it never was. */
     function elapsedSeconds(form) {
         var startedAt = form[STARTED_AT];
 
@@ -561,12 +445,7 @@
         return Math.max(0, Math.round((Date.now() - startedAt) / 1000));
     }
 
-    /**
-     * Marks the moment a form is first interacted with.
-     *
-     * Delegated like the submit handler, so forms added to the page later are
-     * covered too, and only the first interaction counts.
-     */
+    /** Records the first interaction with a form and starts the proof of work. */
     function noteInteraction(event) {
         var target = event.target;
 
@@ -578,20 +457,11 @@
 
         if (form && !form[STARTED_AT]) {
             form[STARTED_AT] = Date.now();
-
-            // The visitor has started filling the form in, so there is time to
-            // do the work before they finish. Done here, it costs them nothing.
             prepareSolution(form);
         }
     }
 
-    /**
-     * Escapes one attribute value for use inside a querySelector.
-     *
-     * Error keys come back from the server, which echoes the identifiers the
-     * form sent. A quote or a backslash in one of them would otherwise make the
-     * selector invalid and throw instead of showing the message.
-     */
+    /** Escapes an attribute value for use inside a querySelector. */
     function quote(value) {
         return String(value).replace(/(["\\])/g, '\\$1');
     }
@@ -617,10 +487,7 @@
         }
     }
 
-    /**
-     * Writes the server errors into the markup the template provides: a
-     * per-field slot when there is one, the shared container otherwise.
-     */
+    /** Writes server errors into per-field slots, or the shared container. */
     function showErrors(form, text, errors) {
         var unplaced = [];
 
@@ -632,10 +499,7 @@
             var selector = quote(path);
             var slot = form.querySelector('[data-jotform-field-error="' + selector + '"]');
 
-            // Every input, not the first: a radio or checkbox group shares one
-            // semantic path across all of its inputs, and marking only the one
-            // that happens to come first leaves the rest of the group looking
-            // valid to a screen reader.
+            // Every input of the path: a choice group shares one path.
             var inputs = form.querySelectorAll('[data-jotform-field="' + selector + '"]');
 
             for (var k = 0; k < inputs.length; k++) {
@@ -661,19 +525,7 @@
         container.textContent = unplaced.length ? unplaced.join(' ') : text;
     }
 
-    /**
-     * Sends the visitor to the thing that went wrong.
-     *
-     * The live region announces the message, but announcing is not the same as
-     * arriving: without this the keyboard focus stays on the submit button, and
-     * finding which of twelve fields was rejected means tabbing back through all
-     * of them. On a long form a sighted visitor may not even see the message,
-     * because it is above the fold.
-     *
-     * The first invalid control in document order, not the first key in the
-     * response — the server answers with a map, and a map has no order worth
-     * relying on.
-     */
+    /** Focuses the first invalid control in document order, else the error container. */
     function focusFirstError(form) {
         var target = form.querySelector('[aria-invalid="true"]');
 
@@ -684,8 +536,6 @@
                 return;
             }
 
-            // Containers are not focusable by default, and making one reachable
-            // by tab would put an empty stop in the middle of every form.
             if (!container.hasAttribute('tabindex')) {
                 container.setAttribute('tabindex', '-1');
             }
@@ -696,10 +546,7 @@
         focusQuietly(target);
     }
 
-    /**
-     * Moves focus and brings the element into view, without letting an old
-     * browser throw its way out of the submit handler.
-     */
+    /** Moves focus and scrolls into view; a failure is ignored. */
     function focusQuietly(element) {
         try {
             element.focus();
@@ -708,18 +555,11 @@
                 element.scrollIntoView({ block: 'center', behavior: 'smooth' });
             }
         } catch (error) {
-            // Focusing is a courtesy, never a requirement.
+            // Focusing is optional.
         }
     }
 
-    /**
-     * Puts the visitor next to the confirmation once a form is accepted.
-     *
-     * Only when the page is not about to be replaced: moving focus and then
-     * navigating away is noise. The polite live region already announces the
-     * message; this is about where the visitor ends up afterwards, which would
-     * otherwise be the submit button of a form that just emptied itself.
-     */
+    /** Focuses the success message after an accepted submission. */
     function focusSuccess(form) {
         var container = form.querySelector('[data-jotform-success]');
 
@@ -747,19 +587,8 @@
     }
 
     /**
-     * Marks the form as sending, and its submit buttons as unavailable.
-     *
-     * `aria-disabled` rather than the `disabled` property, which would look
-     * like the obvious choice: a disabled control cannot hold focus, so the
-     * browser moves focus to the document body the instant the visitor presses
-     * Submit. A keyboard user loses their place for as long as the request
-     * runs, and a screen reader is left on nothing. The repeated submit this
-     * exists to stop is already refused in `handle()`, which returns as soon as
-     * it sees the busy attribute, so the property was never what was doing the
-     * work.
-     *
-     * A theme styles the state through `form[data-jotform-busy]` — the same
-     * attribute it has always had — or through `[aria-disabled="true"]`.
+     * Toggles the busy state: `aria-busy` on the form, `aria-disabled` on the
+     * submit buttons (not `disabled`, which would drop keyboard focus).
      */
     function setBusy(form, busy) {
         var buttons = submitButtons(form);
@@ -781,13 +610,7 @@
         }
     }
 
-    /**
-     * Reads the redirect instruction out of a success body.
-     *
-     * The server only ever sends a same-origin URL it resolved itself, but the
-     * check is repeated here so that nothing but a same-origin navigation can
-     * come out of this script, whatever answered the request.
-     */
+    /** Reads the redirect out of a success body; same-origin URLs only. */
     function redirectFrom(body) {
         var redirect = body && body.redirect;
 
@@ -810,10 +633,7 @@
         };
     }
 
-    /**
-     * Leaves for the target, keeping the form disabled until the page changes so
-     * a second submit is impossible during the delay.
-     */
+    /** Navigates to the redirect target after its delay. */
     function go(redirect) {
         if (redirect.delay > 0) {
             window.setTimeout(function () {
@@ -832,7 +652,6 @@
         try {
             event = new CustomEvent(name, { bubbles: true, cancelable: true, detail: detail });
         } catch (error) {
-            // Older browsers without the CustomEvent constructor.
             event = document.createEvent('CustomEvent');
             event.initCustomEvent(name, true, true, detail);
         }
@@ -866,9 +685,6 @@
         clearErrors(form);
         showSuccess(form, '');
 
-        // Without fetch there is no way to send this form, and letting the
-        // browser submit it natively would post an empty body to the REST
-        // endpoint and replace the page with a JSON error. Say so instead.
         if (typeof window.fetch !== 'function') {
             showErrors(form, message('unsupported'), {});
             focusFirstError(form);
@@ -882,8 +698,6 @@
 
         setBusy(form, true);
 
-        // The proof of work is normally already done; when it is not, the form
-        // stays busy for the fraction of a second it takes.
         withSolution(form, integration, function (solution) {
             spam.pow = solution;
 
@@ -916,10 +730,7 @@
 
                     showSuccess(form, body.message || '');
 
-                    // The event goes out before anything is cleared, and carries
-                    // what was sent. A theme wiring up analytics needs the
-                    // values, and until now they were gone by the time it could
-                    // ask — out of the event, and out of the DOM.
+                    // Dispatched before the form is cleared, so handlers can read the values.
                     var proceed = dispatch(form, 'jotformbridge:success', {
                         integration: integration,
                         fields: fields,
@@ -927,16 +738,13 @@
                         redirect: redirect
                     });
 
-                    // Only now: the form is emptied, the clock restarts and the
-                    // spent proof of work is dropped, all in one place.
                     form.reset();
                     applyConditions(form);
                     form[STARTED_AT] = 0;
                     form[SOLUTION] = null;
 
                     if (redirect && proceed) {
-                        // The form stays busy until the page is replaced, so the
-                        // visitor cannot submit again while the delay runs.
+                        // Stays busy until the page is replaced.
                         go(redirect);
 
                         return;
@@ -953,9 +761,7 @@
 
                 showErrors(form, text, errors);
 
-                // After the event, and only if the theme did not take over: a
-                // theme that scrolls somewhere of its own, or opens a wizard
-                // step, must not have to fight us for the focus.
+                // Focus moves only if the theme did not cancel the event.
                 if (dispatch(form, 'jotformbridge:error', {
                     integration: integration,
                     message: text,
@@ -1000,10 +806,9 @@
         }).observe(document.documentElement, { childList: true, subtree: true });
     }
 
-    // One delegated listener, so forms added to the page later work too.
+    // Delegated, so forms added later are covered too.
     document.addEventListener('submit', handle, false);
 
-    // Anything that counts as the visitor starting to fill the form in.
     document.addEventListener('focusin', noteInteraction, true);
     document.addEventListener('keydown', noteInteraction, true);
     document.addEventListener('pointerdown', noteInteraction, true);

@@ -9,38 +9,21 @@ if (!defined('ABSPATH')) {
 }
 
 /**
- * One local form endpoint: the entity theme code addresses by slug.
- *
- * It owns the binding between a Jotform form and a template, so no public code
- * ever needs the Jotform form ID. Several integrations may point at the same
- * Jotform form — that is a requirement, not an accident.
+ * One local form endpoint, addressed by slug. Owns the binding between a
+ * Jotform form and a template; several integrations may share one form.
  */
 final class Integration
 {
     public const MODE_CUSTOM = 'custom';
     public const MODE_AUTO   = 'auto';
 
-    /**
-     * The mode an integration has when nothing has chosen one.
-     *
-     * Auto, because it is the mode that can render on its own: a new
-     * integration set to `custom` needs a template file that does not exist
-     * yet, so the first thing the editor would say about it is that it is
-     * broken. Rendering from the synced schema needs nothing further, and
-     * moving to a template afterwards is one select away — the starter
-     * template on the same screen is generated from that same schema.
-     */
+    /** Auto: the mode that renders without a template file. */
     public const MODE_DEFAULT = self::MODE_AUTO;
 
     public const SUCCESS_MESSAGE  = 'message';
     public const SUCCESS_REDIRECT = 'redirect';
 
-    /**
-     * Longest redirect delay that can be configured, in seconds.
-     *
-     * The delay exists so the success message can be read, not so a form can
-     * hold the visitor hostage: the form stays disabled for the whole delay.
-     */
+    /** Longest configurable redirect delay, in seconds. */
     public const MAX_REDIRECT_DELAY = 60;
 
     private string $slug;
@@ -67,10 +50,6 @@ final class Integration
     private array $conditions;
 
     /**
-     * The redirect arguments are last and optional on purpose: an integration
-     * stored before they existed is a complete integration, and reading one back
-     * must not need them.
-     *
      * @param array<int, array<string, string>> $conditions
      */
     public function __construct(
@@ -99,9 +78,6 @@ final class Integration
         $this->redirectDelay  = self::clampDelay($redirectDelay);
     }
 
-    /**
-     * The number of seconds actually storable, whatever was asked for.
-     */
     public static function clampDelay(int $seconds): int
     {
         return min(self::MAX_REDIRECT_DELAY, max(0, $seconds));
@@ -113,8 +89,6 @@ final class Integration
     public static function modes(): array
     {
         return [
-            // The default first: the order of a select reads as a
-            // recommendation, whatever the `selected` attribute says.
             self::MODE_AUTO   => __('Auto (rendered from the schema)', 'jotform-bridge'),
             self::MODE_CUSTOM => __('Custom template', 'jotform-bridge'),
         ];
@@ -142,10 +116,8 @@ final class Integration
     }
 
     /**
-     * Sanitizes a raw admin input slice into an integration.
-     *
-     * Validation of what the values mean together (unique slug, known template)
-     * is the repository's job; this only guarantees the types and character set.
+     * Sanitizes a raw admin input slice into an integration; cross-field
+     * validation is the repository's job.
      *
      * @param array<string, mixed> $input Unslashed request slice.
      */
@@ -181,10 +153,7 @@ final class Integration
     }
 
     /**
-     * Reads one value out of a raw request slice, ignoring arrays and objects.
-     *
-     * A forged `jotform_integration[slug][]=x` must not turn into the literal
-     * string "Array"; it is simply not a value this form can carry.
+     * One scalar value out of a raw request slice; arrays are ignored.
      *
      * @param array<string, mixed> $input
      */
@@ -208,8 +177,6 @@ final class Integration
             self::scalar($data, 'template'),
             isset($data['created_at']) && is_scalar($data['created_at']) ? (int) $data['created_at'] : 0,
             isset($data['updated_at']) && is_scalar($data['updated_at']) ? (int) $data['updated_at'] : 0,
-            // Absent keys are the defaults: an integration stored by an earlier
-            // version stays valid and never needs a migration.
             self::scalar($data, 'success_action'),
             (int) self::scalar($data, 'redirect_page_id'),
             (int) self::scalar($data, 'redirect_delay'),
@@ -288,10 +255,7 @@ final class Integration
         return self::successActions()[$this->successAction] ?? $this->successAction;
     }
 
-    /**
-     * Whether the *configuration* asks for a redirect. Whether one can actually
-     * be served is a question about the target page, answered by RedirectTarget.
-     */
+    /** Whether the configuration asks for a redirect; RedirectTarget decides if one can be served. */
     public function redirectsOnSuccess(): bool
     {
         return $this->successAction === self::SUCCESS_REDIRECT;

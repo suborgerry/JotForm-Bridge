@@ -11,13 +11,8 @@ if (!defined('ABSPATH')) {
 }
 
 /**
- * Renders a registered theme template.
- *
- * The class takes a template slug, never a path: the only way to a file is
- * TemplateRegistry, which only contains files TemplateScanner found inside a
- * trusted directory. There is therefore no code path — from a request, an admin
- * field or a filter argument — that can make this class include an arbitrary
- * file.
+ * Renders a registered theme template by slug; the file always comes from
+ * TemplateRegistry, never from a path.
  */
 final class CustomTemplateRenderer
 {
@@ -48,8 +43,7 @@ final class CustomTemplateRenderer
         try {
             self::includeTemplate($file, $context);
         } catch (\Throwable $error) {
-            // Discard whatever the template managed to print: half-rendered
-            // markup is worse than none. The caller decides what to show.
+            // Discard the partial output.
             while (ob_get_level() > $level) {
                 ob_end_clean();
             }
@@ -61,10 +55,7 @@ final class CustomTemplateRenderer
     }
 
     /**
-     * Includes the file in an isolated scope.
-     *
-     * Static so the template cannot reach `$this` and, through it, the plugin
-     * services. It only sees the context variables.
+     * Includes the file in an isolated scope; static, so the template cannot reach `$this`.
      *
      * @param array<string, mixed> $jotform_bridge_context
      */

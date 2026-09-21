@@ -8,12 +8,7 @@ if (!defined('ABSPATH')) {
     exit;
 }
 
-/**
- * Minimal PSR-4 autoloader.
- *
- * The release package must work right after unzipping into wp-content/plugins,
- * so the plugin ships its own autoloader instead of requiring `composer install`.
- */
+/** Minimal PSR-4 autoloader, so the release needs no `composer install`. */
 final class Autoloader
 {
     /**

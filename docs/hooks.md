@@ -31,22 +31,15 @@ accepting that the API key will be sent there.
 | --- | --- | --- |
 | `$hosts` | `array<int, string>` | Allowed hosts. |
 
-Fires in `jotform-bridge/src/Settings/Settings.php:390`.
+Fires in `jotform-bridge/src/Settings/Settings.php:319`.
 
 ## `jotform_bridge_auto_field_html`
 
 Filters the markup of one automatically rendered field.
 
-The intended use is adding a wrapper or a description without
-taking over the whole form. The returned string is printed as is,
-which makes this the one place where the plugin hands the output
-over to somebody else's code.
-
-`$html` is finished, escaped markup. `$field` is not: it is the
-normalized schema entry, and its `label` and `options[*].label`
-are text as Jotform reports it, which may legitimately contain a
-quote or an angle bracket. Anything taken out of `$field` and put
-into markup has to be escaped by the callback:
+The returned string is printed as is. `$html` is escaped markup;
+`$field` is the raw normalized entry, so anything taken from it
+has to be escaped by the callback:
 
     add_filter(
         'jotform_bridge_auto_field_html',
@@ -58,20 +51,13 @@ into markup has to be escaped by the callback:
         2
     );
 
-The values in `$field` are deliberately left raw, because every
-other consumer escapes them at the moment it prints them — see
-`Templates\TemplateScaffold::text()`, which does the same job for
-the generated starter template. Escaping them here instead would
-mean the same array key held escaped text in one context and raw
-text in every other.
-
 | Parameter | Type | Description |
 | --- | --- | --- |
 | `$html` | `string` | Escaped field markup. |
 | `$field` | `array<string, mixed>` | Normalized field; its text is raw. |
 | `$integration` | `string` | Integration slug. |
 
-Fires in `jotform-bridge/src/Rendering/AutoRenderer.php:154`.
+Fires in `jotform-bridge/src/Rendering/AutoRenderer.php:119`.
 
 ## `jotform_bridge_daily_ceiling`
 
@@ -83,7 +69,7 @@ Filters the daily ceiling the quota guard trips at.
 | `$median` | `int` | Median of the last seven days. |
 | `$state` | `array<string, mixed>` | Raw guard state. |
 
-Fires in `jotform-bridge/src/Submission/QuotaGuard.php:263`.
+Fires in `jotform-bridge/src/Submission/QuotaGuard.php:170`.
 
 ## `jotform_bridge_duplicate_window`
 
@@ -95,7 +81,7 @@ accepted. Return 0 to turn the guard off.
 | --- | --- | --- |
 | `$seconds` | `int` | Duplicate window. |
 
-Fires in `jotform-bridge/src/Submission/SubmissionPipeline.php:380`.
+Fires in `jotform-bridge/src/Submission/SubmissionPipeline.php:317`.
 
 ## `jotform_bridge_global_rate_limits`
 
@@ -109,7 +95,7 @@ Set either value to 0 to disable that window.
 | --- | --- | --- |
 | `$limits` | `array{per_minute:int, per_hour:int}` | Current limits. |
 
-Fires in `jotform-bridge/src/Submission/RateLimiter.php:182`.
+Fires in `jotform-bridge/src/Submission/RateLimiter.php:125`.
 
 ## `jotform_bridge_minimum_time`
 
@@ -122,7 +108,7 @@ Return 0 to disable the check.
 | `$seconds` | `int` | Minimum seconds. |
 | `$slug` | `string` | Integration slug. |
 
-Fires in `jotform-bridge/src/Submission/Guards/MinimumTime.php:116`.
+Fires in `jotform-bridge/src/Submission/Guards/MinimumTime.php:83`.
 
 ## `jotform_bridge_normalized_schema`
 
@@ -133,38 +119,34 @@ Filters the normalized schema before it is stored.
 | `$schema` | `FormSchema` | The normalized schema. |
 | `$formId` | `string` | Jotform form ID. |
 
-Fires in `jotform-bridge/src/Forms/SchemaRepository.php:152`.
+Fires in `jotform-bridge/src/Forms/SchemaRepository.php:121`.
 
 ## `jotform_bridge_pow_bits`
 
-Filters how much work a submission must cost.
+Filters how much work a submission must cost. Every extra bit
 
-Every extra bit doubles it. The browser is told the result through
-`jotformBridgeSettings.powBits`, so a filter here changes both sides
-and needs nothing done to the script.
+doubles it; the browser receives the result through
+`jotformBridgeSettings.powBits`.
 
 | Parameter | Type | Description |
 | --- | --- | --- |
 | `$bits` | `int` | Leading zero bits required. |
 | `$slug` | `string` | Integration slug. |
 
-Fires in `jotform-bridge/src/Submission/Guards/ProofOfWork.php:173`.
+Fires in `jotform-bridge/src/Submission/Guards/ProofOfWork.php:112`.
 
 ## `jotform_bridge_pow_required`
 
 Filters whether a submission without a proof of work is refused.
 
-Turning this off removes the only barrier in front of a bot that
-posts straight to the endpoint without running any of the page's
-JavaScript. The one good reason to do it is a site still serving a
-cached copy of an older version of the plugin's script.
+Useful only while a cached older version of the script is still served.
 
 | Parameter | Type | Description |
 | --- | --- | --- |
 | `$required` | `bool` | Whether the proof is mandatory. |
 | `$slug` | `string` | Integration slug. |
 
-Fires in `jotform-bridge/src/Submission/Guards/ProofOfWork.php:189`.
+Fires in `jotform-bridge/src/Submission/Guards/ProofOfWork.php:124`.
 
 ## `jotform_bridge_rate_limits`
 
@@ -177,7 +159,7 @@ Set either value to 0 to disable that window.
 | `$limits` | `array{per_minute:int, per_hour:int}` | Current limits. |
 | `$slug` | `string` | Integration slug. |
 
-Fires in `jotform-bridge/src/Submission/RateLimiter.php:203`.
+Fires in `jotform-bridge/src/Submission/RateLimiter.php:146`.
 
 ## `jotform_bridge_spam_check`
 
@@ -193,7 +175,7 @@ string to reject with a custom, visitor-facing message.
 | `$values` | `array<string, string\|array<int, string>>` | Sanitized values. |
 | `$context` | `array<string, mixed>` | Request metadata. |
 
-Fires in `jotform-bridge/src/Submission/SpamGuard.php:48`.
+Fires in `jotform-bridge/src/Submission/SpamGuard.php:36`.
 
 ## `jotform_bridge_submission_fields`
 
@@ -204,7 +186,7 @@ Filters the sanitized values just before they are mapped.
 | `$values` | `array<string, string\|array<int, string>>` | Sanitized values. |
 | `$slug` | `string` | Integration slug. |
 
-Fires in `jotform-bridge/src/Submission/SubmissionPipeline.php:209`.
+Fires in `jotform-bridge/src/Submission/SubmissionPipeline.php:163`.
 
 ## `jotform_bridge_template_paths`
 
@@ -217,7 +199,7 @@ realpath() and every discovered file is verified to stay inside them.
 | --- | --- | --- |
 | `$paths` | `array<int, string>` | Absolute directory paths, most specific first. |
 
-Fires in `jotform-bridge/src/Templates/TemplateScanner.php:147`.
+Fires in `jotform-bridge/src/Templates/TemplateScanner.php:125`.
 
 ## `jotform_bridge_turnstile_fail_open`
 
@@ -230,21 +212,20 @@ verified.
 | `$failOpen` | `bool` | Allow the submission through. |
 | `$slug` | `string` | Integration slug. |
 
-Fires in `jotform-bridge/src/Submission/Guards/Turnstile.php:208`.
+Fires in `jotform-bridge/src/Submission/Guards/Turnstile.php:169`.
 
 ## `jotform_bridge_turnstile_required`
 
 Filters whether a submission without a challenge token is refused.
 
-Returning false makes the challenge optional, which is only
-sensible while old markup is still being served from a cache.
+Useful only while old markup is still served from a cache.
 
 | Parameter | Type | Description |
 | --- | --- | --- |
 | `$required` | `bool` | Whether the token is mandatory. |
 | `$slug` | `string` | Integration slug. |
 
-Fires in `jotform-bridge/src/Submission/Guards/Turnstile.php:114`.
+Fires in `jotform-bridge/src/Submission/Guards/Turnstile.php:89`.
 
 # Actions
 
@@ -261,7 +242,7 @@ Fires after a submission was accepted by Jotform.
 | `$values` | `array<string, string\|array<int, string>>` | Sanitized values. |
 | `$submissionId` | `string` | Jotform submission ID. |
 
-Fires in `jotform-bridge/src/Submission/SubmissionPipeline.php:294`.
+Fires in `jotform-bridge/src/Submission/SubmissionPipeline.php:240`.
 
 ## `jotform_bridge_before_submit`
 
@@ -272,5 +253,5 @@ Fires before a validated submission is sent to Jotform.
 | `$slug` | `string` | Integration slug. |
 | `$values` | `array<string, string\|array<int, string>>` | Sanitized values. |
 
-Fires in `jotform-bridge/src/Submission/SubmissionPipeline.php:246`.
+Fires in `jotform-bridge/src/Submission/SubmissionPipeline.php:200`.
 

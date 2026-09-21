@@ -16,38 +16,16 @@ if (!defined('ABSPATH')) {
 }
 
 /**
- * Sends one real submission from the admin screen, on purpose.
- *
- * Everything else in this plugin is verified without touching the account: the
- * schema is a stored fixture, the transport is mocked, the mapping is checked
- * against the documented parameter shape. All of that can be right while the
- * form still does not work — a form ID that points somewhere else, a key
- * without write access, a field Jotform has since made required. The only way
- * to know is to send something and read the answer.
- *
- * So this is deliberately not a dry run. The submission lands in the account,
- * triggers whatever notifications the form has configured, and spends one of
- * the month's allowance. A simulation would prove only what the unit tests
- * already prove.
- *
- * It goes around the anti-abuse layer rather than through the pipeline, because
- * the pipeline would refuse it and be right to: there is no browser here to
- * compute a proof of work, and an administrator pressing a button is not a
- * visitor to be rate limited. What is exercised is the part that can actually
- * be wrong end to end — stored schema, validation, mapping, wire format,
- * credentials, and Jotform's own verdict.
+ * Sends one real submission from the admin screen. Not a dry run: it lands in
+ * the account and spends allowance. Bypasses the anti-abuse layer and
+ * exercises stored schema, validation, mapping, transport and credentials.
  */
 final class TestSubmission
 {
-    /**
-     * Put into every text value, so the submission is recognisable in the
-     * Jotform inbox without having to remember when the button was pressed.
-     */
+    /** Put into every text value, so the submission is recognisable in the inbox. */
     public const MARKER = 'Jotform Bridge test';
 
-    /**
-     * example.com is reserved by RFC 2606 and cannot reach anybody.
-     */
+    /** RFC 2606 reserved domain. */
     public const EMAIL = 'jotform-bridge-test@example.com';
 
     private SchemaRepository $schemas;
@@ -99,9 +77,6 @@ final class TestSubmission
             );
         }
 
-        // Run the real validator over the generated values. If it refuses them,
-        // the fault is here or in the stored schema, and saying so is far more
-        // useful than sending something and blaming Jotform for the answer.
         $result = $this->validator->validate($schema, $values, $integration->conditions());
 
         if (!$result->isValid()) {
@@ -131,14 +106,10 @@ final class TestSubmission
         }
 
         if (!$sent->isSuccess()) {
-            // Handed back untouched. A visitor gets a generic message because
-            // upstream detail is not theirs to see; an administrator pressed
-            // this button precisely to read that detail.
+            // The upstream detail is what the administrator pressed the button to read.
             return $sent;
         }
 
-        // It really did spend one of the month's allowance, so the guard is
-        // told — pretending otherwise would make its arithmetic quietly wrong.
         if ($this->quota !== null) {
             $this->quota->record();
         }
@@ -154,11 +125,8 @@ final class TestSubmission
     }
 
     /**
-     * Plausible values for every field the plugin can fill in.
-     *
-     * Choice fields take an option Jotform itself reported, and numbers respect
-     * the range it declared, so the values are the ones the form asks for
-     * rather than the ones that happen to pass our own validator.
+     * Plausible values for every supported field: a reported option for choices,
+     * a number inside the declared range.
      *
      * @return array<string, string|array<int, string>>
      */
@@ -207,7 +175,6 @@ final class TestSubmission
                 return self::EMAIL;
 
             case FieldNormalizer::TYPE_PHONE:
-                // Reserved for fiction, and long enough for the validator.
                 return '+1 555 0100';
 
             case FieldNormalizer::TYPE_NUMBER:

@@ -1,28 +1,13 @@
 /**
- * Jotform Bridge admin screens.
+ * Jotform Bridge admin screens. Scoped to the plugin's own wrappers.
  *
- * Replaces two inline <style> blocks that used to be printed into the views.
- * Everything here is scoped to one of the plugin's own wrappers — .jfb-settings,
- * .jfb-integrations, .jfb-integration — except where a core table rule has to be
- * outweighed, and even then the plugin's own class carries the specificity.
- *
- * Every colour below is one WordPress core already uses in wp-admin, and was
- * checked against core's own stylesheets rather than picked to look right:
- * #d63638 #b32d2e #fcf0f1 (error), #dba617 #996800 #fcf9e8 (warning), #007017
- * (success), #dcdcde #c3c4c7 #a7aaad #f6f7f7 (borders, disabled, grounds) and
- * #3858e9 (focus). Matching them is not decoration — an admin screen that
- * invents its own red is a screen that reads as a different product, and core
- * exposes none of these to plugins as a variable, so they have to be repeated
- * here to be used at all.
- *
- * The single exception is #8a2424, which is in no core stylesheet: it is a
- * hand-darkened hover for the delete button, because core ships a destructive
- * link style and no destructive button style.
+ * Colours are core's own wp-admin palette: #d63638 #b32d2e #fcf0f1 (error),
+ * #dba617 #996800 #fcf9e8 (warning), #007017 (success), #dcdcde #c3c4c7
+ * #a7aaad #f6f7f7 (borders, disabled, grounds), #3858e9 (focus). #8a2424 is a
+ * hand-darkened delete hover.
  */
 
-/* An integration whose template is gone renders nothing on the front end, so
-   the row carries the core error colours as a tint and an edge marker. The
-   stripes are overridden so the tint survives on every other row. */
+/* Broken integration row: error tint and edge marker, overriding the stripes. */
 .widefat.striped > tbody > tr.jfb-row-broken,
 .widefat > tbody > tr.jfb-row-broken {
     background-color: #fcf0f1;
@@ -33,9 +18,7 @@ tr.jfb-row-broken .jfb-broken-note {
     color: #b32d2e;
 }
 
-/* A field the bridge cannot map is worth finding in a long schema, but it is
-   not an error: the row keeps the core warning tint and a marker on its edge
-   instead of shouting in red. */
+/* Unsupported field row: warning tint and edge marker. */
 .widefat.striped > tbody > tr.jfb-row-unsupported,
 .widefat > tbody > tr.jfb-row-unsupported {
     background-color: #fcf9e8;
@@ -46,8 +29,7 @@ tr.jfb-row-unsupported .jfb-unsupported-note {
     color: #996800;
 }
 
-/* Several integrations can share one template, so the cell is a list that stays
-   readable at any count instead of a run-on line. */
+/* Integrations sharing one template, as a list. */
 .jfb-integrations .jfb-template-usage {
     margin: 0;
 }
@@ -60,13 +42,7 @@ tr.jfb-row-unsupported .jfb-unsupported-note {
     margin-bottom: 0;
 }
 
-/* The shortcode cell still has to read as the identifier it is, so the button
-   keeps the plain <code> look and only gains a pointer and the copied marker.
-   The colour has to be said out loud: .button-link paints its text link-blue,
-   and blue on the translucent grey <code> carries is 4.48:1 — under the 4.5:1
-   AA threshold, by an amount that a different admin colour scheme turns into an
-   obvious failure. Inheriting the cell's own colour is both the accessible
-   answer and the one this button was always meant to look like. */
+/* Shortcode copy button keeps the plain <code> look; inherited colour passes AA. */
 .wp-core-ui .jfb-integrations .jfb-copy-shortcode,
 .wp-core-ui .jfb-integrations .jfb-copy-shortcode:hover,
 .wp-core-ui .jfb-integrations .jfb-copy-shortcode:focus,
@@ -84,9 +60,7 @@ tr.jfb-row-unsupported .jfb-unsupported-note {
     cursor: pointer;
 }
 
-/* Taken out of the flow so that showing it never reflows the row: the marker
-   sits to the right of the shortcode and overlaps the cell padding instead of
-   widening the column. */
+/* Out of the flow, so showing it never reflows the row. */
 .jfb-copy-shortcode .jfb-copied {
     position: absolute;
     top: 0;
@@ -95,12 +69,7 @@ tr.jfb-row-unsupported .jfb-unsupported-note {
     white-space: nowrap;
 }
 
-/* Every copy button hides its confirmation until the copy actually happened.
-   Opacity rather than display, so showing it never reflows the row — which is
-   also why the span carries aria-hidden in the markup: at zero opacity it is
-   still in the accessibility tree, and without that attribute every copy button
-   would be named "… Copied" before anybody pressed it. What a screen reader
-   gets instead is the live region the views render, written to by admin.js. */
+/* "Copied" marker: opacity rather than display, so it never reflows; aria-hidden in the markup. */
 .jfb-copied {
     color: #007017;
     opacity: 0;
@@ -112,13 +81,12 @@ tr.jfb-row-unsupported .jfb-unsupported-note {
     opacity: 1;
 }
 
-/* The scaffold button sits on its own line, so its marker follows the text
-   rather than floating beside it. */
+/* The scaffold button sits on its own line; its marker follows the text. */
 .jfb-copy-scaffold .jfb-copied {
     margin-left: .5em;
 }
 
-/* Actions rows: the primary action and the destructive one. */
+/* Action rows. */
 .jfb-actions {
     margin-bottom: 16px;
 }
@@ -133,7 +101,7 @@ tr.jfb-row-unsupported .jfb-unsupported-note {
     margin-right: 8px;
 }
 
-/* Two forms standing side by side rather than stacking. */
+/* Forms side by side. */
 .jfb-actions .jfb-action-form {
     display: inline-block;
     margin-right: 8px;
@@ -143,8 +111,7 @@ tr.jfb-row-unsupported .jfb-unsupported-note {
     margin-right: 0;
 }
 
-/* WordPress ships no destructive button style, only the red link class, so the
-   delete button borrows the core error colours. */
+/* Core has no destructive button style; borrow the error colours. */
 .jfb-actions .jfb-button-delete {
     border-color: #b32d2e;
     background: #b32d2e;
@@ -158,16 +125,13 @@ tr.jfb-row-unsupported .jfb-unsupported-note {
     color: #fff;
 }
 
-/* A row hidden by the toggle behaviour. `hidden` alone loses to the table
-   display rules core sets on <tr>. */
+/* `hidden` alone loses to core's <tr> display rules. */
 .jfb-settings [hidden],
 .jfb-integration [hidden] {
     display: none !important;
 }
 
-/* Health and target states, previously written as inline style attributes.
-   See the palette note at the top of this file for where the colours come
-   from. */
+/* Health and target states. */
 .jfb-state-error {
     color: #b32d2e;
 }
@@ -176,18 +140,12 @@ tr.jfb-row-unsupported .jfb-unsupported-note {
     color: #996800;
 }
 
-/* Not core's #00a32a, which is 2.93:1 on the admin's grey and 3.35:1 on white:
-   core uses that green for notice borders and icons, never for body text.
-   #007017 is what core itself puts on green text, .copy-to-clipboard-container
-   .success among them — which is to say the copied marker below is not a
-   near-miss of core's success colour but the same one, used for the same job,
-   at 6.3:1. */
+/* Core's green for text (#00a32a is for borders and icons only). */
 .jfb-state-ok {
     color: #007017;
 }
 
-/* The Jotform form ID and its Connect button sit on one line, and the result
-   of the lookup goes underneath both. */
+/* Form ID and Connect button on one line, the result underneath. */
 .jfb-connect {
     display: flex;
     flex-wrap: wrap;
@@ -201,8 +159,7 @@ tr.jfb-row-unsupported .jfb-unsupported-note {
     min-height: 1.5em;
 }
 
-/* Empty until something has been looked up: the element exists from the start
-   so that its aria-live region is registered before it is ever written to. */
+/* Exists empty from the start, so the live region is registered before use. */
 .jfb-connect-status:empty {
     min-height: 0;
 }
@@ -216,28 +173,19 @@ tr.jfb-row-unsupported .jfb-unsupported-note {
     max-width: 40em;
 }
 
-/* Core makes .wp-list-table narrow gracefully and does nothing for .widefat, so
-   a four or five column table of ours was 427 CSS pixels wide in a 320 pixel
-   viewport — and, having no scroll container of its own, it took the whole page
-   sideways with it. A data table is allowed to need horizontal scrolling; the
-   fields and buttons above it are not, and that is what this confines.
-
-   tabindex makes the container reachable by keyboard, which anything that
-   scrolls has to be, and the role and label are what a focus stop needs in
-   order to announce itself as something rather than as nothing. */
+/* Horizontal scroll container for wide tables; focusable via tabindex in the markup. */
 .jfb-table-scroll {
     overflow-x: auto;
     max-width: 100%;
 }
 
-/* Whatever the theme does to a focused container, it must be visible. */
+/* Visible focus on the scroll container. */
 .jfb-table-scroll:focus {
     outline: 2px solid #3858e9;
     outline-offset: -2px;
 }
 
-/* Core styles the disabled property, not the ARIA state, and admin.js now uses
-   the state so that the button it belongs to can keep the keyboard focus. */
+/* Core styles `disabled` only; admin.js uses `aria-disabled` to keep focus. */
 .jfb-integration .button[aria-disabled="true"] {
     color: #a7aaad !important;
     border-color: #dcdcde !important;
@@ -247,9 +195,7 @@ tr.jfb-row-unsupported .jfb-unsupported-note {
     transform: none;
 }
 
-/* The challenge notice states a fact rather than raising an alarm, so it keeps
-   the neutral left edge instead of the blue one core gives .notice-info, and it
-   folds its setup steps away until somebody asks for them. */
+/* Challenge notice: neutral left edge, setup steps folded away. */
 .jfb-challenge-notice {
     margin: 1em 15px 2px 0;
 }
@@ -275,10 +221,7 @@ tr.jfb-row-unsupported .jfb-unsupported-note {
     white-space: pre-wrap;
 }
 
-/* The editor's primary action sits beside the title rather than at the foot of
-   the page: the fields it saves are the first thing on the screen, and the
-   schema table and starter template below them are reference material nobody
-   should have to scroll past to press Save. */
+/* Editor header: title and primary action on one line. */
 .jfb-page-header {
     display: flex;
     align-items: center;

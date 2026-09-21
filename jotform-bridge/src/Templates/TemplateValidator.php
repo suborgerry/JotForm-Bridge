@@ -11,12 +11,8 @@ if (!defined('ABSPATH')) {
 }
 
 /**
- * Compares the semantic identifiers a template declares with the Normalized
- * Schema of the Jotform form an integration is bound to.
- *
- * The comparison is purely static: it works on the literal `data-jotform-field`
- * values TemplateScanner extracted, never on a rendered template. What cannot
- * be verified statically is reported as such rather than assumed to be fine.
+ * Compares the literal `data-jotform-field` identifiers of a template with the
+ * Normalized Schema. Purely static; dynamic identifiers are reported as such.
  */
 final class TemplateValidator
 {
@@ -78,11 +74,8 @@ final class TemplateValidator
     }
 
     /**
-     * Every semantic path the schema exposes, flattened.
-     *
-     * A composite field contributes its children, not itself: a template that
-     * needs `name.first` and `name.last` is not satisfied by a single `name`
-     * input, so `name` is deliberately absent from this map.
+     * Every semantic path the schema exposes; composites contribute their
+     * children, not themselves.
      *
      * @return array<string, array<string, mixed>> Path => row metadata.
      */
@@ -142,8 +135,6 @@ final class TemplateValidator
         ];
 
         if (!$meta['supported']) {
-            // The template may or may not reference it; either way the plugin
-            // cannot map the value, and a required one blocks the form.
             $row['status']  = $meta['required']
                 ? CompatibilityReport::UNSUPPORTED_REQUIRED
                 : CompatibilityReport::UNSUPPORTED_OPTIONAL;
@@ -195,8 +186,7 @@ final class TemplateValidator
     {
         $field = $schema->field($path);
 
-        // Using the parent key of a composite field is a distinct mistake and
-        // deserves a message that says what to write instead.
+        // The parent key of a composite field gets a message naming its children.
         if ($field !== null && $field['children'] !== []) {
             $children = array_map(
                 static fn(array $child): string => (string) $child['key'],

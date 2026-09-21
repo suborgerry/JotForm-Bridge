@@ -13,33 +13,20 @@ if (!defined('ABSPATH')) {
 }
 
 /**
- * Registers and enqueues the frontend script.
- *
- * The script is registered on every front-end request but enqueued only while a
- * Jotform Bridge form is actually being rendered, so pages without a form ship
- * no extra JavaScript. It is plain ES5-compatible vanilla JS: no build step, no
- * jQuery, no dependencies.
+ * Registers the frontend script on every request and enqueues it only while a
+ * form is rendered.
  */
 final class Assets
 {
     public const HANDLE = 'jotform-bridge';
 
-    /**
-     * The challenge widget, loaded only when a form is on the page and only
-     * when the site has configured it. A third-party script is not something to
-     * put on pages that do not need it.
-     */
+    /** The challenge widget; loaded only with a form and only when configured. */
     public const TURNSTILE_HANDLE = 'jotform-bridge-turnstile';
 
     private bool $registered = false;
 
     /**
-     * Proof-of-work difficulty per integration slug, for the forms on this page.
-     *
-     * The guard evaluates `jotform_bridge_pow_bits` per slug, so the browser
-     * cannot be told a single number: two integrations on one page may be worth
-     * different amounts of work. Filled in as forms render, which is why the
-     * localized data is rewritten on every enqueue rather than once.
+     * Proof-of-work difficulty per integration slug, filled in as forms render.
      *
      * @var array<string, int>
      */
@@ -65,9 +52,6 @@ final class Assets
         );
 
         if (Turnstile::isConfigured()) {
-            // A script on Cloudflare's CDN. Appending a version of ours would
-            // be a query string on somebody else's file: it would not describe
-            // what is served, and would only defeat their caching.
             wp_register_script(
                 self::TURNSTILE_HANDLE,
                 Turnstile::SCRIPT_URL,
@@ -84,10 +68,9 @@ final class Assets
     }
 
     /**
-     * Called from the renderer, i.e. only when a form is really on the page.
+     * Called from the renderer, only when a form is on the page.
      *
-     * @param string $slug The integration being rendered, so the script can be
-     *                     told what its proof of work has to cost.
+     * @param string $slug The integration being rendered.
      * @param array<int, array<string, string>> $rules Conditional rules.
      * @param array<int, string> $required Required schema paths.
      */
@@ -113,26 +96,10 @@ final class Assets
         }
     }
 
-    /**
-     * Hands the script everything it may not invent for itself.
-     *
-     * Called again for each new form on the page, because the difficulty map
-     * only becomes complete as they render. Each call replaces the data rather
-     * than adding to it: wp_localize_script() prepends to whatever is already
-     * there, so localizing twice would print two assignments to the same
-     * variable and leave the earlier one as dead weight in the markup.
-     *
-     * The difficulty has to arrive this way and not as a constant in the
-     * script. It used to be written into `assets/frontend.js` by hand, which
-     * meant `jotform_bridge_pow_bits` moved the server and left the browser
-     * where it was: filtering it upwards refused every submission on the site,
-     * and filtering it downwards changed nothing at all while still charging
-     * the visitor the old, higher cost.
-     */
+    /** Localizes the script data; called again for each new form on the page. */
     private function localize(): void
     {
-        // localize() prepends to existing data; an empty string is nothing to
-        // prepend to, so this replaces rather than accumulates.
+        // wp_localize_script() prepends; clearing first replaces instead.
         wp_scripts()->add_data(self::HANDLE, 'data', '');
 
         wp_localize_script(

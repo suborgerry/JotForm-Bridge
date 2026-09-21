@@ -8,13 +8,7 @@ if (!defined('ABSPATH')) {
     exit;
 }
 
-/**
- * A ready-to-serialize REST answer: status code plus response body.
- *
- * Keeping it a plain value object lets the whole pipeline be exercised in tests
- * without WordPress REST classes, and leaves the controller with nothing to do
- * but hand it to WP_REST_Response.
- */
+/** A ready-to-serialize REST answer: status code, body and extra headers. */
 final class SubmissionOutcome
 {
     private int $status;
@@ -37,9 +31,7 @@ final class SubmissionOutcome
     }
 
     /**
-     * The `redirect` key exists only on a success, and only when the target
-     * resolved. Failure constructors have no way to add one, which is the
-     * guarantee that a validation error or an upstream error never carries one.
+     * `redirect` is present only when the target resolved.
      *
      * @param array{url:string, delay:int}|null $redirect
      */
@@ -104,8 +96,6 @@ final class SubmissionOutcome
     }
 
     /**
-     * Headers the controller has to add on top of the ones it always sends.
-     *
      * @return array<string, string>
      */
     public function headers(): array

@@ -28,12 +28,7 @@ if (defined('JOTFORM_BRIDGE_VERSION')) {
     return;
 }
 
-// The version is written down once, in the header above, because that is
-// the one place WordPress reads it from. Everything else — the asset URLs, the
-// upgrade routine, the schema's "synced by" stamp — takes it from here, so the
-// number can never disagree with itself. Reading it costs one 8 KB read of a
-// file already in the page cache, which is nothing beside what wp-settings.php
-// has just loaded.
+// The version lives in the header above only; everything else reads it from here.
 define('JOTFORM_BRIDGE_VERSION', (string) get_file_data(__FILE__, ['Version' => 'Version'])['Version']);
 define('JOTFORM_BRIDGE_FILE', __FILE__);
 define('JOTFORM_BRIDGE_DIR', plugin_dir_path(__FILE__));
@@ -41,9 +36,7 @@ define('JOTFORM_BRIDGE_URL', plugin_dir_url(__FILE__));
 define('JOTFORM_BRIDGE_MIN_PHP', '8.0');
 define('JOTFORM_BRIDGE_MIN_WP', '6.4');
 
-/**
- * Renders an admin notice and stops the boot when the environment is too old.
- */
+/** Admin notice shown when the environment is too old. */
 function jotform_bridge_requirements_notice(string $message): void
 {
     add_action(

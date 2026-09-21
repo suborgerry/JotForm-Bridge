@@ -9,11 +9,8 @@ if (!defined('ABSPATH')) {
 }
 
 /**
- * Assembles a FormSchema from the raw question list.
- *
- * FieldNormalizer handles one question at a time; everything that needs to see
- * the whole form — semantic key collisions, diagnostics, the fingerprint —
- * lives here.
+ * Assembles a FormSchema from the raw question list: collisions, diagnostics
+ * and the fingerprint, everything that needs the whole form.
  */
 final class SchemaBuilder
 {
@@ -50,9 +47,7 @@ final class SchemaBuilder
             $key = (string) $field['key'];
 
             if (isset($fields[$key])) {
-                // Two fields want the same public identifier. Guessing which one
-                // a template means would silently misroute data, so both are
-                // flagged and the newcomer falls back to its qid-based key.
+                // Both are flagged; the newcomer falls back to its qid-based key.
                 $fields[$key]['collision'] = true;
                 $field['collision']        = true;
                 $field['key']              = SemanticKey::FALLBACK_PREFIX . $field['qid'];
@@ -83,11 +78,8 @@ final class SchemaBuilder
     }
 
     /**
-     * Deterministic hash over the structurally significant parts of a schema.
-     *
-     * Labels, order and hint text are excluded on purpose: they change without
-     * breaking a template. Anything that would change how data is collected or
-     * mapped is included.
+     * Deterministic hash over the structurally significant parts of a schema;
+     * labels, order and hint text are excluded.
      *
      * @param array<string, array<string, mixed>> $fields
      */
@@ -122,15 +114,12 @@ final class SchemaBuilder
             ];
         }
 
-        // Sort by key so a reordered form yields the same fingerprint.
         ksort($significant);
 
         return hash('sha256', (string) wp_json_encode($significant));
     }
 
     /**
-     * Keeps composite child paths in sync after a collision rename.
-     *
      * @param array<string, mixed> $field
      *
      * @return array<string, mixed>
@@ -155,8 +144,6 @@ final class SchemaBuilder
     {
         if (!$field['supported']) {
             $diagnostics[] = [
-                // A required field we cannot map means the form cannot be
-                // submitted correctly at all.
                 'level'   => $field['required']
                     ? FormSchema::DIAGNOSTIC_ERROR
                     : FormSchema::DIAGNOSTIC_WARNING,

@@ -11,25 +11,14 @@ if (!defined('ABSPATH')) {
 }
 
 /**
- * Turns validated semantic values into Jotform submission parameters.
- *
- * This is the only place where a qid becomes visible again. The parameter shape
- * is the one Jotform documents for `POST /form/{formID}/submissions`:
+ * Turns validated semantic values into the parameters Jotform documents for
+ * `POST /form/{formID}/submissions`:
  *
  *   scalar answer      submission[{qid}]=value
  *   composite answer   submission[{qid}][{subfield}]=value
  *   multi-value answer submission[{qid}][]=value  (repeated)
  *
- * Sources checked before implementing this class:
- *  - https://api.jotform.com/docs/ (authentication, endpoints, envelope)
- *  - jotform/jotform-api-python `create_form_submission()`, which turns the
- *    documented `{qid}_{subfield}` keys into `submission[{qid}][{subfield}]`
- *  - Jotform support documentation of the endpoint, which shows
- *    `submission[3][first]`, `submission[31][]` and the
- *    `application/x-www-form-urlencoded` content type.
- *
- * The subfield names are not invented here either: they are the answer keys the
- * schema already carries per composite child (`first`, `last`, `addr_line1`, …).
+ * Subfield names are the answer keys the schema carries per composite child.
  */
 final class SubmissionMapper
 {
@@ -44,8 +33,7 @@ final class SubmissionMapper
     {
         $params = [];
 
-        // Driven by the schema rather than by the request, so the payload order
-        // is stable and only known fields can ever be mapped.
+        // Driven by the schema, so only known fields are mapped.
         foreach ($schema->supportedFields() as $field) {
             $qid = (string) $field['qid'];
 
@@ -92,8 +80,6 @@ final class SubmissionMapper
     }
 
     /**
-     * Builds one parameter name.
-     *
      * @param string|null $subfield Null for a scalar answer, '' for a list.
      */
     private function name(string $qid, ?string $subfield = null): string

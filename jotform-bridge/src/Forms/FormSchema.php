@@ -9,12 +9,8 @@ if (!defined('ABSPATH')) {
 }
 
 /**
- * The Normalized Schema of one Jotform form.
- *
- * This is the internal contract every later layer works against: templates,
- * validation, rendering and submission mapping. It is a plain read-only value
- * object over normalized field arrays, so it survives a round trip through a
- * WordPress transient without custom serialization.
+ * The Normalized Schema of one Jotform form: a read-only value object over
+ * normalized field arrays, the contract every later layer works against.
  */
 final class FormSchema
 {
@@ -99,8 +95,7 @@ final class FormSchema
     }
 
     /**
-     * Every semantic path a template may use: scalar fields by their own key,
-     * composite fields by their children only.
+     * Every semantic path a template may use; composites by their children only.
      *
      * @return array<int, string>
      */
@@ -124,8 +119,6 @@ final class FormSchema
     }
 
     /**
-     * Required semantic paths, expanded the same way as semanticPaths().
-     *
      * @return array<int, string>
      */
     public function requiredPaths(): array
@@ -151,9 +144,6 @@ final class FormSchema
         return $paths;
     }
 
-    /**
-     * Backend-only lookup. Templates and REST payloads never see the qid.
-     */
     public function qidFor(string $key): ?string
     {
         $field = $this->field($key);
@@ -200,18 +190,13 @@ final class FormSchema
         return $this->collisions() !== [];
     }
 
-    /**
-     * A schema with errors is still readable, but must not be trusted for
-     * rendering or submission mapping.
-     */
+    /** False when the schema has errors; it must then not be rendered or mapped. */
     public function isUsable(): bool
     {
         return $this->errors() === [];
     }
 
-    /**
-     * Deterministic hash over the structurally significant parts of the schema.
-     */
+    /** Deterministic hash of the structurally significant parts. */
     public function fingerprint(): string
     {
         return $this->fingerprint;
@@ -246,9 +231,7 @@ final class FormSchema
     }
 
     /**
-     * Field arrays come back out of a transient, so their shape is verified
-     * rather than assumed: an entry that is missing what every later layer reads
-     * is dropped instead of being allowed to fatal in the middle of a page.
+     * Drops stored entries missing a key every later layer reads.
      *
      * @param mixed $fields
      *

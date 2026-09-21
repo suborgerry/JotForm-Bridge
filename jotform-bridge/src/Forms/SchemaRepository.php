@@ -12,39 +12,20 @@ if (!defined('ABSPATH')) {
 }
 
 /**
- * Durable, manually synchronized storage of the Normalized Schema.
- *
- * The schema is not a cache. Nothing here expires, nothing here refetches: one
- * option per form ID, written only by sync(), which runs only when an
- * administrator presses "Sync Schema" for that integration. A page view, a
- * submission and a compatibility check all read what is stored and never reach
- * out to Jotform — so a Jotform outage, a slow API or an expired cache entry
- * cannot influence a request a visitor is waiting on.
- *
- * The price is explicit and deliberate: a form changed in Jotform stays
- * unchanged here until somebody syncs it. That is the point — the site owner
- * decides when the contract between the theme and Jotform moves.
- *
- * A small option holds the per-form metadata (last sync, fingerprint, last
- * error, plugin version at sync time) that has to outlive the schema itself.
- * No custom database table.
+ * Durable, manually synchronized storage of the Normalized Schema: one option
+ * per form ID with no TTL, written only by sync(). Reads never contact
+ * Jotform. A separate option holds per-form metadata (last sync, fingerprint,
+ * last error, plugin version).
  */
 final class SchemaRepository
 {
     public const OPTION_PREFIX = 'jotform_bridge_schema_';
     public const META_OPTION   = 'jotform_bridge_schema_meta';
 
-    /**
-     * Where versions up to 0.1.0 kept the schema. Only ever deleted, never read:
-     * a schema that lived in a transient was written by a different storage
-     * contract, and re-syncing it by hand is one click.
-     */
+    /** Where versions up to 0.1.0 kept the schema; only ever deleted. */
     public const LEGACY_TRANSIENT_PREFIX = 'jotform_bridge_schema_';
 
-    /**
-     * Returned when a form has never been synced. Distinct from an API error:
-     * nothing failed, the administrator simply has not synced yet.
-     */
+    /** The form has never been synced. */
     public const ERROR_NOT_SYNCED = 'schema_not_synced';
 
     private JotformClient $client;
@@ -57,9 +38,7 @@ final class SchemaRepository
         $this->builder = new SchemaBuilder();
     }
 
-    /**
-     * Returns the stored schema, or null when the form was never synced.
-     */
+    /** The stored schema, or null when the form was never synced. */
     public function stored(string $formId): ?FormSchema
     {
         $formId = self::normalizeFormId($formId);
@@ -82,13 +61,7 @@ final class SchemaRepository
         return $this->stored($formId) !== null;
     }
 
-    /**
-     * The read path used by rendering and by submissions.
-     *
-     * Never contacts Jotform: what is stored is the answer, and "nothing is
-     * stored" is a failure the caller has to handle rather than something this
-     * class silently fixes behind the request.
-     */
+    /** The read path for rendering and submissions; never contacts Jotform. */
     public function get(string $formId): ApiResponse
     {
         $stored = $this->stored($formId);
@@ -104,12 +77,8 @@ final class SchemaRepository
     }
 
     /**
-     * The write path: fetches the questions from Jotform, normalizes them and
-     * replaces what is stored. Called only from the explicit admin action.
-     *
-     * On failure the previously stored schema is left untouched, so a failed
-     * sync degrades to "still running on the previous definition" rather than
-     * to a form that stops working.
+     * Fetches, normalizes and replaces the stored schema. On failure the
+     * previous schema is left untouched and the error is recorded in the meta.
      *
      * @return ApiResponse Data is `['schema' => FormSchema, 'changed' => bool]`.
      */
@@ -178,10 +147,7 @@ final class SchemaRepository
         );
     }
 
-    /**
-     * Drops the stored schema of one form. Metadata is kept so the previous
-     * fingerprint can still be compared after the next sync.
-     */
+    /** Drops the stored schema of one form; metadata is kept. */
     public function forget(string $formId): void
     {
         $formId = self::normalizeFormId($formId);
@@ -192,15 +158,7 @@ final class SchemaRepository
         }
     }
 
-    /**
-     * Drops every stored schema and all metadata.
-     *
-     * Nothing in the plugin lifecycle calls this any more — a schema is
-     * configuration-grade state now, and losing it means every form on the site
-     * needs a manual sync. It exists for uninstall and for tests.
-     *
-     * Static because uninstall has no built services to work with.
-     */
+    /** Drops every stored schema and all metadata; for uninstall and tests. */
     public static function flushAll(): void
     {
         $meta = get_option(self::META_OPTION, []);
@@ -215,12 +173,7 @@ final class SchemaRepository
         delete_option(self::META_OPTION);
     }
 
-    /**
-     * Removes the transients versions up to 0.1.0 kept the schemas in.
-     *
-     * Only the legacy copies go: what an administrator synced under the current
-     * storage rule is untouched.
-     */
+    /** Removes the legacy schema transients; stored options are untouched. */
     public static function purgeLegacyTransients(): void
     {
         $meta = get_option(self::META_OPTION, []);
@@ -251,13 +204,7 @@ final class SchemaRepository
         ];
     }
 
-    /**
-     * Whether the stored schema was written by an older plugin version.
-     *
-     * Not acted upon automatically: normalization can change between versions,
-     * so the administrator is told to re-sync instead of having the schema
-     * discarded under a running site.
-     */
+    /** Whether the stored schema was written by an older plugin version. */
     public function isStale(string $formId): bool
     {
         $meta = $this->meta($formId);
@@ -270,10 +217,7 @@ final class SchemaRepository
         return self::OPTION_PREFIX . self::normalizeFormId($formId);
     }
 
-    /**
-     * Jotform form IDs are numeric strings; anything else is rejected rather
-     * than sanitized into a different form's storage key.
-     */
+    /** Digits only; anything else becomes ''. */
     private static function normalizeFormId(string $formId): string
     {
         $formId = trim($formId);

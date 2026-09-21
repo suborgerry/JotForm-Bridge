@@ -8,12 +8,7 @@ if (!defined('ABSPATH')) {
     exit;
 }
 
-/**
- * Result of a Jotform API call.
- *
- * Deliberately not a WP_Error: the domain layer stays testable without
- * WordPress, and the admin layer decides how to present the failure.
- */
+/** Result of a Jotform API call. */
 final class ApiResponse
 {
     private bool $success;
@@ -28,8 +23,7 @@ final class ApiResponse
     private ?int $status;
 
     /**
-     * Facts about the call itself rather than about its result — currently the
-     * remaining daily API allowance Jotform reports alongside every answer.
+     * Facts about the call itself, e.g. the remaining daily API allowance.
      *
      * @var array<string, mixed>
      */
@@ -108,9 +102,7 @@ final class ApiResponse
         return $this->meta;
     }
 
-    /**
-     * How many API calls the account has left today, when Jotform said so.
-     */
+    /** Remaining daily API calls, when Jotform reported them. */
     public function limitLeft(): ?int
     {
         return isset($this->meta['limit_left']) ? (int) $this->meta['limit_left'] : null;

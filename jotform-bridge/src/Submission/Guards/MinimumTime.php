@@ -11,47 +11,19 @@ if (!defined('ABSPATH')) {
 }
 
 /**
- * Refuses a form that was filled in faster than a person can fill one in.
- *
- * The second shipped provider, and the second one that costs a visitor nothing:
- * no challenge, no third-party script, no extra request. It pairs with the
- * honeypot rather than replacing it — a bot that leaves the decoy alone still
- * has to spend real seconds on the page, and a bot that spends real seconds is
- * a much more expensive bot to run at scale.
- *
- * The measurement comes from the browser, which means it can be forged. That is
- * a deliberate trade: the alternatives are a server-side stamp in the markup,
- * which full-page caching turns into the same already-old value for everybody,
- * or a token issued per page view, which costs a request before the form is even
- * used. Neither is worth it for a check whose whole purpose is to be free.
- *
- * A submission that carries no measurement is allowed through, exactly like a
- * form with no honeypot: templates and integrations must keep working when the
- * markup has not been updated, and refusing them would break sites rather than
- * bots. "No measurement" means the key is absent, though — a value that is
- * present but could not have been produced by the script is a forgery, and is
- * refused.
+ * Refuses a form submitted faster than MIN_SECONDS after it was first touched.
+ * The measurement comes from the browser. An absent value is allowed; a value
+ * the script could not have produced is refused.
  */
 final class MinimumTime
 {
-    /**
-     * Key inside the `spam` container, in seconds.
-     */
+    /** Key inside the `spam` container, in seconds. */
     public const KEY = 't';
 
-    /**
-     * How long a form must have been open before it may be submitted.
-     *
-     * Two seconds is under what it takes to read a single label, and well above
-     * anything a person could trip over — including somebody pasting a prepared
-     * answer, which is the case a longer threshold would punish.
-     */
+    /** Seconds a form must have been open before it may be submitted. */
     public const MIN_SECONDS = 2;
 
-    /**
-     * Beyond this the number says nothing useful, and is treated as absent: a
-     * tab left open overnight is not evidence of anything.
-     */
+    /** Beyond this the value is treated as absent. */
     private const MAX_SECONDS = 86400;
 
     public function register(): void
@@ -86,16 +58,11 @@ final class MinimumTime
 
         $seconds = (int) $raw;
 
-        // The script clamps its own measurement at zero, so a negative number
-        // cannot come from a browser that ran it. Treating it as "not measured"
-        // would hand every bot a one-character way past this check.
+        // The script clamps at zero, so a negative value is a forgery.
         if ($seconds < 0) {
             return false;
         }
 
-        // Beyond the ceiling the number says nothing either way: a tab left
-        // open overnight is not evidence, and refusing it would punish a real
-        // visitor for being slow.
         if ($seconds > self::MAX_SECONDS) {
             return $allowed;
         }

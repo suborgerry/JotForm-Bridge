@@ -9,17 +9,9 @@ if (!defined('ABSPATH')) {
 }
 
 /**
- * Turns a configured redirect page ID into a URL — or into a reason why not.
- *
- * The same evaluation answers both questions the plugin asks about a redirect
- * target: what the admin screen should warn about, and what the submission
- * response may contain. Having one implementation means the warning an admin
- * sees is literally the check the endpoint performs.
- *
- * Only the page ID is ever stored. The URL is resolved per submission, so a
- * changed permalink is reflected immediately and a stale URL can never be
- * served. Nothing here consults the request: an open redirect would need a URL
- * from outside, and there is no path for one to get in.
+ * Resolves a configured redirect page ID into an internal URL, or a reason why
+ * not. Used by both the admin warning and the submission response; the URL is
+ * resolved at answer time and never read from the request.
  */
 final class RedirectTarget
 {
@@ -44,10 +36,7 @@ final class RedirectTarget
     public const STATE_INVALID_URL = 'invalid_url';
 
     /**
-     * Everything known about one integration's redirect target.
-     *
-     * `url` is non-empty only in STATE_OK, which is what makes "no redirect" the
-     * safe default of every other outcome.
+     * `url` is non-empty only in STATE_OK.
      *
      * @return array{state:string, url:string, delay:int, label:string, message:string}
      */
@@ -130,9 +119,7 @@ final class RedirectTarget
     }
 
     /**
-     * Whether a target the admin asked for cannot be served.
-     *
-     * "No redirect configured" is not a problem; "configured and broken" is.
+     * Whether a configured target cannot be served.
      *
      * @param array{state:string, url:string, delay:int, label:string, message:string} $target
      */
@@ -141,15 +128,7 @@ final class RedirectTarget
         return $target['state'] !== self::STATE_OK && $target['state'] !== self::STATE_DISABLED;
     }
 
-    /**
-     * The permalink of a page, but only if it stays on this site.
-     *
-     * wp_validate_redirect() does the host comparison WordPress itself trusts,
-     * including the protocol-relative `//evil.example` case, which parses as a
-     * host-less URL and would otherwise leave the site. The explicit host check
-     * in front of it is not redundant: it makes the invariant local and testable
-     * rather than inherited from a helper whose default is `wp-admin/`.
-     */
+    /** The permalink of a page, only if it stays on this site. */
     private function internalUrl(int $pageId): string
     {
         $permalink = get_permalink($pageId);

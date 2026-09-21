@@ -45,11 +45,7 @@ $jfbReport  = $compatibility['report'] instanceof CompatibilityReport ? $compati
         </h1>
 
         <?php
-        /* The button lives outside the form it submits, so it names the form.
-           It sits beside the title rather than at the foot of the page: the
-           fields it saves are the first thing on the screen, and everything
-           below them — the schema table, the starter template — is reference
-           material somebody should not have to scroll past to press Save. */
+        // Outside the form it submits, so it names the form.
         submit_button(
             $isNew ? __('Create Integration', 'jotform-bridge') : __('Save Integration', 'jotform-bridge'),
             'primary',
@@ -107,17 +103,6 @@ $jfbReport  = $compatibility['report'] instanceof CompatibilityReport ? $compati
                     <label for="jfb-form"><?php echo esc_html__('Jotform Form ID', 'jotform-bridge'); ?></label>
                 </th>
                 <td>
-                    <?php
-                    /* A field and a button rather than a select. The plugin no
-                       longer fetches the account form list — see the amendment
-                       in AGENTS.md — so the ID is typed and resolved one at a
-                       time. Connect form answers over admin-ajax and leaves the
-                       rest of this form untouched, so nothing typed is lost.
-
-                       Without JavaScript the button does nothing and the field
-                       still saves: an unconnected ID is a warning, not an
-                       error, which is what keeps this screen usable then. */
-                    ?>
                     <p class="jfb-connect">
                         <input
                             type="text"
@@ -363,12 +348,7 @@ $jfbReport  = $compatibility['report'] instanceof CompatibilityReport ? $compati
         <div class="notice notice-warning inline">
             <p>
                 <?php
-                /* Which button to name depends on which one is on the screen.
-                   Sync Schema posts the slug of a saved integration, so it is
-                   not rendered while one is being created — and this sentence
-                   spent that whole screen pointing at it. Connect form loads
-                   the definition of a form that has none, which is what makes
-                   there be something to point at here. */
+                // Sync Schema is not rendered on the Add screen; name the button that is.
                 echo $isNew
                     ? esc_html__(
                         'This form has never been synced. Nothing is fetched automatically: press Connect form above, which loads the definition along with the title. Until then the form does not render and submissions are refused.',
@@ -475,9 +455,6 @@ $jfbReport  = $compatibility['report'] instanceof CompatibilityReport ? $compati
             <tbody>
                 <?php foreach ($jfbReport->rows() as $jfbRow) : ?>
                     <?php
-                    /* An unmappable type is the one thing worth marking on the
-                       row it belongs to; the rest of the report is already
-                       summarised above the table. */
                     $jfbUnsupported = in_array(
                         (string) $jfbRow['status'],
                         [
@@ -525,8 +502,7 @@ $jfbReport  = $compatibility['report'] instanceof CompatibilityReport ? $compati
 
     <?php if ($scaffold !== '') : ?>
         <?php
-        // The scaffold is built from the supported fields alone, so the ones
-        // marked in the schema table above are worth naming as missing here.
+        // The scaffold is built from the supported fields alone.
         $jfbScaffoldSkipped = count($schema !== null ? $schema->unsupportedFields() : []);
         ?>
         <h2><?php echo esc_html__('Starter template', 'jotform-bridge'); ?></h2>
@@ -563,9 +539,6 @@ $jfbReport  = $compatibility['report'] instanceof CompatibilityReport ? $compati
                 data-jfb-copy-from="#jfb-scaffold"
             >
                 <?php esc_html_e('Copy to clipboard', 'jotform-bridge'); ?>
-                <?php // aria-hidden: it is faded in with opacity, so it stays in the
-                      // accessibility tree and would otherwise be part of this
-                      // button's name before anybody pressed it. ?>
                 <span class="jfb-copied" aria-hidden="true"><?php esc_html_e('Copied', 'jotform-bridge'); ?></span>
             </button>
         </p>

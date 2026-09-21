@@ -52,9 +52,7 @@ final class ConditionalLogic
             $rule = [];
             foreach (['action', 'target', 'source', 'operator', 'value'] as $key) {
                 $value = is_array($row) && isset($row[$key]) && is_scalar($row[$key]) ? (string) $row[$key] : '';
-                // Option values are literal text: stripping tags or percent
-                // sequences would change what a condition compares against.
-                // Every consumer escapes this value at its output boundary.
+                // `value` is literal text, compared verbatim; escaped at output.
                 $rule[$key] = $key === 'value'
                     ? trim(str_replace(chr(0), '', wp_check_invalid_utf8($value, true)))
                     : sanitize_text_field($value);

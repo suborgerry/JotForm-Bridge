@@ -14,12 +14,8 @@ if (!defined('ABSPATH')) {
 }
 
 /**
- * Builds the variables a custom template is given.
- *
- * Deliberately narrow: everything a template legitimately needs to render
- * markup, and nothing else. The Jotform form ID, the question IDs and the API
- * key are not part of it and cannot be reached from it — a template that wanted
- * to leak them would have nothing to leak.
+ * Builds the variables a custom template is given. No form ID, qid or API
+ * key is part of it.
  */
 final class TemplateContext
 {
@@ -46,23 +42,15 @@ final class TemplateContext
                 'required' => $schema->requiredPaths(),
             ],
             'endpoint'    => $endpoint,
-            // Ready-to-print markup rather than a flag: a template that simply
-            // echoes it gets the decoy right, and one that forgets is no worse
-            // off than before.
+            // Ready-to-print markup; `turnstile` is empty unless configured.
             'honeypot'    => Honeypot::markup('jfb-' . $integration->slug()),
-            // Empty unless the site configured a challenge, so a template can
-            // print it unconditionally.
             'turnstile'   => Turnstile::markup(),
-            // A form marked for this plugin is sent by its script and by
-            // nothing else, so a visitor without JavaScript deserves to be told
-            // rather than left pressing a button that posts an empty body.
             'noscript'    => AutoRenderer::noscript(),
         ];
     }
 
     /**
-     * The schema flattened to the semantic paths a template addresses, keeping
-     * only presentation-relevant properties.
+     * The schema flattened to semantic paths, presentation properties only.
      *
      * @return array<string, array<string, mixed>>
      */

@@ -1,17 +1,8 @@
 <?php
 
 /**
- * Uninstall cleanup.
- *
- * Everything derived from Jotform — the synced schemas, the connected form
- * records, the template registry — is always removed: it is worthless once the plugin is
- * gone, and re-syncing it by hand is exactly one click per integration.
- *
- * Configuration is a different matter: integrations and settings
- * are work somebody did by hand, and deleting them on uninstall would destroy it
- * silently, including on the "deactivate, delete, reinstall" round trip people
- * use to fix a broken update. It is therefore kept unless the administrator
- * explicitly asked for a full removal on the settings screen.
+ * Uninstall cleanup. Derived state is always removed; integrations and
+ * settings only when "delete data on uninstall" was enabled.
  *
  * @package JotformBridge
  */
@@ -22,17 +13,9 @@ if (!defined('WP_UNINSTALL_PLUGIN')) {
     exit;
 }
 
-/**
- * Removes everything this plugin stored on one site.
- *
- * Options are per site, and uninstall runs once for the whole installation, so
- * on a network this has to be applied to every blog — otherwise deleting the
- * plugin leaves its data behind everywhere except the one site that happened to
- * be current.
- */
+/** Removes everything this plugin stored on one site; run per blog on a network. */
 $jfbCleanUpSite = static function (): void {
-    // One schema option per form; the meta option is the only index of them. The
-    // transient of the same name is what versions up to 0.1.0 used.
+    // The meta option is the index of the per-form schema options.
     $jfbSchemaMeta = get_option('jotform_bridge_schema_meta', []);
 
     if (is_array($jfbSchemaMeta)) {
@@ -44,8 +27,7 @@ $jfbCleanUpSite = static function (): void {
 
     delete_option('jotform_bridge_connected_forms');
 
-    // The account form list and its two companions. Written by versions that
-    // stored every form on the account; nothing writes them now.
+    // Legacy account form list.
     delete_option('jotform_bridge_forms');
     delete_transient('jotform_bridge_forms');
     delete_option('jotform_bridge_forms_meta');
@@ -56,13 +38,10 @@ $jfbCleanUpSite = static function (): void {
     delete_option('jotform_bridge_connection');
     delete_option('jotform_bridge_quota');
 
-    // Written by versions that kept a per-integration submission tally.
+    // Legacy submission tally.
     delete_option('jotform_bridge_stats');
     delete_option('jotform_bridge_version');
 
-    // The remembered answer of the GitHub update check. A site transient, so
-    // on a network it is one record for the whole installation; deleting it
-    // once per site is harmless.
     delete_site_transient('jotform_bridge_update_check');
 
     $jfbSettings = get_option('jotform_bridge_settings', []);

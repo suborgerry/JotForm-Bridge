@@ -8,19 +8,7 @@ if (!defined('ABSPATH')) {
     exit;
 }
 
-/**
- * Registers the stylesheet and script the admin screens use.
- *
- * Both used to be printed inline into the views. That could not be cached, could
- * not be minified, made the markup harder to read than the behaviour it carried,
- * and — the reason it had to change — is refused outright by any site running a
- * content security policy, which would have left the admin screens silently
- * half-working.
- *
- * Enqueued only on this plugin's own screens: an admin loading two extra files
- * on every page of somebody else's plugin is exactly the behaviour that makes
- * WordPress admins slow.
- */
+/** Enqueues the admin stylesheet and script, on this plugin's screens only. */
 final class AdminAssets
 {
     public const STYLE_HANDLE  = 'jotform-bridge-admin';
@@ -55,10 +43,6 @@ final class AdminAssets
             true
         );
 
-        // Everything the script says out loud. It used to carry one English
-        // sentence in its source, which no `.po` file could ever reach, and it
-        // now needs three more: a copy that succeeded and a copy that failed
-        // are announced rather than only shown.
         wp_localize_script(
             self::SCRIPT_HANDLE,
             'jotformBridgeAdmin',
@@ -72,13 +56,7 @@ final class AdminAssets
         );
     }
 
-    /**
-     * Whether the screen being rendered belongs to this plugin.
-     *
-     * The hook suffix is the reliable signal — it is derived from the menu slug
-     * — and get_current_screen() is only consulted when the action was called
-     * without one.
-     */
+    /** Whether the screen belongs to this plugin; the hook suffix first, get_current_screen() without one. */
     private static function isPluginScreen(string $hook): bool
     {
         if ($hook !== '' && strpos($hook, IntegrationsPage::MENU_SLUG) !== false) {

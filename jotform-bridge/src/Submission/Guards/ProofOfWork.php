@@ -11,65 +11,22 @@ if (!defined('ABSPATH')) {
 }
 
 /**
- * Makes every submission cost a little processor time.
- *
- * The other free providers ask a bot to be careless: fill in a hidden field,
- * or send faster than a person could type. A bot that is not careless walks
- * past both. The paid one, Turnstile, does stop it — but only on sites whose
- * owner went and got keys, which most never will.
- *
- * This is the layer that needs nothing from anybody. Before a form is sent the
- * browser has to find a number that makes
- * `sha256("slug|timestamp|nonce")` start with a run of zero bits. At sixteen
- * bits that is about 65,000 hashes: unnoticeable once, and ruinous at the scale
- * spam is only worth sending at. It does not identify anyone, it does not ask
- * the visitor to do anything, and it involves no third party.
- *
- * Unlike the honeypot and the timing check, a missing proof is refused. Those
- * two are hints in the markup that an old template may not carry; this one
- * comes from the plugin's own script on every form it renders, so the only way
- * to arrive without it is to skip the script — which is exactly what a bot
- * posting straight to the endpoint does. Allowing that would leave the hole
- * these providers exist to close.
- *
- * Three things are checked, and the third is the one people forget: the hash
- * has to be hard enough, the timestamp has to be recent, and the same solution
- * cannot be used twice. Without the last one a bot would solve once and send
- * for as long as the window lasted.
- *
- * A determined attacker can compute solutions ahead of time — the format is
- * public and there is no server secret in it. That is deliberate: binding to a
- * secret would mean putting a per-visitor value in the page, which full-page
- * caching turns into the same value for everybody, or fetching one per view,
- * which costs a request before the form is even used. And precomputation does
- * not actually help: it moves the cost earlier without reducing it, and the
- * cost per submission is the entire point.
+ * Proof of work: the browser must find a nonce making
+ * `sha256("slug|timestamp|nonce")` start with BITS zero bits. A missing proof
+ * is refused. Checked: difficulty, recency and single use.
  */
 final class ProofOfWork
 {
     /** Key inside the `spam` container: "timestamp:nonce". */
     public const KEY = 'pow';
 
-    /**
-     * Leading zero bits required. Must match the frontend script.
-     */
+    /** Default leading zero bits; must match the frontend script. */
     public const BITS = 16;
 
-    /**
-     * How old a solution may be. Generous, because it is computed when the
-     * visitor starts filling the form in rather than when they submit it.
-     *
-     * The frontend recomputes at POW_STALE, 240 seconds, and that has to stay
-     * comfortably below this: a browser reusing a solution the guard has aged
-     * out gets a refusal it cannot explain to the visitor. Lowering this value
-     * without lowering that one is how a form starts failing for anybody who
-     * takes more than a few minutes to fill it in.
-     */
+    /** Seconds a solution stays valid; the frontend's POW_STALE must stay below it. */
     public const WINDOW = 600;
 
-    /**
-     * Tolerance for a client clock that runs ahead.
-     */
+    /** Tolerance for a client clock that runs ahead. */
     private const FUTURE_SKEW = 120;
 
     public const TRANSIENT_PREFIX = 'jotform_bridge_pow_';
@@ -111,8 +68,7 @@ final class ProofOfWork
             return false;
         }
 
-        // Solve once, send once. The transient outlives the window the
-        // timestamp check accepts, so there is no gap between the two.
+        // Single use.
         $seen = self::TRANSIENT_PREFIX . md5($slug . '|' . $timestamp . '|' . $nonce);
 
         if (get_transient($seen) !== false) {
@@ -124,9 +80,7 @@ final class ProofOfWork
         return $allowed;
     }
 
-    /**
-     * Whether one candidate solution is hard enough.
-     */
+    /** Whether one candidate solution is hard enough. */
     public static function meets(string $slug, int $timestamp, int $nonce, int $bits = self::BITS): bool
     {
         $hash = hash('sha256', $slug . '|' . $timestamp . '|' . $nonce, true);
@@ -144,28 +98,13 @@ final class ProofOfWork
         return $rest === 0 || (ord($hash[$whole]) >> (8 - $rest)) === 0;
     }
 
-    /**
-     * How much work this integration's submissions must cost.
-     *
-     * Public and static because the browser has to be told the same number, and
-     * `Rendering\Assets` asks this method rather than reading the constant: two
-     * places evaluating the same filter is how the numbers drift apart, and
-     * they used not to be asked at all.
-     *
-     * The floor and the ceiling are the range in which the guard is still a
-     * guard. Below about eight bits the work is free even for a script that
-     * solves it once per submission; above 24 a mid-range phone takes long
-     * enough that people abandon the form, and refusing real visitors is the
-     * failure mode this whole layer exists to avoid.
-     */
+    /** Difficulty for one integration; `Rendering\Assets` hands the same number to the browser. */
     public static function bits(string $slug): int
     {
         /**
-         * Filters how much work a submission must cost.
-         *
-         * Every extra bit doubles it. The browser is told the result through
-         * `jotformBridgeSettings.powBits`, so a filter here changes both sides
-         * and needs nothing done to the script.
+         * Filters how much work a submission must cost. Every extra bit
+         * doubles it; the browser receives the result through
+         * `jotformBridgeSettings.powBits`.
          *
          * @param int    $bits Leading zero bits required.
          * @param string $slug Integration slug.
@@ -177,11 +116,7 @@ final class ProofOfWork
     {
         /**
          * Filters whether a submission without a proof of work is refused.
-         *
-         * Turning this off removes the only barrier in front of a bot that
-         * posts straight to the endpoint without running any of the page's
-         * JavaScript. The one good reason to do it is a site still serving a
-         * cached copy of an older version of the plugin's script.
+         * Useful only while a cached older version of the script is still served.
          *
          * @param bool   $required Whether the proof is mandatory.
          * @param string $slug     Integration slug.

@@ -1,12 +1,7 @@
 <?php
 
 /**
- * The public PHP API of the plugin.
- *
- * Loaded from the main plugin file rather than through the autoloader, because
- * these are plain functions in the global namespace: that is what a theme
- * developer expects to call, and it is the only part of the plugin that other
- * code is meant to depend on.
+ * The public PHP API of the plugin: plain functions in the global namespace.
  *
  * @package JotformBridge
  */
@@ -21,15 +16,12 @@ if (!defined('ABSPATH')) {
 
 if (!function_exists('jotform_bridge_render')) {
     /**
-     * Returns the rendered HTML of one integration.
-     *
-     * Usage in a theme:
+     * Returns the rendered HTML of one integration:
      *
      *     echo jotform_bridge_render('contact');
      *
-     * Never throws and never prints: an unknown, disabled or misconfigured
-     * integration yields an empty string for visitors and a short diagnostic for
-     * administrators, so a template mistake cannot break the page.
+     * Never throws. A misconfigured integration yields '' for visitors and a
+     * short diagnostic for administrators.
      */
     function jotform_bridge_render(string $slug): string
     {
@@ -43,13 +35,8 @@ if (!function_exists('jotform_bridge_render')) {
 
 if (!function_exists('jotform_bridge_honeypot')) {
     /**
-     * The honeypot markup for a custom template.
-     *
-     * Templates rendered through the plugin already receive the same string as
-     * `$honeypot`; this function exists for markup built outside that context.
-     * The output is escaped and safe to print:
-     *
-     *     <?php echo jotform_bridge_honeypot(); ?>
+     * The honeypot markup, escaped and safe to print. Templates rendered by the
+     * plugin receive the same string as `$honeypot`.
      */
     function jotform_bridge_honeypot(string $slug = ''): string
     {
@@ -63,11 +50,8 @@ if (!function_exists('jotform_bridge_honeypot')) {
 
 if (!function_exists('jotform_bridge_challenge')) {
     /**
-     * The challenge widget markup for a custom template, if one is configured.
-     *
-     * Empty when the site has no challenge keys, so it is safe to print
-     * unconditionally. Templates rendered through the plugin already receive
-     * the same string as `$turnstile`.
+     * The challenge widget markup; '' when no keys are configured. Templates
+     * rendered by the plugin receive the same string as `$turnstile`.
      */
     function jotform_bridge_challenge(): string
     {
@@ -77,10 +61,7 @@ if (!function_exists('jotform_bridge_challenge')) {
 
 if (!function_exists('jotform_bridge_endpoint')) {
     /**
-     * The REST endpoint an integration submits to.
-     *
-     * Useful for a template that wants to set the form action itself; the
-     * rendering context already provides the same value as `$endpoint`.
+     * The REST endpoint an integration submits to; the same value as `$endpoint`.
      */
     function jotform_bridge_endpoint(string $slug): string
     {

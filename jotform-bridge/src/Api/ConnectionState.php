@@ -8,10 +8,7 @@ if (!defined('ABSPATH')) {
     exit;
 }
 
-/**
- * Stores the outcome of the last connection test so the settings page can show
- * a status without calling Jotform on every page view.
- */
+/** Stores the outcome of the last connection test for the settings screen. */
 final class ConnectionState
 {
     public const OPTION = 'jotform_bridge_connection';

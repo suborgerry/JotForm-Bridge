@@ -12,42 +12,15 @@ if (!defined('ABSPATH')) {
 }
 
 /**
- * What the plugin knows about the Jotform forms integrations actually use.
- *
- * One record per connected form, written only by the explicit "Connect form"
- * button in the integration editor. This used to be a copy of the whole account
- * form list, refreshed by "Sync with Jotform" on the settings screen; that is
- * gone, and nothing anywhere asks Jotform what forms an account has.
- *
- * The reasoning, recorded because the old design was deliberate too:
- *
- * * the list was the largest thing the plugin stored and the least of it was
- *   used — a site with three integrations kept every form on the account, and
- *   a shared agency account can hold hundreds;
- * * it was fetched with `limit=1000` and no paging, so a large account was
- *   silently truncated and the missing forms could never be selected;
- * * "Remove from list" and its option existed only to hide rows nobody wanted
- *   to see. A store that holds only what is referenced has nothing to hide.
- *
- * Like the schema this is stored rather than cached: no TTL, nothing expires on
- * its own, and no page view or submission ever writes it. A record is a *name*
- * for an ID — the ID itself, the authoritative part, lives on the Integration —
- * so a stale title is cosmetic and a missing one costs nothing but a label.
+ * One record per connected Jotform form, written only by "Connect form".
+ * Stored with no TTL. A record is a label for an ID; the ID itself lives on
+ * the Integration.
  *
  * @phpstan-type ConnectedForm array{id:string, title:string, status:string, updated:string, connected_at:int}
  */
 final class FormRepository
 {
-    /**
-     * Deliberately not the old `jotform_bridge_forms`.
-     *
-     * That option held a list; this one holds a map keyed by form ID. Both are
-     * integer-keyed arrays of arrays once PHP has coerced the numeric keys, so
-     * no honest check could tell an old value from a new one. Reusing the name
-     * would have meant guessing, and guessing wrong means an account list being
-     * read as connected forms. A new name and a plain delete of the old one is
-     * the version of this that cannot be subtly wrong.
-     */
+    /** A map keyed by form ID; not the legacy list option below. */
     public const OPTION = 'jotform_bridge_connected_forms';
 
     /** Options versions up to 0.1.0 kept the account list in. Only deleted. */
@@ -62,8 +35,7 @@ final class FormRepository
     private JotformClient $client;
 
     /**
-     * In-request memo. The integrations list asks for a title once per row, and
-     * the answer cannot change within one request.
+     * In-request memo.
      *
      * @var array<int|string, ConnectedForm>|null
      */
@@ -75,13 +47,8 @@ final class FormRepository
     }
 
     /**
-     * Every connected form, keyed by form ID.
-     *
-     * The key comes back as an integer, not a string: PHP coerces a numeric
-     * string array key on the way in and there is no way to stop it. Lookups by
-     * string ID still work, because the same coercion applies to them — but
-     * code iterating this should read `$form['id']`, which is a string by
-     * construction, rather than the key it arrived under.
+     * Every connected form, keyed by form ID. PHP coerces the numeric keys to
+     * integers; read `$form['id']` for the string.
      *
      * @return array<int|string, ConnectedForm>
      */
@@ -99,9 +66,6 @@ final class FormRepository
                 continue;
             }
 
-            // PHP turns a numeric string key into an integer on the way in, so
-            // the id is read back from the key rather than trusted to be a
-            // string, and the record's own id is only a fallback.
             $formId = trim((string) $key);
 
             if ($formId === '' || !ctype_digit($formId)) {
@@ -137,9 +101,7 @@ final class FormRepository
         return $this->get($formId) !== null;
     }
 
-    /**
-     * The stored title, or an empty string when the form was never connected.
-     */
+    /** The stored title, or '' when the form was never connected. */
     public function title(string $formId): string
     {
         $form = $this->get($formId);
@@ -155,12 +117,8 @@ final class FormRepository
     }
 
     /**
-     * Asks Jotform about one form and stores what came back.
-     *
-     * The only write path, and it runs only when an administrator presses
-     * "Connect form". On failure nothing stored is touched: a form that was
-     * connected yesterday keeps its title through a Jotform outage rather than
-     * losing its label because a network call timed out.
+     * Asks Jotform about one form and stores the record; on failure nothing
+     * stored is touched.
      *
      * @return ApiResponse Data is the stored record on success.
      */
@@ -192,9 +150,7 @@ final class FormRepository
         return ApiResponse::success($record, $response->status(), $response->meta());
     }
 
-    /**
-     * Drops one record. The form itself is untouched: this is a local label.
-     */
+    /** Drops one local record. */
     public function forget(string $formId): void
     {
         $formId = self::normalizeFormId($formId);
@@ -253,10 +209,7 @@ final class FormRepository
         ];
     }
 
-    /**
-     * Jotform form IDs are numeric strings; anything else is rejected rather
-     * than sanitized into some other form's record.
-     */
+    /** Digits only; anything else becomes ''. */
     private static function normalizeFormId(string $formId): string
     {
         $formId = trim($formId);

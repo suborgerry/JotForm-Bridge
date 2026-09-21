@@ -12,11 +12,8 @@ if (!defined('ABSPATH')) {
 }
 
 /**
- * The only low-level layer that talks to the Jotform REST API.
- *
- * Authentication and endpoints follow the official documentation
- * (https://api.jotform.com/docs/): the key travels in the `APIKEY` header,
- * never as a query parameter, and every response uses the
+ * The only layer that talks to the Jotform REST API (https://api.jotform.com/docs/).
+ * The key travels in the `APIKEY` header; every response uses the
  * `{responseCode, message, content}` envelope.
  */
 final class JotformClient
@@ -28,33 +25,13 @@ final class JotformClient
     public const ERROR_API          = 'api_error';
     public const ERROR_UNEXPECTED   = 'unexpected_response';
 
-    /**
-     * The account has spent its daily API call allowance.
-     *
-     * Separated from ERROR_API because it is the one upstream failure that does
-     * not resolve on its own within the request's lifetime: it lasts until
-     * midnight EST, and hammering the API until then only wastes the visitor's
-     * time. The site owner has to be told, not the log.
-     */
+    /** The account has spent its daily API call allowance. */
     public const ERROR_API_LIMIT = 'api_limit_exceeded';
 
-    /**
-     * The account has spent its monthly submission allowance.
-     *
-     * Worse than the previous one: every form on the account is switched off
-     * until the billing cycle rolls over, embedded ones included.
-     */
+    /** The account has spent its monthly submission allowance. */
     public const ERROR_FORM_QUOTA = 'form_over_quota';
 
-    /**
-     * Fragments Jotform uses to say the account is out of allowance.
-     *
-     * Matched against the envelope message because the API reports both
-     * conditions through the ordinary error shape rather than a machine-readable
-     * code. Deliberately narrow: a false positive here stops the form, so
-     * anything that does not clearly say "limit" or "quota" stays a generic
-     * error.
-     */
+    /** Envelope message fragments identifying the two allowance failures. */
     private const API_LIMIT_MARKERS = [
         'api-limit',
         'api limit',
@@ -71,30 +48,7 @@ final class JotformClient
         'upgrade your account',
     ];
 
-    /**
-     * How long to wait for Jotform, in seconds.
-     *
-     * Fifteen is long for a request a visitor is waiting on, and the number
-     * next door argues the opposite case: Turnstile verifies on five, because
-     * a slow check is worse for the visitor than the fail policy behind it.
-     * The difference is that a Turnstile verification is a question, and a
-     * submission is a write.
-     *
-     * Giving up on a write does not undo it. When the socket closes early the
-     * submission may well have landed in Jotform, and all a shorter timeout
-     * buys is that we no longer know whether it did — the visitor is told to
-     * try again, and either loses their answer or files it twice. So on this
-     * path the argument runs the other way: wait long enough to hear the
-     * verdict, because the verdict is the only thing that distinguishes the
-     * two outcomes.
-     *
-     * The same value covers the admin reads (Check Connection, Connect form,
-     * Sync Schema) because nobody is waiting on those but an administrator who
-     * pressed a button and can see that it is working.
-     *
-     * There is no per-call override. One existed as a constructor parameter
-     * that no caller ever passed, which is not a knob but the memory of one.
-     */
+    /** Request timeout in seconds; long enough to hear the verdict on a write. */
     private const TIMEOUT = 15;
 
     private string $apiKey;
@@ -115,9 +69,7 @@ final class JotformClient
         return new self($settings->apiKey(), $settings->baseUrl(), $logger);
     }
 
-    /**
-     * GET /user — used as a read-only connection test.
-     */
+    /** GET /user — read-only connection test. */
     public function testConnection(): ApiResponse
     {
         $response = $this->get('/user');
@@ -140,26 +92,10 @@ final class JotformClient
     }
 
     /**
-     * GET /form/{formID} — the definition of one form, reduced to what we show.
+     * GET /form/{formID} — one form, reduced to id, title, status and updated_at.
      *
-     * This replaced `GET /user/forms`. The account list was the largest thing
-     * the plugin stored and the least of it was ever used: a site with three
-     * integrations kept every form on the account, and the list was fetched
-     * with `limit=1000` and no paging, so a large account was silently
-     * truncated and the missing forms could never be selected at all.
-     *
-     * The fields come from a live read of the documented endpoint: `content` is
-     * a single object carrying `id`, `username`, `title`, `height`, `status`,
-     * `created_at`, `updated_at`, `last_submission`, `new`, `count`, `type`,
-     * `favorite`, `archived` and `url`. We keep the four that mean something to
-     * a site owner and drop the rest.
-     *
-     * A caller cannot learn *why* this failed. Jotform answers 401 with the
-     * same "You're not authorized to use (/form-id)" message for a form that
-     * does not exist, a form belonging to another account and an API key that
-     * is wrong — verified against the live API. That is defensible of Jotform,
-     * since telling the three apart would let anyone enumerate form IDs, but it
-     * means the plugin must never claim to know which one happened.
+     * A 401 is ambiguous: Jotform answers a missing form, another account's
+     * form and a wrong key identically.
      *
      * @return ApiResponse Data is `['id', 'title', 'status', 'updated']`.
      */
@@ -182,8 +118,6 @@ final class JotformClient
 
         $content = $response->data();
 
-        // The envelope is an object here rather than a list, and an answer
-        // without an id is not a form however successful the status was.
         if (!isset($content['id']) || (string) $content['id'] === '') {
             return ApiResponse::failure(
                 self::ERROR_UNEXPECTED,
@@ -206,12 +140,7 @@ final class JotformClient
     }
 
     /**
-     * GET /form/{formID}/questions — the question/schema definition of one form.
-     *
-     * Documented at https://www.jotform.com/apidocs-v1/ ("Get form questions").
-     * `content` is an object keyed by qid, so the list is re-indexed and sorted
-     * by the `order` property before it leaves the client. No normalization
-     * happens here: that is FieldNormalizer's job.
+     * GET /form/{formID}/questions — raw questions, re-indexed and sorted by `order`.
      *
      * @return ApiResponse Data is a list of raw question arrays.
      */
@@ -239,7 +168,6 @@ final class JotformClient
                 continue;
             }
 
-            // The envelope key is the qid; the property is normally present too.
             if (!isset($question['qid']) || (string) $question['qid'] === '') {
                 $question['qid'] = (string) $qid;
             }
@@ -265,12 +193,8 @@ final class JotformClient
     }
 
     /**
-     * POST /form/{formID}/submissions — creates one submission.
-     *
-     * The parameter names are built by SubmissionMapper; this method only knows
-     * how to put them on the wire. Jotform expects the submission parameters as
-     * `application/x-www-form-urlencoded` body fields, the same encoding the
-     * official client libraries use.
+     * POST /form/{formID}/submissions — creates one submission from
+     * parameters already mapped by SubmissionMapper, form-urlencoded.
      *
      * @param array<string, string|array<int, string>> $params Already-mapped
      *                                                         `submission[...]` parameters.
@@ -313,8 +237,6 @@ final class JotformClient
     }
 
     /**
-     * Performs a GET request and unwraps the Jotform response envelope.
-     *
      * @param array<string, scalar> $query
      */
     public function get(string $path, array $query = []): ApiResponse
@@ -347,8 +269,6 @@ final class JotformClient
     }
 
     /**
-     * Performs a POST request and unwraps the Jotform response envelope.
-     *
      * @param array<string, string|array<int, string>> $params
      */
     public function post(string $path, array $params): ApiResponse
@@ -377,10 +297,8 @@ final class JotformClient
     }
 
     /**
-     * Encodes mapped parameters into a form-urlencoded body.
-     *
-     * A list value is repeated under the same name, which is how Jotform
-     * documents multi-value answers (`submission[31][]=A&submission[31][]=B`).
+     * Form-urlencoded body; a list value is repeated under the same name
+     * (`submission[31][]=A&submission[31][]=B`).
      *
      * @param array<string, string|array<int, string>> $params
      */
@@ -420,9 +338,6 @@ final class JotformClient
         $body   = (string) wp_remote_retrieve_body($response);
         $parsed = json_decode($body, true);
 
-        // Jotform reports the remaining daily call allowance on every answer.
-        // It costs nothing to carry it along, and it is the only warning a site
-        // gets before the API stops answering.
         $meta = is_array($parsed) ? self::extractMeta($parsed) : [];
 
         if (!is_array($parsed)) {
@@ -452,7 +367,7 @@ final class JotformClient
             );
         }
 
-        // The envelope carries its own response code, which can disagree with HTTP status.
+        // The envelope's own response code can disagree with the HTTP status.
         if (isset($parsed['responseCode']) && (int) $parsed['responseCode'] !== 200) {
             $this->log('Jotform reported an API-level error.', [
                 'path'          => $path,
@@ -486,7 +401,7 @@ final class JotformClient
     }
 
     /**
-     * Tells the two allowance failures apart from an ordinary error.
+     * Classifies the two allowance failures; anything else is `$fallback`.
      *
      * @param array<mixed> $parsed
      */
@@ -510,7 +425,6 @@ final class JotformClient
             }
         }
 
-        // 429 means the same thing whatever the prose says.
         return $status === 429 ? self::ERROR_API_LIMIT : $fallback;
     }
 
@@ -529,8 +443,6 @@ final class JotformClient
     }
 
     /**
-     * Extracts a safe, human-readable message from the response envelope.
-     *
      * @param array<mixed> $parsed
      */
     private function envelopeMessage(array $parsed, int $status): string
@@ -561,9 +473,6 @@ final class JotformClient
         );
     }
 
-    /**
-     * Guards against an upstream message echoing the key back at us.
-     */
     private function stripSecrets(string $message): string
     {
         if ($this->apiKey === '') {

@@ -11,35 +11,18 @@ if (!defined('ABSPATH')) {
 /**
  * Discovers custom form templates by reading — never executing — theme files.
  *
- * Discovery is split from analysis on purpose, because they cost very different
- * amounts. discover() reads only the first few kilobytes of each file, enough
- * for the headers, and is cheap enough to run whenever somebody asks what
- * templates exist. fields() reads a whole file looking for the identifiers it
- * declares, and is only needed by the compatibility report on an admin screen.
- * Doing both at once would have made "list the templates" as expensive as the
- * heaviest thing anybody wants to know about them.
- *
- * The scanner is the only component that touches the filesystem. It works
- * exclusively from paths it derives itself (theme directories) or that a
- * developer adds through the `jotform_bridge_template_paths` filter. A path
- * originating in a request never reaches this class: there is no code path that
- * would let it.
+ * discover() reads only file headers; fields() reads a whole file and is used
+ * by the admin compatibility report only. Paths come from the theme directories
+ * and the `jotform_bridge_template_paths` filter, never from a request.
  */
 final class TemplateScanner
 {
     public const HEADER_NAME = 'Jotform Template Name';
 
-    /**
-     * The slug is the file name, so a declared one has nothing left to say. It
-     * is still looked for, because a template written for an earlier version
-     * deserves to be told that the line is now ignored.
-     */
+    /** Legacy header; ignored with a warning, the slug is the file name. */
     public const HEADER_SLUG = 'Jotform Template Slug';
 
-    /**
-     * Binding a template to one specific Jotform form belongs to the
-     * Integration, so this header is rejected rather than ignored.
-     */
+    /** Rejected: the form binding belongs to the Integration. */
     public const HEADER_FORBIDDEN = 'Jotform Form ID';
 
     public const DIRECTORY = 'jotform-bridge-templates';
@@ -61,19 +44,14 @@ final class TemplateScanner
     public const CODE_UNREADABLE      = 'unreadable_file';
     public const CODE_OUTSIDE_ROOT    = 'outside_template_root';
 
-    /**
-     * Enough for a file header. Reading further would only slow the scan down.
-     */
+    /** Bytes read for a header. */
     private const HEADER_BYTES = 8192;
 
-    /**
-     * Upper bound for the source we search for field identifiers. A form
-     * template larger than this is not a form template.
-     */
+    /** Upper bound for the source searched for field identifiers. */
     private const SOURCE_BYTES = 262144;
 
     /**
-     * Lists the templates that exist right now, from headers only.
+     * Lists the templates on disk, from headers only.
      *
      * @return array{
      *     templates: array<string, array<string, mixed>>,
@@ -179,10 +157,7 @@ final class TemplateScanner
     }
 
     /**
-     * PHP files directly inside one root, verified to actually live there.
-     *
-     * The scan is deliberately shallow: nested partials are an implementation
-     * detail of a template, not templates themselves.
+     * PHP files directly inside one root (no recursion), verified to resolve there.
      *
      * @param array<int, array<string, string>> $diagnostics
      *
@@ -225,8 +200,7 @@ final class TemplateScanner
                 continue;
             }
 
-            // A symlink may resolve outside the root it was found in. Such a
-            // file is not covered by the trusted directory and is rejected.
+            // A symlink resolving outside the root is rejected.
             if (strpos($real, $root . DIRECTORY_SEPARATOR) !== 0) {
                 $diagnostics[] = [
                     'level'   => self::LEVEL_ERROR,
@@ -267,8 +241,7 @@ final class TemplateScanner
         $name         = $this->headerValue($header, self::HEADER_NAME);
         $declaredSlug = $this->headerValue($header, self::HEADER_SLUG);
 
-        // Not a Jotform template at all — an ordinary theme file in the same
-        // directory is not an error.
+        // An ordinary theme file in the directory is not an error.
         if ($name === '' && $declaredSlug === '') {
             return null;
         }
@@ -312,9 +285,6 @@ final class TemplateScanner
             return null;
         }
 
-        // The file name is the identifier, so a template keeps working while
-        // its title changes and an integration points at something a person
-        // can find on disk.
         $slug = sanitize_key(basename($file, '.php'));
 
         if ($slug === '') {
@@ -361,20 +331,7 @@ final class TemplateScanner
         ];
     }
 
-    /**
-     * The moment the file last changed on disk.
-     *
-     * Read by one thing: the "last modified" column on the integrations list,
-     * which is how a developer checks that the file the admin is describing is
-     * the file they just edited.
-     *
-     * Editors and sync tools that rewrite a file with its original timestamp
-     * (cp -p, rsync -t, "preserve modification time") leave filemtime() behind,
-     * while the inode change time still moves, so the later of the two is the
-     * closer answer to "when was this template last touched". Kept after being
-     * questioned as cleverness with no reader: it has one, and both calls hit
-     * PHP's stat cache for the same file, so the pair costs one syscall.
-     */
+    /** Later of mtime and ctime: tools that preserve mtime still move ctime. */
     private function lastChange(string $file): int
     {
         $mtime = (int) @filemtime($file);
@@ -392,9 +349,6 @@ final class TemplateScanner
      */
     private function overrideDiagnostic(array $kept, array $rejected): array
     {
-        // Two files can only share a slug by having the same name in different
-        // roots, which is the child theme overriding the parent: expected, and
-        // worth saying out loud so the file nobody edits is easy to spot.
         return [
             'level'   => self::LEVEL_NOTICE,
             'code'    => self::CODE_OVERRIDDEN,
@@ -410,10 +364,8 @@ final class TemplateScanner
     }
 
     /**
-     * Extracts the literal semantic identifiers a template declares.
-     *
-     * Values produced by PHP are reported as dynamic instead of guessed: a
-     * wrong guess would either hide a real incompatibility or invent one.
+     * Extracts the literal `data-jotform-field` identifiers a template declares;
+     * values produced by PHP are counted as dynamic.
      *
      * @return array{fields: array<int, string>, dynamic: int}
      */
@@ -425,16 +377,12 @@ final class TemplateScanner
             return ['fields' => [], 'dynamic' => 0];
         }
 
-        // A comment is not markup. Without this, the documentation block a
-        // well-commented template starts with — which naturally spells out
-        // data-jotform-field="key" — would be read as a real identifier and
-        // reported as a field the Jotform form does not have.
         $source = self::withoutPhpComments($source);
 
         $fields  = [];
         $dynamic = 0;
 
-        // Quoted attribute values, single or double quoted.
+        // Quoted attribute values.
         if (preg_match_all('/data-jotform-field\s*=\s*(["\'])(.*?)\1/s', $source, $matches) !== false) {
             foreach ($matches[2] as $value) {
                 if (strpos($value, '<?') !== false) {
@@ -477,22 +425,14 @@ final class TemplateScanner
         ];
     }
 
-    /**
-     * Removes PHP comments from a template source, keeping everything else.
-     *
-     * Tokenizing is lexing, not executing: `token_get_all()` never runs the
-     * code. HTML comments are left alone on purpose — an identifier commented
-     * out in markup is still one a developer might uncomment, and the report
-     * mentioning it is more useful than silence.
-     */
+    /** Removes PHP comments (not HTML comments) from a template source. */
     private static function withoutPhpComments(string $source): string
     {
         if (strpos($source, '<?') === false) {
             return $source;
         }
 
-        // The source may be a truncated tail of a longer file, so a warning
-        // about an unterminated token is expected rather than exceptional.
+        // The source may be truncated, so an unterminated token is expected.
         // phpcs:ignore WordPress.PHP.NoSilencedErrors.Discouraged -- an unterminated token is the normal case here, and the return value is checked below.
         $tokens = @token_get_all($source);
 
@@ -505,7 +445,7 @@ final class TemplateScanner
         foreach ($tokens as $token) {
             if (is_array($token)) {
                 if ($token[0] === T_COMMENT || $token[0] === T_DOC_COMMENT) {
-                    // Keep the newlines, so reported line numbers stay usable.
+                    // Keep the newlines.
                     $clean .= str_repeat("\n", substr_count((string) $token[1], "\n"));
 
                     continue;
@@ -523,21 +463,11 @@ final class TemplateScanner
     }
 
     /**
-     * Reads at most $bytes from a file. The file is never included or evaluated.
+     * Reads at most $bytes from a file through plain fopen(); the file is never
+     * included. Errors are suppressed: an unreadable file is handled by the
+     * return value.
      *
-     * WP_Filesystem is deliberately not used. It exists so a site can write
-     * through FTP or SSH when the web server cannot write directly, and it
-     * initialises a whole abstraction — sometimes prompting for credentials —
-     * to do it. This is a bounded read of a theme file the process can already
-     * see, on a path the admin asks for on demand, and the amendment in
-     * AGENTS.md that removed the registry cache depends on it staying cheap.
-     *
-     * The `@` is likewise deliberate: a file that vanished between scandir()
-     * and here, or one the process may not read, is an ordinary outcome that
-     * the return values below handle. A warning in the log would be noise.
-     *
-     * @param positive-int $bytes fread() raises a ValueError below 1, and the
-     *                            `@` does not suppress an exception.
+     * @param positive-int $bytes
      */
     private function read(string $file, int $bytes): string
     {
@@ -557,9 +487,7 @@ final class TemplateScanner
         return is_string($contents) ? $contents : '';
     }
 
-    /**
-     * Reads one `Header Name: value` line out of a file header.
-     */
+    /** Reads one `Header Name: value` line out of a file header. */
     private function headerValue(string $header, string $field): string
     {
         $pattern = '/^[ \t\/*#@]*' . preg_quote($field, '/') . ':(.*)$/mi';
